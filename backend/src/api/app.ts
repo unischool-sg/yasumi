@@ -85,6 +85,11 @@ export function createApp(deps: AppDeps) {
     return c.json(summary);
   });
 
+  // 公開: 登録済み学校の一覧（landing の学校一覧ページ / 認証不要・PII なし）。
+  app.get("/public/schools", async (c) => {
+    return c.json(await schoolsRepo.listPublicSchools(deps.db));
+  });
+
   const api = new Hono<AuthEnv>();
   api.use("*", rateLimit());
   api.use("*", authMiddleware(deps));

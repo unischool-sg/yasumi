@@ -55,6 +55,28 @@ export async function listSchoolsByCreator(db: Db, userId: string): Promise<Scho
     .orderBy(desc(schools.createdAt));
 }
 
+/** 公開: 登録済み学校の一覧（landing の学校一覧ページ用）。PII は返さず公開安全な列のみ。 */
+export type PublicSchool = {
+  id: string;
+  name: string;
+  prefecture: string;
+  city: string | null;
+  websiteUrl: string | null;
+};
+
+export async function listPublicSchools(db: Db): Promise<PublicSchool[]> {
+  return db
+    .select({
+      id: schools.id,
+      name: schools.name,
+      prefecture: schools.prefecture,
+      city: schools.city,
+      websiteUrl: schools.websiteUrl,
+    })
+    .from(schools)
+    .orderBy(schools.prefecture, schools.name);
+}
+
 /** 管理画面: 全学校の一覧（新しい順・ページング）。 */
 export async function listSchools(db: Db, opts: { limit?: number; offset?: number } = {}): Promise<SchoolRow[]> {
   return db

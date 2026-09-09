@@ -12,6 +12,9 @@ COPY landing/package.json ./landing/
 COPY packages/shared/package.json ./packages/shared/
 RUN bun install --frozen-lockfile
 COPY landing ./landing
+# 学校一覧ページが叩く公開API のベースURL（ビルド時に埋め込み）
+ARG PUBLIC_API_BASE_URL
+ENV PUBLIC_API_BASE_URL=$PUBLIC_API_BASE_URL
 RUN bun run --cwd landing build
 
 # --- serve ---

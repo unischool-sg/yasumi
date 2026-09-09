@@ -1,0 +1,354 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+import { LINE_URL } from "../consts";
+---
+
+<Layout
+  title="登録されている学校 | やすみ？"
+  description="やすみ？に登録されている学校の一覧。あなたの学校がすでに登録されているか、友だち追加の前に確認できます。"
+>
+  <Header />
+
+  <!-- Hero -->
+  <section class="sc-hero">
+    <div class="container">
+      <p class="eyebrow">SCHOOLS</p>
+      <h1>登録されている学校</h1>
+      <p class="sc-lead">
+        やすみ？にみんなが登録した学校の一覧です。あなたの学校がすでにあるか探してみてください。
+        なければ、LINEミニアプリからかんたんに追加できます。
+      </p>
+      <p class="sc-count" id="sc-count" aria-live="polite"></p>
+      <div class="sc-search">
+        <input
+          id="sc-filter"
+          type="search"
+          placeholder="学校名・地域でさがす"
+          autocomplete="off"
+          aria-label="学校をさがす"
+        />
+      </div>
+    </div>
+  </section>
+
+  <!-- List -->
+  <section class="sc-list-sec">
+    <div class="container">
+      <!-- loading -->
+      <div id="sc-loading" class="sc-state">
+        <div class="sc-skel"></div>
+        <div class="sc-skel"></div>
+        <div class="sc-skel"></div>
+      </div>
+      <!-- error -->
+      <div id="sc-error" class="sc-state" hidden>
+        <p class="sc-msg">学校一覧を読み込めませんでした。時間をおいて再度お試しください。</p>
+      </div>
+      <!-- empty (全体) -->
+      <div id="sc-empty" class="sc-state" hidden>
+        <p class="sc-msg">まだ登録された学校がありません。最初の1校になりませんか？</p>
+        <a href={LINE_URL} target="_blank" rel="noopener" class="btn btn-line">LINEで学校を登録する</a>
+      </div>
+      <!-- no match (検索) -->
+      <div id="sc-nomatch" class="sc-state" hidden>
+        <p class="sc-msg">「<span id="sc-q"></span>」に一致する学校は見つかりませんでした。</p>
+      </div>
+      <!-- results -->
+      <div id="sc-results" class="sc-groups"></div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta">
+    <div class="container">
+      <div class="cta-card">
+        <h2>あなたの学校を追加しよう。</h2>
+        <p>対象地域・警報・判定時刻を登録すれば、同じ学校のみんなで共有できます。</p>
+        <a href={LINE_URL} target="_blank" rel="noopener" class="btn btn-line">LINEで友だち追加</a>
+      </div>
+    </div>
+  </section>
+
+  <Footer />
+</Layout>
+
+<script>
+  import { API_BASE } from "../consts";
+
+  type PublicSchool = {
+    id: string;
+    name: string;
+    prefecture: string;
+    city: string | null;
+    websiteUrl: string | null;
+  };
+
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+  const loading = $("sc-loading");
+  const errorEl = $("sc-error");
+  const emptyEl = $("sc-empty");
+  const nomatchEl = $("sc-nomatch");
+  const resultsEl = $("sc-results");
+  const countEl = $("sc-count");
+  const filterEl = $<HTMLInputElement>("sc-filter");
+  const qEl = $("sc-q");
+
+  let all: PublicSchool[] = [];
+
+  const norm = (s: string) => s.toLowerCase().normalize("NFKC");
+
+  // http(s) のみ許可（javascript: 等を弾く）。
+  function safeUrl(url: string | null): string | null {
+    if (!url) return null;
+    return /^https?:\/\//i.test(url) ? url : null;
+  }
+
+  function schoolCard(s: PublicSchool): HTMLElement {
+    const card = document.createElement("div");
+    card.className = "sc-card";
+
+    const name = document.createElement("div");
+    name.className = "sc-name";
+    name.textContent = s.name;
+    card.appendChild(name);
+
+    const meta = document.createElement("div");
+    meta.className = "sc-meta";
+    meta.textContent = s.city ? `${s.prefecture} ${s.city}` : s.prefecture;
+    card.appendChild(meta);
+
+    const url = safeUrl(s.websiteUrl);
+    if (url) {
+      const link = document.createElement("a");
+      link.className = "sc-site";
+      link.href = url;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "学校公式サイト →";
+      card.appendChild(link);
+    }
+    return card;
+  }
+
+  function render(list: PublicSchool[]) {
+    resultsEl.replaceChildren();
+    // 都道府県ごとにグルーピング（listPublicSchools が prefecture 昇順で返す）。
+    const groups = new Map<string, PublicSchool[]>();
+    for (const s of list) {
+      const g = groups.get(s.prefecture) ?? [];
+      g.push(s);
+      groups.set(s.prefecture, g);
+    }
+    for (const [pref, items] of groups) {
+      const wrap = document.createElement("div");
+      wrap.className = "sc-group";
+
+      const head = document.createElement("h2");
+      head.className = "sc-group-head";
+      head.textContent = `${pref} (${items.length})`;
+      wrap.appendChild(head);
+
+      const grid = document.createElement("div");
+      grid.className = "sc-grid";
+      for (const s of items) grid.appendChild(schoolCard(s));
+      wrap.appendChild(grid);
+
+      resultsEl.appendChild(wrap);
+    }
+  }
+
+  function applyFilter() {
+    const q = norm(filterEl.value.trim());
+    const list = q
+      ? all.filter((s) => norm(`${s.name} ${s.prefecture} ${s.city ?? ""}`).includes(q))
+      : all;
+
+    const hasQuery = q.length > 0;
+    nomatchEl.hidden = !(hasQuery && list.length === 0);
+    if (hasQuery && list.length === 0) qEl.textContent = filterEl.value.trim();
+    resultsEl.hidden = list.length === 0;
+    render(list);
+  }
+
+  filterEl.addEventListener("input", applyFilter);
+
+  async function load() {
+    try {
+      const res = await fetch(`${API_BASE}/public/schools`, { headers: { accept: "application/json" } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      all = (await res.json()) as PublicSchool[];
+    } catch {
+      loading.hidden = true;
+      errorEl.hidden = false;
+      return;
+    }
+
+    loading.hidden = true;
+    countEl.textContent = `現在 ${all.length} 校が登録されています`;
+
+    if (all.length === 0) {
+      emptyEl.hidden = false;
+      filterEl.disabled = true;
+      return;
+    }
+    applyFilter();
+  }
+
+  load();
+</script>
+
+<style>
+  .sc-hero {
+    padding: 64px 0 24px;
+  }
+  .sc-hero h1 {
+    font-size: clamp(30px, 5vw, 46px);
+    font-weight: 700;
+    margin: 8px 0 14px;
+  }
+  .sc-lead {
+    color: var(--muted);
+    font-size: 17px;
+    max-width: 36em;
+    margin: 0;
+  }
+  .sc-count {
+    margin: 18px 0 0;
+    font-weight: 700;
+    color: var(--blue);
+  }
+  .sc-search {
+    margin-top: 20px;
+  }
+  .sc-search input {
+    width: 100%;
+    max-width: 420px;
+    font-size: 16px;
+    padding: 13px 18px;
+    border: 1px solid #dadce0;
+    border-radius: 999px;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    font-family: inherit;
+  }
+  .sc-search input:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.15);
+  }
+
+  .sc-list-sec {
+    padding: 24px 0 48px;
+  }
+  .sc-state {
+    display: grid;
+    gap: 14px;
+    place-items: center;
+    text-align: center;
+    padding: 24px 0;
+  }
+  .sc-msg {
+    color: var(--muted);
+    font-size: 16px;
+    margin: 0;
+  }
+  .sc-skel {
+    width: 100%;
+    height: 88px;
+    border-radius: var(--radius);
+    background: linear-gradient(90deg, #f1f3f4 25%, #e8eaed 37%, #f1f3f4 63%);
+    background-size: 400% 100%;
+    animation: sc-shimmer 1.4s ease infinite;
+  }
+  @keyframes sc-shimmer {
+    0% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
+  .sc-groups {
+    display: grid;
+    gap: 40px;
+  }
+  .sc-group-head {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ink);
+    padding-bottom: 10px;
+    margin: 0 0 18px;
+    border-bottom: 2px solid var(--blue-soft);
+  }
+  .sc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+  }
+  .sc-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  .sc-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 28px rgba(60, 64, 67, 0.12);
+    border-color: #c6dafc;
+  }
+  .sc-name {
+    font-weight: 700;
+    font-size: 17px;
+    line-height: 1.4;
+  }
+  .sc-meta {
+    color: var(--muted);
+    font-size: 14px;
+    margin-top: 6px;
+  }
+  .sc-site {
+    display: inline-block;
+    margin-top: 12px;
+    color: var(--blue);
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .sc-site:hover {
+    text-decoration: underline;
+  }
+
+  /* CTA（index と共通の見た目） */
+  .cta {
+    padding: 40px 0 88px;
+  }
+  .cta-card {
+    background: linear-gradient(120deg, #1a73e8, #00b4d8, #1a73e8);
+    background-size: 200% auto;
+    animation: gradientShift 9s ease infinite;
+    color: #fff;
+    text-align: center;
+    border-radius: var(--radius-lg);
+    padding: 64px 32px;
+  }
+  .cta-card h2 {
+    font-size: clamp(26px, 4vw, 40px);
+    font-weight: 700;
+  }
+  .cta-card p {
+    opacity: 0.92;
+    font-size: 18px;
+    margin: 12px 0 28px;
+  }
+  .btn-line {
+    background: #06c755;
+    color: #fff;
+  }
+  .btn-line:hover {
+    background: #05b34c;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(6, 199, 85, 0.35);
+  }
+</style>
