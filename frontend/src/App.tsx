@@ -21,7 +21,7 @@ import {
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import type { ApiClient } from "./api/client.ts";
 import type { Subscription } from "./api/types.ts";
-import { useLiff } from "./hooks/useLiff.ts";
+import { useAuth } from "./hooks/useAuth.ts";
 import { EditSchool } from "./pages/EditSchool.tsx";
 import { Home } from "./pages/Home.tsx";
 import { MySchools } from "./pages/MySchools.tsx";
@@ -32,12 +32,12 @@ type Tab = "home" | "search" | "manage";
 type View = { kind: "tabs" } | { kind: "register"; name: string } | { kind: "edit"; schoolId: string };
 
 export function App() {
-  const liff = useLiff();
-  if (liff.status === "loading") return <Splash>読み込み中…</Splash>;
-  if (liff.status === "error" || !liff.api) {
-    return <Splash error>{liff.error ?? "初期化に失敗しました"}</Splash>;
+  const auth = useAuth();
+  if (auth.status === "loading") return <Splash>読み込み中…</Splash>;
+  if (auth.status === "error" || !auth.api) {
+    return <Splash error>{auth.error ?? "初期化に失敗しました"}</Splash>;
   }
-  return <Main api={liff.api} />;
+  return <Main api={auth.api} />;
 }
 
 function Main({ api }: { api: ApiClient }) {

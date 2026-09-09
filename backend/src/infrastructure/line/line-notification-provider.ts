@@ -21,6 +21,7 @@ export class LineNotificationProvider implements NotificationProvider {
   }
 
   async send(target: NotificationTarget, message: NotificationMessage): Promise<void> {
+    if (!target.lineUserId) throw new Error("LINE push requires lineUserId");
     const res = await this.fetchFn(LINE_PUSH_URL, {
       method: "POST",
       headers: {

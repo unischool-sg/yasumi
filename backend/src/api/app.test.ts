@@ -102,6 +102,30 @@ suite("API integration", () => {
     expect(rows2.some((s) => s.schoolId === schoolId)).toBe(false);
   });
 
+  it("デバイストークン 登録→upsert冪等→削除", async () => {
+    const body = JSON.stringify({ token: "fcm-token-1", platform: "android" });
+    const post = await req("/api/me/device-tokens", {
+      method: "POST",
+      headers: { ...auth("Udev"), "content-type": "application/json" },
+      body,
+    });
+    expect(post.status).toBe(201);
+    const row = (await post.json()) as { token: string; platform: string };
+    expect(row.token).toBe("fcm-token-1");
+
+    // 同一トークンの再登録は upsert（201・重複行なし）
+    const post2 = await req("/api/me/device-tokens", {
+      method: "POST",
+      headers: { ...auth("Udev"), "content-type": "application/json" },
+      body,
+    });
+    expect(post2.status).toBe(201);
+
+    // 削除
+    const del = await req("/api/me/device-tokens?token=fcm-token-1", { method: "DELETE", headers: auth("Udev") });
+    expect(del.status).toBe(204);
+  });
+
   it("存在しない学校の購読 → 404", async () => {
     const res = await req("/api/me/subscriptions", {
       method: "POST",

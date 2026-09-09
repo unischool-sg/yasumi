@@ -1,0 +1,17 @@
+# Capacitor がコピー/生成する web 成果物
+www/
+
+# ネイティブプロジェクト（cap add で生成。当面はコミットしない方針。
+# CI や配布で必要になったら方針を見直す）
+ios/
+android/
+
+# 依存
+node_modules/
+
+# 機微情報（リポジトリに入れない）
+google-services.json
+GoogleService-Info.plist
+*.keystore
+*.mobileprovision
+*.p8

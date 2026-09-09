@@ -11,6 +11,7 @@ import type { NotificationProvider } from "../domain/notification/provider.ts";
 import type { WarningProvider } from "../domain/warning/provider.ts";
 import { verifySignature } from "../infrastructure/line/webhook.ts";
 import * as areasRepo from "../infrastructure/db/repositories/areas.ts";
+import * as deviceTokensRepo from "../infrastructure/db/repositories/device-tokens.ts";
 import * as cfg from "../infrastructure/db/repositories/school-config.ts";
 import * as rulesRepo from "../infrastructure/db/repositories/rules.ts";
 import * as schoolsRepo from "../infrastructure/db/repositories/schools.ts";
@@ -29,6 +30,8 @@ export interface AppDeps extends AuthDeps {
   /** 判定パイプライン用（M7）。未設定なら run-check は 503。 */
   warningProvider?: WarningProvider;
   notificationProvider?: NotificationProvider;
+  /** FCM プッシュ（無料通知）。設定時はデバイストークン登録済みユーザーへ優先送信。 */
+  pushProvider?: NotificationProvider;
   /** テスト用の現在時刻。 */
   now?: () => Date;
   /** 管理画面の JWT 署名鍵（設定時のみ /api/admin を有効化）。 */
@@ -78,6 +81,7 @@ export function createApp(deps: AppDeps) {
         db: deps.db,
         warningProvider: deps.warningProvider,
         notificationProvider: deps.notificationProvider,
+        ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
         ...(deps.now ? { now: deps.now } : {}),
       },
       { triggeredAt },
@@ -295,6 +299,31 @@ export function createApp(deps: AppDeps) {
     await subsRepo.removeSubscription(deps.db, c.get("userId"), c.req.param("schoolId"));
     return c.body(null, 204);
   });
+
+  // --- Device tokens（ネイティブアプリ/PWA の FCM プッシュ通知先 / 無料通知）---
+  api.post(
+    "/me/device-tokens",
+    zValidator("json", z.object({ token: z.string().min(1), platform: z.enum(["ios", "android", "web"]) })),
+    async (c) => {
+      const body = c.req.valid("json");
+      const row = await deviceTokensRepo.upsertDeviceToken(deps.db, {
+        userId: c.get("userId"),
+        platform: body.platform,
+        token: body.token,
+        ...(deps.now ? { now: deps.now() } : {}),
+      });
+      return c.json(row, 201);
+    },
+  );
+
+  api.delete(
+    "/me/device-tokens",
+    zValidator("query", z.object({ token: z.string().min(1) })),
+    async (c) => {
+      await deviceTokensRepo.removeDeviceToken(deps.db, c.get("userId"), c.req.valid("query").token);
+      return c.body(null, 204);
+    },
+  );
 
   // --- Status / History（PRD §15〜§17, §37 / ホーム画面）---
   api.get("/schools/:id/status", async (c) => {

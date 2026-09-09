@@ -1,8 +1,12 @@
 import type { CheckResult } from "@yasumi/shared";
 
-/** 通知先（LINE は lineUserId）。将来の通知手段では別フィールドを足す。 */
+/**
+ * 通知先。チャネルごとに使うフィールドが異なる（LINE=lineUserId / FCM=deviceTokens）。
+ * 各 NotificationProvider は自分が使うフィールドのみ参照する。
+ */
 export interface NotificationTarget {
-  lineUserId: string;
+  lineUserId?: string;
+  deviceTokens?: string[];
 }
 
 /** 通知メッセージ（MVP は text のみ / 将来 Flex 等）。 */

@@ -1,0 +1,25 @@
+{
+  "name": "@yasumi/native",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "やすみ？ ネイティブアプリ（Capacitor で frontend を webview 化・FCM 無料プッシュ）",
+  "comment": "root workspaces には含めない独立プロジェクト。web/docker ビルドに Capacitor の重い依存を持ち込まないため、ここで個別に `bun install` する。",
+  "scripts": {
+    "build:web": "cd ../frontend && VITE_PLATFORM=native bun run build && rm -rf ../native/www && cp -r dist ../native/www",
+    "sync": "bun run build:web && cap sync",
+    "add:ios": "cap add ios",
+    "add:android": "cap add android",
+    "open:ios": "cap open ios",
+    "open:android": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/ios": "^6.2.0",
+    "@capacitor/android": "^6.2.0",
+    "@capacitor-firebase/messaging": "^6.3.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0"
+  }
+}

@@ -73,6 +73,12 @@ export function createApiClient(idToken: string) {
       }),
     deleteRule: (ruleId: string) =>
       request<void>(`/api/rules/${ruleId}`, { method: "DELETE" }),
+    /** ネイティブ/PWA の FCM デバイストークンを登録（無料プッシュの送信先 / Part B）。 */
+    registerDeviceToken: (input: { token: string; platform: "ios" | "android" | "web" }) =>
+      request<void>("/api/me/device-tokens", { method: "POST", body: JSON.stringify(input) }),
+    /** デバイストークンを削除（ログアウト時など）。 */
+    deleteDeviceToken: (token: string) =>
+      request<void>(`/api/me/device-tokens?token=${encodeURIComponent(token)}`, { method: "DELETE" }),
   };
 }
 

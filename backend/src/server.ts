@@ -2,6 +2,7 @@ import { createApp } from "./api/app.ts";
 import { createLineIdTokenVerifier } from "./api/auth.ts";
 import { startCron } from "./cron.ts";
 import { getDb } from "./infrastructure/db/client.ts";
+import { FcmNotificationProvider } from "./infrastructure/fcm/fcm-notification-provider.ts";
 import { JmaWarningProvider } from "./infrastructure/jma/jma-warning-provider.ts";
 import { LineNotificationProvider } from "./infrastructure/line/line-notification-provider.ts";
 
@@ -17,6 +18,21 @@ const adminLineUserIds = (process.env.ADMIN_LINE_USER_IDS ?? "")
   .map((s) => s.trim())
   .filter(Boolean);
 
+// FCM(無料プッシュ)。サービスアカウント3点が揃っている時だけ有効化。
+// 未設定ならデバイストークン登録済みでも LINE プッシュにフォールバックする。
+const fcmProjectId = process.env.FCM_PROJECT_ID ?? "";
+const fcmClientEmail = process.env.FCM_CLIENT_EMAIL ?? "";
+const fcmPrivateKey = process.env.FCM_PRIVATE_KEY ?? "";
+const pushProvider =
+  fcmProjectId && fcmClientEmail && fcmPrivateKey
+    ? new FcmNotificationProvider({
+        credentials: { projectId: fcmProjectId, clientEmail: fcmClientEmail, privateKey: fcmPrivateKey },
+      })
+    : undefined;
+if (!pushProvider) {
+  console.warn("[yasumi] FCM_* 未設定のため FCM プッシュは無効（LINE プッシュのみ）");
+}
+
 const app = createApp({
   db: getDb(),
   verifyIdToken: createLineIdTokenVerifier(channelId),
@@ -28,6 +44,7 @@ const app = createApp({
   notificationProvider: new LineNotificationProvider({
     accessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN ?? "",
   }),
+  ...(pushProvider ? { pushProvider } : {}),
 });
 
 // 同一プロセス cron を起動（30分ごと・app.fetch 駆動 / backend/CRON.md）。

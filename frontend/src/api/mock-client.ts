@@ -115,5 +115,8 @@ export function createMockClient(): ApiClient {
       }
       return delay(undefined as void);
     },
+    registerDeviceToken: (_input: { token: string; platform: "ios" | "android" | "web" }) =>
+      delay(undefined as void),
+    deleteDeviceToken: (_token: string) => delay(undefined as void),
   };
 }
