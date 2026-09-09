@@ -92,6 +92,11 @@ export function createApp(deps: AppDeps) {
   // --- User ---
   api.get("/me", (c) => c.json({ userId: c.get("userId") }));
 
+  // 自分が作成した学校の一覧（LIFF「編集」タブ / PRD §23）
+  api.get("/me/schools", async (c) => {
+    return c.json(await schoolsRepo.listSchoolsByCreator(deps.db, c.get("userId")));
+  });
+
   // --- Schools ---
   api.get(
     "/schools/search",
