@@ -1,0 +1,35 @@
+name: yasumi
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-3000}:3000"
+    environment:
+      PORT: 3000
+      DATABASE_URL: ${DATABASE_URL}
+      LINE_CHANNEL_SECRET: ${LINE_CHANNEL_SECRET}
+      LINE_CHANNEL_ACCESS_TOKEN: ${LINE_CHANNEL_ACCESS_TOKEN}
+      LIFF_CHANNEL_ID: ${LIFF_CHANNEL_ID}
+      ADMIN_LINE_USER_IDS: ${ADMIN_LINE_USER_IDS}
+      INTERNAL_CRON_TOKEN: ${INTERNAL_CRON_TOKEN}
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    # 本番ではホストに公開しない（api とは compose 内部ネットワークで接続 / docker/SPEC.md §7）。
+    # ローカルで直接接続したい場合は override で ports を足す。
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:

@@ -1,0 +1,771 @@
+---
+import Layout from "../layouts/Layout.astro";
+
+const steps = [
+  { n: "1", title: "LINEで友だち追加", body: "公式アカウントを追加して、ミニアプリを開きます。" },
+  { n: "2", title: "学校を登録・購読", body: "学校を検索して購読。無ければ対象地域・警報・判定時刻を登録します。" },
+  { n: "3", title: "あとは待つだけ", body: "朝の判定時刻に自動でチェック。該当すればLINEに通知が届きます。" },
+];
+
+const results = [
+  { label: "通常登校", color: "#1e8e3e" },
+  { label: "自宅待機", color: "#f9ab00" },
+  { label: "午前休", color: "#e8710a" },
+  { label: "午後から登校", color: "#e8710a" },
+  { label: "全日休校", color: "#d93025" },
+];
+
+const faqs = [
+  { q: "学校公式のサービスですか？", a: "いいえ。気象庁の情報と、ユーザーが登録した学校規則をもとに自動判定するサービスです。最終的な登校判断は学校公式の連絡をご確認ください。" },
+  { q: "料金はかかりますか？", a: "現在は無料でご利用いただけます。" },
+  { q: "自分の学校が登録されていません。", a: "アプリから新しく登録できます。対象地域・対象警報・判定時刻（30分刻み）を設定するだけ。登録内容は同じ学校のみんなで共有されます。" },
+  { q: "どの地域に対応していますか？", a: "気象庁の地域コードに基づいて判定します。まずは兵庫県から対応を広げています。" },
+];
+---
+
+<Layout>
+  <!-- Header -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="/" class="brand">
+        <span class="brand-name">やすみ？</span>
+      </a>
+      <nav class="header-nav">
+        <a href="#features">特徴</a>
+        <a href="#how">使い方</a>
+        <a href="#faq">FAQ</a>
+        <a href="#cta" class="btn btn-primary btn-sm">使ってみる</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="blob blob-a"></div>
+    <div class="blob blob-b"></div>
+    <div class="blob blob-c"></div>
+    <div class="container hero-grid">
+      <div class="hero-copy reveal in">
+        <h1>今日、学校ある？<br />を、<span class="grad-text">自動で。</span></h1>
+        <p class="lead">
+          学校の気象警報ルールを登録しておくだけ。休校・午前休などを
+          <strong>LINEで自動通知</strong>。朝、学校に行くべきかを考えなくてよくなります。
+        </p>
+        <div class="hero-cta">
+          <a href="#cta" class="btn btn-primary">使ってみる</a>
+          <a href="#how" class="btn btn-outline">使い方を見る</a>
+        </div>
+        <p class="hero-note">※学校公式のサービスではありません。</p>
+      </div>
+      <div class="hero-visual">
+        <div class="phone float">
+          <div class="phone-topbar">やすみ？</div>
+          <div class="phone-body">
+            <div class="status-card">
+              <div class="status-head">
+                <span class="status-school">三田学園高等学校</span>
+                <span class="status-chip">今日</span>
+              </div>
+              <div class="status-label">午前休</div>
+              <div class="status-reason">三田市 暴風警報</div>
+              <div class="status-time">08:00 判定</div>
+            </div>
+          </div>
+          <div class="phone-nav"><span class="nav-item active">● ホーム</span><span class="nav-item">さがす</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features (alternating panels) -->
+  <div id="features">
+    <!-- Feature 1 -->
+    <section class="feature">
+      <div class="container panel panel-blue reveal">
+        <div class="panel-copy">
+          <p class="eyebrow">今日どうする？</p>
+          <h2>結果を、ひと目で。</h2>
+          <p>「暴風警報」ではなく「午前休」。ユーザーが本当に知りたい答えを、ホームの一番上に大きく表示します。</p>
+        </div>
+        <div class="panel-visual">
+          <div class="mini-phone">
+            <div class="status-card">
+              <div class="status-head"><span class="status-school">三田学園高等学校</span><span class="status-chip">今日</span></div>
+              <div class="status-label">午前休</div>
+              <div class="status-reason">三田市 暴風警報</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Feature 2 (reversed) -->
+    <section class="feature">
+      <div class="container panel panel-green reverse reveal">
+        <div class="panel-copy">
+          <p class="eyebrow">通知</p>
+          <h2>LINEに、自動で届く。</h2>
+          <p>判定結果はLINEにそのまま届きます。朝、自分で気象情報と学校ルールを照らし合わせる必要はもうありません。</p>
+        </div>
+        <div class="panel-visual">
+          <div class="line-mock">
+            <div class="line-header">やすみ？</div>
+            <div class="line-bubble">
+              <b>やすみ？ 判定</b><br />
+              三田学園高等学校<br /><br />
+              8:00現在、対象地域に暴風警報が発表されています。<br />
+              学校規則上、<b>「午前休」</b>に該当します。<br /><br />
+              次回判定：10:00
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Feature 3 -->
+    <section class="feature">
+      <div class="container panel panel-yellow reveal">
+        <div class="panel-copy">
+          <p class="eyebrow">共有</p>
+          <h2>学校ルールを、みんなで。</h2>
+          <p>対象地域・対象警報・判定時刻を登録すれば、同じ学校のみんなで共有。誰かが登録すれば全員が使えます。</p>
+        </div>
+        <div class="panel-visual">
+          <div class="rules-mock">
+            <div class="chips-row"><span class="mchip on">三田市</span><span class="mchip on">神戸市</span><span class="mchip">西宮市</span></div>
+            <div class="chips-row"><span class="mchip on">暴風警報</span><span class="mchip on">大雨警報</span></div>
+            <div class="rule-row"><b>08:00</b> → <span class="r-am">午前休</span></div>
+            <div class="rule-row"><b>10:00</b> → <span class="r-full">全日休校</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- 判定の種類 -->
+  <section class="results-sec">
+    <div class="container section-head reveal">
+      <p class="eyebrow">RESULTS</p>
+      <h2>判定は、5種類。</h2>
+    </div>
+    <div class="container result-chips reveal">
+      {results.map((r, i) => <span class="chip reveal" style={`--c:${r.color};--delay:${i * 0.06}s`}>{r.label}</span>)}
+    </div>
+  </section>
+
+  <!-- How -->
+  <section id="how" class="how">
+    <div class="container section-head">
+      <p class="eyebrow">HOW IT WORKS</p>
+      <h2>3ステップで、もう迷わない。</h2>
+    </div>
+    <div class="container steps">
+      {
+        steps.map((s, i) => (
+          <div class="step reveal" style={`--delay:${i * 0.1}s`}>
+            <div class="step-n">{s.n}</div>
+            <h3>{s.title}</h3>
+            <p>{s.body}</p>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" class="faq">
+    <div class="container faq-inner">
+      <div class="section-head">
+        <p class="eyebrow">FAQ</p>
+        <h2>よくある質問</h2>
+      </div>
+      <div class="faq-list reveal">
+        {
+          faqs.map((f) => (
+            <details class="faq-item">
+              <summary>{f.q}</summary>
+              <p>{f.a}</p>
+            </details>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section id="cta" class="cta">
+    <div class="container">
+      <div class="cta-card reveal">
+        <h2>朝、考えなくていい毎日へ。</h2>
+        <p>LINEで友だち追加するだけ。今日から自動で判定します。</p>
+        <a href="#" class="btn btn-white">使ってみる</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">やすみ？</div>
+      <p class="footer-disclaimer">
+        本サービスは学校公式サービスではありません。気象庁の情報とユーザーが登録した学校規則をもとに自動判定しています。
+        最終的な登校判断については、学校からの公式連絡をご確認ください。
+      </p>
+      <p class="footer-copy">© 2026 やすみ？</p>
+    </div>
+  </footer>
+</Layout>
+
+<script>
+  // スクロールで各要素をふわっと表示（IntersectionObserver）。
+  const items = document.querySelectorAll<HTMLElement>(".reveal:not(.in)");
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) {
+          e.target.classList.add("in");
+          io.unobserve(e.target);
+        }
+      }
+    },
+    { threshold: 0.12, rootMargin: "0px 0px -8% 0px" },
+  );
+  items.forEach((el) => io.observe(el));
+</script>
+
+<style>
+  /* Header */
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 68px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 20px;
+  }
+  .header-nav {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    font-weight: 500;
+    color: var(--muted);
+    font-size: 15px;
+  }
+  .header-nav a:not(.btn):hover {
+    color: var(--ink);
+  }
+  .btn-sm {
+    padding: 10px 22px;
+    font-size: 14px;
+  }
+  @media (max-width: 700px) {
+    .header-nav a:not(.btn) {
+      display: none;
+    }
+  }
+
+  /* Buttons: Google-ish */
+  :global(.btn-outline) {
+    background: #fff;
+    color: var(--blue);
+    border: 1px solid #dadce0;
+  }
+  :global(.btn-outline:hover) {
+    background: #f8faff;
+    border-color: #c6dafc;
+  }
+
+  /* Hero */
+  .hero {
+    padding: 72px 0 40px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero .container {
+    position: relative;
+    z-index: 2;
+  }
+  /* Google 4色のふわっとしたブロブ（背景） */
+  .blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(70px);
+    opacity: 0.5;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .blob-a {
+    width: 360px;
+    height: 360px;
+    background: #4285f4;
+    top: -120px;
+    right: -60px;
+    animation: blob 14s ease-in-out infinite;
+  }
+  .blob-b {
+    width: 300px;
+    height: 300px;
+    background: #34a853;
+    top: 120px;
+    right: 240px;
+    opacity: 0.35;
+    animation: blob 18s ease-in-out infinite reverse;
+  }
+  .blob-c {
+    width: 260px;
+    height: 260px;
+    background: #fbbc04;
+    top: -40px;
+    right: 380px;
+    opacity: 0.3;
+    animation: blob 20s ease-in-out infinite;
+  }
+  .grad-text {
+    background: linear-gradient(90deg, #4285f4, #0f9d58, #4285f4);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: gradientShift 6s ease infinite;
+  }
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1fr 0.85fr;
+    gap: 56px;
+    align-items: center;
+  }
+  .hero-copy h1 {
+    font-size: clamp(38px, 6vw, 60px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .lead {
+    color: var(--muted);
+    font-size: 18px;
+    margin: 22px 0 30px;
+    max-width: 30em;
+  }
+  .hero-cta {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .hero-note {
+    margin-top: 16px;
+    font-size: 13px;
+    color: #9aa0a6;
+  }
+  .hero-visual {
+    display: grid;
+    place-items: center;
+  }
+  @media (max-width: 820px) {
+    .hero {
+      padding: 40px 0 24px;
+    }
+    .hero-grid {
+      grid-template-columns: 1fr;
+      gap: 36px;
+    }
+    .hero-cta {
+      justify-content: flex-start;
+    }
+  }
+
+  /* Phone */
+  .phone {
+    width: 290px;
+    background: #fff;
+    border-radius: 34px;
+    border: 10px solid #202124;
+    box-shadow: 0 24px 50px rgba(32, 33, 36, 0.22);
+    overflow: hidden;
+  }
+  .phone-topbar {
+    padding: 15px 18px;
+    font-weight: 700;
+    border-bottom: 1px solid var(--line);
+  }
+  .phone-body {
+    padding: 14px;
+    background: var(--surface);
+    min-height: 240px;
+  }
+  .phone-nav {
+    display: flex;
+    justify-content: space-between;
+    border-top: 1px solid var(--line);
+    padding: 10px 22px;
+    font-size: 12px;
+    color: #9aa0a6;
+  }
+  .nav-item.active {
+    color: var(--blue);
+    font-weight: 700;
+  }
+  .status-card {
+    background: #fdeee1;
+    border-radius: 18px;
+    padding: 18px;
+  }
+  .status-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .status-school {
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .status-chip {
+    background: var(--orange);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 999px;
+  }
+  .status-label {
+    color: var(--orange);
+    font-size: 40px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 6px 0 4px;
+  }
+  .status-reason {
+    font-weight: 600;
+    color: #3c4043;
+    font-size: 15px;
+  }
+  .status-time {
+    margin-top: 12px;
+    font-size: 11px;
+    color: #80868b;
+  }
+
+  /* Feature panels */
+  .feature {
+    padding: 20px 0;
+  }
+  .panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+    align-items: center;
+    border-radius: var(--radius-lg);
+    padding: 64px;
+  }
+  .panel-blue {
+    background: var(--blue-soft);
+  }
+  .panel-green {
+    background: var(--green-soft);
+  }
+  .panel-yellow {
+    background: var(--yellow-soft);
+  }
+  .panel.reverse .panel-copy {
+    order: 2;
+  }
+  .panel-copy h2 {
+    font-size: clamp(28px, 3.6vw, 40px);
+    font-weight: 700;
+    margin: 10px 0 14px;
+  }
+  .panel-copy p {
+    color: #3c4043;
+    font-size: 17px;
+    margin: 0;
+    max-width: 26em;
+  }
+  .panel-visual {
+    display: grid;
+    place-items: center;
+  }
+  .mini-phone {
+    width: 280px;
+    background: #fff;
+    border-radius: 22px;
+    padding: 16px;
+    box-shadow: 0 14px 40px rgba(32, 33, 36, 0.14);
+  }
+  .line-mock {
+    width: 300px;
+    background: #fff;
+    border-radius: 22px;
+    overflow: hidden;
+    box-shadow: 0 14px 40px rgba(32, 33, 36, 0.14);
+  }
+  .line-header {
+    background: #06c755;
+    color: #fff;
+    font-weight: 700;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .line-bubble {
+    margin: 16px;
+    background: #f1f3f4;
+    border-radius: 4px 16px 16px 16px;
+    padding: 14px 16px;
+    font-size: 14px;
+    color: #3c4043;
+    line-height: 1.7;
+  }
+  .rules-mock {
+    width: 300px;
+    background: #fff;
+    border-radius: 22px;
+    padding: 20px;
+    box-shadow: 0 14px 40px rgba(32, 33, 36, 0.14);
+    display: grid;
+    gap: 10px;
+  }
+  .chips-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .mchip {
+    border: 1px solid #dadce0;
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .mchip.on {
+    background: var(--blue);
+    color: #fff;
+    border-color: var(--blue);
+  }
+  .rule-row {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 15px;
+  }
+  .r-am {
+    color: var(--orange);
+    font-weight: 700;
+  }
+  .r-full {
+    color: #d93025;
+    font-weight: 700;
+  }
+  @media (max-width: 820px) {
+    .panel {
+      grid-template-columns: 1fr;
+      padding: 40px 28px;
+      gap: 32px;
+      text-align: center;
+    }
+    .panel.reverse .panel-copy {
+      order: 0;
+    }
+    .panel-copy p {
+      margin: 0 auto;
+    }
+  }
+
+  /* Section head */
+  .section-head {
+    text-align: center;
+    max-width: 640px;
+    margin: 0 auto 44px;
+  }
+  .section-head h2 {
+    font-size: clamp(26px, 4vw, 38px);
+    font-weight: 700;
+    margin-top: 8px;
+  }
+
+  /* Results */
+  .results-sec {
+    padding: 72px 0;
+  }
+  .result-chips {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .chip {
+    border: 1.5px solid var(--c);
+    color: var(--c);
+    background: color-mix(in srgb, var(--c) 8%, #fff);
+    font-weight: 700;
+    padding: 9px 20px;
+    border-radius: 999px;
+    font-size: 15px;
+  }
+
+  /* How */
+  .how {
+    background: var(--surface);
+  }
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+  .step {
+    text-align: center;
+    background: #fff;
+    border-radius: var(--radius);
+    padding: 32px 24px;
+    box-shadow: 0 1px 3px rgba(60, 64, 67, 0.1);
+    transition:
+      transform 0.25s ease,
+      box-shadow 0.25s ease;
+  }
+  .step:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 28px rgba(60, 64, 67, 0.14);
+  }
+  .panel-visual > * {
+    transition: transform 0.3s ease;
+  }
+  .panel:hover .panel-visual > * {
+    transform: translateY(-4px) rotate(-0.5deg);
+  }
+  .step-n {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 16px;
+    display: grid;
+    place-items: center;
+    background: var(--blue);
+    color: #fff;
+    font-weight: 700;
+    font-size: 20px;
+    border-radius: 999px;
+  }
+  .step h3 {
+    font-size: 19px;
+    margin-bottom: 8px;
+  }
+  .step p {
+    color: var(--muted);
+    margin: 0;
+    font-size: 15px;
+  }
+  @media (max-width: 700px) {
+    .steps {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* FAQ */
+  .faq-inner {
+    max-width: 760px;
+  }
+  .faq-list {
+    display: grid;
+    gap: 12px;
+  }
+  .faq-item {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 4px 20px;
+    background: #fff;
+  }
+  .faq-item summary {
+    cursor: pointer;
+    font-weight: 600;
+    padding: 16px 0;
+    list-style: none;
+    position: relative;
+  }
+  .faq-item summary::-webkit-details-marker {
+    display: none;
+  }
+  .faq-item summary::after {
+    content: "+";
+    position: absolute;
+    right: 0;
+    color: var(--blue);
+    font-size: 22px;
+  }
+  .faq-item[open] summary::after {
+    content: "−";
+  }
+  .faq-item p {
+    margin: 0 0 16px;
+    color: var(--muted);
+  }
+
+  /* CTA */
+  .cta {
+    padding: 40px 0 88px;
+  }
+  .cta-card {
+    background: linear-gradient(120deg, #1a73e8, #00b4d8, #1a73e8);
+    background-size: 200% auto;
+    animation: gradientShift 9s ease infinite;
+    color: #fff;
+    text-align: center;
+    border-radius: var(--radius-lg);
+    padding: 64px 32px;
+  }
+  .cta-card h2 {
+    font-size: clamp(26px, 4vw, 40px);
+    font-weight: 700;
+  }
+  .cta-card p {
+    opacity: 0.92;
+    font-size: 18px;
+    margin: 12px 0 28px;
+  }
+  .btn-white {
+    background: #fff;
+    color: var(--blue);
+  }
+  .btn-white:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Footer */
+  .site-footer {
+    background: #fff;
+    border-top: 1px solid var(--line);
+    padding: 48px 0;
+    color: var(--muted);
+  }
+  .footer-brand {
+    font-weight: 700;
+    color: var(--ink);
+    font-size: 18px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .footer-disclaimer {
+    max-width: 720px;
+    font-size: 13px;
+    line-height: 1.8;
+    margin: 0 0 20px;
+  }
+  .footer-copy {
+    font-size: 13px;
+    color: #9aa0a6;
+    margin: 0;
+  }
+</style>

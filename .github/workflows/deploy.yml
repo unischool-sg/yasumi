@@ -1,0 +1,71 @@
+name: Deploy (product)
+
+# product ブランチへの push（= PR マージ）で self-hosted runner 上で自動デプロイする。
+on:
+  push:
+    branches: [product]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-product
+  cancel-in-progress: false
+
+env:
+  # 本番の「やすみ」関連はすべてこのディレクトリに集約する。
+  DEPLOY_SUBDIR: yasumi-prod
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, unischool]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: yasumi-prod へ配置
+        run: |
+          DEST="$HOME/$DEPLOY_SUBDIR"
+          mkdir -p "$DEST"
+          if [ ! -f "$DEST/.env" ]; then
+            echo "::error::$DEST/.env がありません。DEPLOY.md のセットアップを参照してください。"
+            exit 1
+          fi
+          # ソースを同期（.env / .git / node_modules / dist は保持・除外）
+          rsync -a --delete \
+            --exclude '.git' --exclude '.env' --exclude 'node_modules' --exclude 'dist' \
+            ./ "$DEST/"
+
+      - name: ビルド & 起動
+        run: cd "$HOME/$DEPLOY_SUBDIR" && docker compose --env-file .env -f docker/docker-compose.yml up -d --build
+
+      - name: PostgreSQL の起動を待機
+        run: |
+          cd "$HOME/$DEPLOY_SUBDIR"
+          for i in $(seq 1 30); do
+            if docker compose --env-file .env -f docker/docker-compose.yml exec -T postgres pg_isready >/dev/null 2>&1; then
+              echo "postgres ready"; exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::postgres が起動しませんでした"; exit 1
+
+      - name: マイグレーション & 初期データ
+        run: |
+          cd "$HOME/$DEPLOY_SUBDIR"
+          docker compose --env-file .env -f docker/docker-compose.yml exec -T api bun run backend/src/infrastructure/db/migrate.ts
+          docker compose --env-file .env -f docker/docker-compose.yml exec -T api bun run backend/src/infrastructure/db/seed-areas.ts
+
+      - name: ヘルスチェック
+        run: |
+          cd "$HOME/$DEPLOY_SUBDIR"
+          for i in $(seq 1 15); do
+            if docker compose --env-file .env -f docker/docker-compose.yml exec -T api \
+                 bun -e 'const r=await fetch("http://localhost:3000/health"); if(!r.ok) process.exit(1)' >/dev/null 2>&1; then
+              echo "health ok"; exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::health チェックに失敗しました"; exit 1
+
+      - name: 古いイメージを削除
+        if: always()
+        run: docker image prune -f
