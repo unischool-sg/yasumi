@@ -53,14 +53,17 @@ M8 デプロイ / 一般公開
 
 **目的**: 指定地域コード → 現在の警報 `Warning[]` を取得できる。
 
-- [ ] `domain/warning/`: `Warning` 型・`WarningType` 定義
-- [ ] `infrastructure/jma/`: `JmaWarningProvider`（気象庁レスポンス → `Warning[]` 正規化）
-- [ ] 地域コード基準の取得（名称でなくコード）
-- [ ] 一括取得＋キャッシュ（学校単位でリクエストしない / §33）
-- [ ] 取得失敗時は例外 → 上位で `UNKNOWN`（§51）
-- [ ] 気象庁レスポンス構造の調査メモ（`research/` などに記録）
+> 📄 **詳細仕様確定済み**: [backend/JMA_ADAPTER.md](./backend/JMA_ADAPTER.md)
+
+- [x] `domain/warning/provider.ts`: `WarningProvider` ポート
+- [x] `infrastructure/jma/`: `JmaWarningProvider`（気象庁レスポンス → `Warning[]` 正規化）+ `parse.ts` / `warning-codes.ts`
+- [x] 地域コード基準の取得（名称でなくコード。都道府県 JSON をバッチ取得）
+- [x] 一括取得＋TTLキャッシュ（学校単位でリクエストしない / §33）
+- [x] 取得失敗時は例外 → 上位で `UNKNOWN`（§51）
+- [x] 気象庁レスポンス構造の調査（JMA_ADAPTER.md §2 に記録）
 
 **完了条件**: 地域コード配列を渡すと `Warning[]` が返る。JMA固有構造は Domain に漏れない。単体テストあり。
+→ **達成**（parse 8 + provider 6 テスト green / 実 API スモーク OK / typecheck OK）
 
 **依存**: なし（最優先）
 
