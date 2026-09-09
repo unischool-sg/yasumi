@@ -24,9 +24,22 @@ const faqs = [
   { q: "自分の学校が登録されていません。", a: "アプリから新しく登録できます。対象地域・対象警報・判定時刻（30分刻み）を設定するだけ。登録内容は同じ学校のみんなで共有されます。" },
   { q: "どの地域に対応していますか？", a: "気象庁の地域コードに基づいて判定します。まずは兵庫県から対応を広げています。" },
 ];
+
+// FAQ の構造化データ（検索リッチリザルト狙い）。
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqs.map((f) => ({
+    "@type": "Question",
+    name: f.q,
+    acceptedAnswer: { "@type": "Answer", text: f.a },
+  })),
+};
 ---
 
 <Layout>
+  <script slot="head" type="application/ld+json" set:html={JSON.stringify(faqJsonLd)} />
+
   <Header />
 
   <!-- Hero -->

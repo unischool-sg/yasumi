@@ -2,11 +2,45 @@
 interface Props {
   title?: string;
   description?: string;
+  ogImage?: string;
+  ogImageAlt?: string;
+  /** og:type（トップは website、記事系は article 等）。 */
+  type?: string;
+  /** クロール拒否したいページで true。 */
+  noindex?: boolean;
 }
 const {
   title = "やすみ？ | 今日、学校ある？を自動で。",
   description = "学校の気象警報ルールを登録しておくだけ。休校・午前休などをLINEで自動通知。朝、学校に行くべきかを考えなくてよくするサービスです。",
+  ogImage = "/ogp.png",
+  ogImageAlt = "今日、学校ある？を、自動で。やすみ？",
+  type = "website",
+  noindex = false,
 } = Astro.props;
+const site = Astro.site ?? Astro.url.origin;
+const canonicalUrl = new URL(Astro.url.pathname, site).toString();
+const ogImageUrl = new URL(ogImage, site).toString();
+const siteName = "やすみ？";
+const siteUrl = new URL("/", site).toString();
+
+// 全ページ共通の構造化データ（Organization + WebSite）。
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: siteName,
+    url: siteUrl,
+    logo: ogImageUrl,
+    sameAs: ["https://unischool.jp", "https://x.com/tanahiro2010"],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: siteName,
+    url: siteUrl,
+    inLanguage: "ja",
+  },
+];
 ---
 
 <!doctype html>
@@ -16,16 +50,45 @@ const {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
     <meta name="theme-color" content="#1a73e8" />
+    <title>{title}</title>
+    <link rel="canonical" href={canonicalUrl} />
+    <meta name="robots" content={noindex ? "noindex,nofollow" : "index,follow"} />
+
+    <!-- Favicon -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+
+    <!-- Open Graph -->
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:type" content="website" />
-    <title>{title}</title>
+    <meta property="og:type" content={type} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:site_name" content={siteName} />
+    <meta property="og:locale" content="ja_JP" />
+    <meta property="og:image" content={ogImageUrl} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={ogImageAlt} />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImageUrl} />
+    <meta name="twitter:image:alt" content={ogImageAlt} />
+
+    <!-- 構造化データ -->
+    {jsonLd.map((d) => <script type="application/ld+json" set:html={JSON.stringify(d)} />)}
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700;800&display=swap"
       rel="stylesheet"
     />
+
+    <!-- ページ個別の head（JSON-LD 等） -->
+    <slot name="head" />
   </head>
   <body>
     <slot />
