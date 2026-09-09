@@ -118,7 +118,76 @@ VITE_LIFF_ID=<liff-id> VITE_API_BASE_URL=https://<ドメイン> bun run --cwd fr
 
 ---
 
-## 9. 残课題 / 将来（PRD §60）
+## 9. CI/CD 自動デプロイ（self-hosted runner）
+
+`product` ブランチへの **PR マージ（= push）で自動デプロイ**する。
+ワークフローは [.github/workflows/deploy.yml](./.github/workflows/deploy.yml)。
+サーバー(unischool)上の self-hosted runner が `up -d --build → migrate → seed → health` を実行する。
+
+### 9.1 サーバー準備（一度だけ / unischool 上で実行）
+
+前提: `docker` / `docker compose` / `git` が入っており、実行ユーザーが docker を sudo なしで使える
+（`sudo usermod -aG docker $USER` 後に再ログイン）。
+
+**(a) 秘密情報ファイル `~/yasumi.env` を作成**（runner サービスユーザーのホーム）:
+
+```bash
+# 例。実値を設定（.env.example 参照）
+cat > ~/yasumi.env <<'EOF'
+PORT=3000
+API_PORT=3000
+POSTGRES_PORT=5432
+DATABASE_URL=postgres://app:<強いパスワード>@postgres:5432/yasumi
+POSTGRES_USER=app
+POSTGRES_PASSWORD=<強いパスワード>
+POSTGRES_DB=yasumi
+LINE_CHANNEL_SECRET=<...>
+LINE_CHANNEL_ACCESS_TOKEN=<...>
+LIFF_CHANNEL_ID=<...>
+INTERNAL_CRON_TOKEN=<推測困難な値>
+ADMIN_LINE_USER_IDS=<自分のlineUserId>
+EOF
+chmod 600 ~/yasumi.env
+```
+
+**(b) self-hosted runner をインストールし常駐**（ラベル `unischool`）:
+
+```bash
+mkdir -p ~/actions-runner && cd ~/actions-runner
+# 最新版を取得（Linux x64 の例。arm64 等は URL を調整）
+V=$(curl -s https://api.github.com/repos/actions/runner/releases/latest | grep -oP '"tag_name": "v\K[^"]+')
+curl -o runner.tar.gz -L https://github.com/actions/runner/releases/download/v${V}/actions-runner-linux-x64-${V}.tar.gz
+tar xzf runner.tar.gz
+
+# 登録トークン（手元PCで gh 認証済みなら以下で取得。1時間有効）:
+#   gh api -X POST repos/unischool-sg/yasumi/actions/runners/registration-token --jq .token
+./config.sh --url https://github.com/unischool-sg/yasumi \
+  --token <REG_TOKEN> --labels unischool --name unischool --unattended
+
+# サービス化して常駐（再起動後も自動起動）
+sudo ./svc.sh install
+sudo ./svc.sh start
+```
+
+> 代替: GitHub → Settings → Actions → Runners → “New self-hosted runner” が
+> トークン入りの同等コマンドを表示する。ラベルに `unischool` を追加すること。
+
+### 9.2 初回デプロイ（ブートストラップ）
+
+1. runner が Online（Settings → Actions → Runners）になっていることを確認。
+2. `develop` → `product` の PR を作成しマージ（または `git push origin develop:product`）。
+3. push を検知して deploy ワークフローが発火 → サーバーでビルド/起動/マイグレーション。
+4. 以降は **product への PR マージごとに自動デプロイ**。手動実行は Actions → Deploy (product) → Run workflow。
+
+### 9.3 秘密情報の方針
+
+- self-hosted のため秘密情報は **サーバー上の `~/yasumi.env`** に集約し、GitHub には保存しない。
+- 値を変えたら `~/yasumi.env` を更新して再デプロイ（次回マージ or 手動 Run）。
+- 代替として GitHub Secrets に入れ、ワークフローで `.env` を生成する方式も可能。
+
+---
+
+## 10. 残課題 / 将来（PRD §60）
 
 - 管理者承認・編集提案フロー、Flex Message、複数学校切替、通知時間設定。
 - Web Push / Discord / Email（`NotificationProvider` 追加のみで対応可能）。
