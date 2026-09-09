@@ -19,6 +19,17 @@ services:
     depends_on:
       - postgres
 
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
+      args:
+        VITE_LIFF_ID: ${VITE_LIFF_ID}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-8082}:80"
+
   landing:
     build:
       context: ..
