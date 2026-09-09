@@ -93,3 +93,25 @@ export async function listWarningChecksBySchool(
     .orderBy(desc(warningChecks.checkedAt))
     .limit(limit);
 }
+
+/** 管理画面: 判定履歴一覧（任意で school/date フィルタ）。 */
+export async function listWarningChecks(
+  db: Db,
+  filter: { schoolId?: string; targetDate?: string } = {},
+  limit = 100,
+): Promise<WarningCheckRow[]> {
+  const conds = [];
+  if (filter.schoolId) conds.push(eq(warningChecks.schoolId, filter.schoolId));
+  if (filter.targetDate) conds.push(eq(warningChecks.targetDate, filter.targetDate));
+  const base = db.select().from(warningChecks);
+  const q = conds.length > 0 ? base.where(and(...conds)) : base;
+  return q.orderBy(desc(warningChecks.checkedAt)).limit(limit);
+}
+
+export async function countWarningChecksByDate(db: Db, targetDate: string): Promise<number> {
+  const rows = await db
+    .select({ id: warningChecks.id })
+    .from(warningChecks)
+    .where(eq(warningChecks.targetDate, targetDate));
+  return rows.length;
+}

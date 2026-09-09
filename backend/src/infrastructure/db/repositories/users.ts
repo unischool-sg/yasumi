@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import type { Db } from "../client.ts";
 import { lineAccounts, users } from "../schema.ts";
 
@@ -21,6 +21,25 @@ export async function findOrCreateByLineUserId(db: Db, lineUserId: string): Prom
     await tx.insert(lineAccounts).values({ userId: user.id, lineUserId });
     return { userId: user.id };
   });
+}
+
+/** 管理画面: ユーザー一覧（内部ID + LINEユーザーID + 作成日、新しい順）。 */
+export async function listUsers(
+  db: Db,
+  opts: { limit?: number; offset?: number } = {},
+): Promise<{ id: string; lineUserId: string | null; createdAt: Date }[]> {
+  return db
+    .select({ id: users.id, lineUserId: lineAccounts.lineUserId, createdAt: users.createdAt })
+    .from(users)
+    .leftJoin(lineAccounts, eq(lineAccounts.userId, users.id))
+    .orderBy(desc(users.createdAt))
+    .limit(opts.limit ?? 100)
+    .offset(opts.offset ?? 0);
+}
+
+export async function countUsers(db: Db): Promise<number> {
+  const rows = await db.select({ id: users.id }).from(users);
+  return rows.length;
 }
 
 /** 内部ユーザーの LINE ユーザーIDを取得（通知送信に使う）。 */

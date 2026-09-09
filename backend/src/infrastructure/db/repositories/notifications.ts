@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { Db } from "../client.ts";
 import { notifications } from "../schema.ts";
 
@@ -43,6 +43,28 @@ export async function createNotificationIfAbsent(
 /** 送信完了時刻を記録。 */
 export async function markNotificationSent(db: Db, id: string, sentAt: Date): Promise<void> {
   await db.update(notifications).set({ sentAt }).where(eq(notifications.id, id));
+}
+
+/** 管理画面: 通知一覧（任意で school/date フィルタ・新しい順）。 */
+export async function listNotifications(
+  db: Db,
+  filter: { schoolId?: string; targetDate?: string } = {},
+  limit = 100,
+): Promise<NotificationRow[]> {
+  const conds = [];
+  if (filter.schoolId) conds.push(eq(notifications.schoolId, filter.schoolId));
+  if (filter.targetDate) conds.push(eq(notifications.targetDate, filter.targetDate));
+  const base = db.select().from(notifications);
+  const q = conds.length > 0 ? base.where(and(...conds)) : base;
+  return q.orderBy(desc(notifications.sentAt)).limit(limit);
+}
+
+export async function countNotificationsByDate(db: Db, targetDate: string): Promise<number> {
+  const rows = await db
+    .select({ id: notifications.id })
+    .from(notifications)
+    .where(eq(notifications.targetDate, targetDate));
+  return rows.length;
 }
 
 export async function findNotification(

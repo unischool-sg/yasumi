@@ -16,8 +16,19 @@ services:
       LIFF_CHANNEL_ID: ${LIFF_CHANNEL_ID}
       ADMIN_LINE_USER_IDS: ${ADMIN_LINE_USER_IDS}
       INTERNAL_CRON_TOKEN: ${INTERNAL_CRON_TOKEN}
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET}
     depends_on:
       - postgres
+
+  admin:
+    build:
+      context: ..
+      dockerfile: docker/admin.Dockerfile
+      args:
+        VITE_ADMIN_API_BASE_URL: ${VITE_ADMIN_API_BASE_URL}
+    restart: unless-stopped
+    ports:
+      - "${ADMIN_PORT:-8083}:80"
 
   frontend:
     build:

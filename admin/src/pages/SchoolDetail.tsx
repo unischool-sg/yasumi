@@ -1,0 +1,127 @@
+import { Box, Button, Card, CardContent, Chip, Divider, MenuItem, Stack, TextField, Typography } from "@mui/material";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { api } from "../api/client.ts";
+
+const WARNING_TYPES = ["暴風警報", "大雨警報", "洪水警報", "大雪警報", "暴風雪警報", "高潮警報", "波浪警報"];
+const RESULTS = [
+  ["NORMAL", "通常登校"],
+  ["WAIT", "自宅待機"],
+  ["AM_OFF", "午前休"],
+  ["PM_START", "午後から登校"],
+  ["FULL_OFF", "全日休校"],
+];
+const TIMES = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`);
+
+export function SchoolDetail({ id }: { id: string }) {
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const { data } = useQuery({ queryKey: ["school", id], queryFn: () => api.getSchool(id) });
+  const { data: allAreas = [] } = useQuery({ queryKey: ["areas"], queryFn: api.listAreas });
+
+  const [name, setName] = useState("");
+  const [city, setCity] = useState("");
+  const [areaCodes, setAreaCodes] = useState<Set<string>>(new Set());
+  const [warnings, setWarnings] = useState<Set<string>>(new Set());
+  const [rule, setRule] = useState({ checkTime: "08:00", result: "AM_OFF" });
+
+  useEffect(() => {
+    if (!data) return;
+    setName(data.name);
+    setCity(data.city ?? "");
+    setAreaCodes(new Set(data.areaCodes));
+    setWarnings(new Set(data.warningTypes));
+  }, [data]);
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["school", id] });
+  const save = useMutation({
+    mutationFn: () => api.updateSchool(id, { name, city: city || null, areaCodes: [...areaCodes], warningTypes: [...warnings] }),
+    onSuccess: invalidate,
+  });
+  const addRule = useMutation({ mutationFn: () => api.createRule(id, rule), onSuccess: invalidate });
+  const delRule = useMutation({ mutationFn: (rid: string) => api.deleteRule(rid), onSuccess: invalidate });
+
+  function toggle(set: Set<string>, key: string, setter: (s: Set<string>) => void) {
+    const n = new Set(set);
+    n.has(key) ? n.delete(key) : n.add(key);
+    setter(n);
+  }
+
+  if (!data) return <Typography>読み込み中…</Typography>;
+
+  return (
+    <Box>
+      <Button onClick={() => navigate({ to: "/schools" })} size="small" sx={{ mb: 1 }}>
+        ← 学校一覧
+      </Button>
+      <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+        {data.name}
+      </Typography>
+
+      <Card variant="outlined" sx={{ mb: 2 }}>
+        <CardContent>
+          <Typography variant="subtitle2" sx={{ mb: 1.5 }}>基本情報</Typography>
+          <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+            <TextField size="small" label="学校名" value={name} onChange={(e) => setName(e.target.value)} />
+            <TextField size="small" label="市区町村" value={city} onChange={(e) => setCity(e.target.value)} />
+          </Stack>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>対象地域</Typography>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2 }}>
+            {allAreas.map((a) => (
+              <Chip
+                key={a.code}
+                label={a.name}
+                color={areaCodes.has(a.code) ? "primary" : "default"}
+                variant={areaCodes.has(a.code) ? "filled" : "outlined"}
+                onClick={() => toggle(areaCodes, a.code, setAreaCodes)}
+              />
+            ))}
+          </Box>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>対象警報</Typography>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2 }}>
+            {WARNING_TYPES.map((w) => (
+              <Chip
+                key={w}
+                label={w}
+                color={warnings.has(w) ? "primary" : "default"}
+                variant={warnings.has(w) ? "filled" : "outlined"}
+                onClick={() => toggle(warnings, w, setWarnings)}
+              />
+            ))}
+          </Box>
+          <Button variant="contained" onClick={() => save.mutate()} disabled={save.isPending}>
+            保存
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card variant="outlined">
+        <CardContent>
+          <Typography variant="subtitle2" sx={{ mb: 1.5 }}>判定ルール（30分刻み）</Typography>
+          <Stack spacing={1} sx={{ mb: 2 }}>
+            {data.rules.map((r) => (
+              <Stack key={r.id} direction="row" spacing={2} sx={{ alignItems: "center" }}>
+                <Typography sx={{ fontWeight: 700, width: 64 }}>{r.checkTime}</Typography>
+                <Typography>→ {RESULTS.find(([v]) => v === r.result)?.[1] ?? r.result}</Typography>
+                <Box sx={{ flex: 1 }} />
+                <Button size="small" color="error" onClick={() => delRule.mutate(r.id)}>削除</Button>
+              </Stack>
+            ))}
+            {data.rules.length === 0 && <Typography variant="body2" color="text.secondary">ルールがありません</Typography>}
+          </Stack>
+          <Divider sx={{ my: 2 }} />
+          <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+            <TextField size="small" select label="時刻" value={rule.checkTime} onChange={(e) => setRule({ ...rule, checkTime: e.target.value })} sx={{ width: 120 }}>
+              {TIMES.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+            </TextField>
+            <TextField size="small" select label="結果" value={rule.result} onChange={(e) => setRule({ ...rule, result: e.target.value })} sx={{ width: 180 }}>
+              {RESULTS.map(([v, l]) => <MenuItem key={v} value={v}>{l}</MenuItem>)}
+            </TextField>
+            <Button variant="outlined" onClick={() => addRule.mutate()}>ルール追加</Button>
+          </Stack>
+        </CardContent>
+      </Card>
+    </Box>
+  );
+}

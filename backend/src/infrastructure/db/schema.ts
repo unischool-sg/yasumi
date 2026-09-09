@@ -19,6 +19,16 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// 管理画面のアカウント（LINE ユーザーとは別系統・id/password 認証 / admin）。
+export const admins = pgTable("admins", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  username: varchar("username", { length: 100 }).notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  role: varchar("role", { length: 20 }).notNull().default("admin"), // 'superadmin' | 'admin'
+  disabled: boolean("disabled").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const lineAccounts = pgTable("line_accounts", {
   userId: uuid("user_id").primaryKey(),
   lineUserId: varchar("line_user_id", { length: 255 }).notNull().unique(),
