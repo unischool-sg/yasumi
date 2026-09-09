@@ -40,6 +40,9 @@ const app = createApp({
   lineChannelSecret: process.env.LINE_CHANNEL_SECRET ?? "",
   internalCronToken,
   ...(process.env.ADMIN_JWT_SECRET ? { adminJwtSecret: process.env.ADMIN_JWT_SECRET } : {}),
+  // ネイティブ LINE ログイン（LIFF と同じチャネル）。secret 未設定なら /api/auth/line/token は 503。
+  lineLoginChannelId: channelId,
+  lineLoginChannelSecret: process.env.LINE_LOGIN_CHANNEL_SECRET ?? "",
   warningProvider: new JmaWarningProvider(),
   notificationProvider: new LineNotificationProvider({
     accessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN ?? "",
