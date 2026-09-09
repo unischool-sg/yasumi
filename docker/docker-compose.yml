@@ -19,6 +19,14 @@ services:
     depends_on:
       - postgres
 
+  landing:
+    build:
+      context: ..
+      dockerfile: docker/landing.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${LANDING_PORT:-8081}:80"
+
   postgres:
     image: postgres:17
     restart: unless-stopped
