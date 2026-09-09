@@ -1,5 +1,5 @@
 import type { CheckResult, Warning } from "@yasumi/shared";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { Db } from "../client.ts";
 import { warningChecks } from "../schema.ts";
 
@@ -67,7 +67,7 @@ export async function findWarningCheck(
   return rows[0];
 }
 
-/** 学校の指定日の判定履歴（ホーム/履歴表示）。 */
+/** 学校の指定日の判定（ホーム: 今日の状態）。checkedAt 降順。 */
 export async function listWarningChecksBySchoolAndDate(
   db: Db,
   schoolId: string,
@@ -76,5 +76,20 @@ export async function listWarningChecksBySchoolAndDate(
   return db
     .select()
     .from(warningChecks)
-    .where(and(eq(warningChecks.schoolId, schoolId), eq(warningChecks.targetDate, targetDate)));
+    .where(and(eq(warningChecks.schoolId, schoolId), eq(warningChecks.targetDate, targetDate)))
+    .orderBy(desc(warningChecks.checkedAt));
+}
+
+/** 学校の判定履歴（新しい順）。 */
+export async function listWarningChecksBySchool(
+  db: Db,
+  schoolId: string,
+  limit = 50,
+): Promise<WarningCheckRow[]> {
+  return db
+    .select()
+    .from(warningChecks)
+    .where(eq(warningChecks.schoolId, schoolId))
+    .orderBy(desc(warningChecks.checkedAt))
+    .limit(limit);
 }

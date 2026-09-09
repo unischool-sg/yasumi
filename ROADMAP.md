@@ -167,16 +167,18 @@ M8 デプロイ / 一般公開
 
 **目的**: 30分ごとに自動で判定 → 保存 → 通知が回る。
 
-- [ ] `POST /api/internal/run-check`（内部トークン認可 / §54）
-- [ ] 判定パイプライン（§57）: 該当ルール検索 → 警報一括取得 → 評価 → warning_checks 保存 → Subscription → Push → notifications 保存
-- [ ] `cron.ts`: `startCron(app)` で毎時 :00 / :30 に `app.fetch` 発火
-- [ ] in-flight guard（多重発火防止）/ graceful shutdown で `stop()`
-- [ ] 判定の確定性（§34）: 発火時点の事実を保存し後で変えない
-- [ ] 冪等性検証: 再起動・重複発火でも二重にならない（§35, §36）
-- [ ] JST 基準の時刻・`target_date` 処理
+- [x] `POST /api/internal/run-check`（内部トークン認可 / §54）
+- [x] 判定パイプライン（§57）: 該当ルール検索 → 警報一括取得 → 評価 → warning_checks 保存 → Subscription → Push → notifications 保存
+- [x] `cron.ts`: `startCron(app)` で毎時 :00 / :30 に `app.fetch` 発火
+- [x] in-flight guard（多重発火防止）/ graceful shutdown で `stop()`
+- [x] 判定の確定性（§34）: 発火時点の事実を保存し後で変えない（保存済み result を通知に採用）
+- [x] 冪等性検証: 再起動・重複発火でも二重にならない（§35, §36）
+- [x] JST 基準の時刻・`target_date` 処理（`shared/jst.ts`）
+- [x] `GET /api/schools/:id/status` / `history`（ホーム画面用）
 
 **完了条件**: MVP完成シナリオ（§59）が通る —
 購読済み学校で、朝の判定時刻に警報があれば「午前休」の LINE 通知が届く。
+→ **達成**（HTTP 経路の E2E で run-check→AM_OFF 通知→status 反映を確認・冪等/UNKNOWN もテスト green）
 
 **依存**: M1, M2, M3, M6（全て）
 

@@ -6,18 +6,30 @@ import { z } from "zod";
 import { type AuthDeps, type AuthEnv, authMiddleware } from "./auth.ts";
 import { checkSchoolEditable } from "./authz.ts";
 import { rateLimit } from "./middleware/rate-limit.ts";
+import type { NotificationProvider } from "../domain/notification/provider.ts";
+import type { WarningProvider } from "../domain/warning/provider.ts";
 import { verifySignature } from "../infrastructure/line/webhook.ts";
 import * as areasRepo from "../infrastructure/db/repositories/areas.ts";
 import * as cfg from "../infrastructure/db/repositories/school-config.ts";
 import * as rulesRepo from "../infrastructure/db/repositories/rules.ts";
 import * as schoolsRepo from "../infrastructure/db/repositories/schools.ts";
 import * as subsRepo from "../infrastructure/db/repositories/subscriptions.ts";
+import * as warningChecksRepo from "../infrastructure/db/repositories/warning-checks.ts";
+import { runCheck } from "../pipeline/run-check.ts";
+import { jstDateString } from "../shared/jst.ts";
 
 export interface AppDeps extends AuthDeps {
   /** 管理者の LINE ユーザーID（学校/ルール編集の許可 / PRD §23）。 */
   adminLineUserIds?: string[];
   /** LINE Webhook 署名検証用のチャネルシークレット（PRD §54）。 */
   lineChannelSecret?: string;
+  /** cron 内部エンドポイントの認可トークン（backend/CRON.md §5）。 */
+  internalCronToken?: string;
+  /** 判定パイプライン用（M7）。未設定なら run-check は 503。 */
+  warningProvider?: WarningProvider;
+  notificationProvider?: NotificationProvider;
+  /** テスト用の現在時刻。 */
+  now?: () => Date;
 }
 
 const checkResultSchema = z.enum(["NORMAL", "WAIT", "AM_OFF", "PM_START", "FULL_OFF", "UNKNOWN"]);
@@ -46,6 +58,28 @@ export function createApp(deps: AppDeps) {
     }
     // MVP: イベントは最小処理（200 応答）。友だち追加/リッチメニューは将来（§20）。
     return c.json({ ok: true });
+  });
+
+  // cron 内部エンドポイント（内部トークン認可 / backend/CRON.md §5, §6）。
+  app.post("/api/internal/run-check", async (c) => {
+    if (!deps.internalCronToken || c.req.header("x-internal-token") !== deps.internalCronToken) {
+      return c.json({ error: "unauthorized" }, 401);
+    }
+    if (!deps.warningProvider || !deps.notificationProvider) {
+      return c.json({ error: "pipeline not configured" }, 503);
+    }
+    const body = (await c.req.json().catch(() => ({}))) as { triggeredAt?: string };
+    const triggeredAt = body.triggeredAt ? new Date(body.triggeredAt) : (deps.now?.() ?? new Date());
+    const summary = await runCheck(
+      {
+        db: deps.db,
+        warningProvider: deps.warningProvider,
+        notificationProvider: deps.notificationProvider,
+        ...(deps.now ? { now: deps.now } : {}),
+      },
+      { triggeredAt },
+    );
+    return c.json(summary);
   });
 
   const api = new Hono<AuthEnv>();
@@ -247,6 +281,30 @@ export function createApp(deps: AppDeps) {
   api.delete("/me/subscriptions/:schoolId", async (c) => {
     await subsRepo.removeSubscription(deps.db, c.get("userId"), c.req.param("schoolId"));
     return c.body(null, 204);
+  });
+
+  // --- Status / History（PRD §15〜§17, §37 / ホーム画面）---
+  api.get("/schools/:id/status", async (c) => {
+    const id = c.req.param("id");
+    const school = await schoolsRepo.findSchoolById(deps.db, id);
+    if (!school) return c.json({ error: "not found" }, 404);
+    const today = jstDateString(deps.now?.() ?? new Date());
+    const checks = await warningChecksRepo.listWarningChecksBySchoolAndDate(deps.db, id, today);
+    const latest = checks[0];
+    return c.json({
+      schoolId: id,
+      schoolName: school.name,
+      date: today,
+      latest: latest
+        ? { result: latest.result, checkedAt: latest.checkedAt, warnings: latest.rawData ?? [] }
+        : null,
+      checks,
+    });
+  });
+
+  api.get("/schools/:id/history", async (c) => {
+    const rows = await warningChecksRepo.listWarningChecksBySchool(deps.db, c.req.param("id"));
+    return c.json(rows);
   });
 
   app.route("/api", api);

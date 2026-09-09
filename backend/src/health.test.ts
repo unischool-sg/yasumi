@@ -41,3 +41,29 @@ describe("POST /api/webhooks/line", () => {
     expect((await req("bogus")).status).toBe(401);
   });
 });
+
+describe("POST /api/internal/run-check（内部トークン認可）", () => {
+  const withToken = createApp({
+    db: {} as Db,
+    verifyIdToken: async () => ({ lineUserId: "x" }),
+    internalCronToken: "cron-token",
+    // providers 未設定
+  });
+  const call = (token?: string) =>
+    withToken.fetch(
+      new Request("http://localhost/api/internal/run-check", {
+        method: "POST",
+        headers: { "content-type": "application/json", ...(token ? { "x-internal-token": token } : {}) },
+        body: "{}",
+      }),
+    );
+
+  it("トークンなし/不一致 → 401", async () => {
+    expect((await call()).status).toBe(401);
+    expect((await call("wrong")).status).toBe(401);
+  });
+
+  it("正トークンだが provider 未設定 → 503", async () => {
+    expect((await call("cron-token")).status).toBe(503);
+  });
+});
