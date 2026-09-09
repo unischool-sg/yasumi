@@ -9,7 +9,7 @@ export function Areas() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ code: "", name: "", prefecture: "兵庫県" });
-  const { data = [] } = useQuery({ queryKey: ["areas"], queryFn: api.listAreas });
+  const { data = [] } = useQuery({ queryKey: ["areas"], queryFn: () => api.listAreas() });
 
   const create = useMutation({
     mutationFn: () => api.createArea(form),

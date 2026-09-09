@@ -109,7 +109,7 @@ export const api = {
     request(`/schools/${schoolId}/rules`, { method: "POST", body: JSON.stringify(b) }),
   deleteRule: (id: string) => request<void>(`/rules/${id}`, { method: "DELETE" }),
   // areas
-  listAreas: () => request<Area[]>("/areas"),
+  listAreas: (prefecture?: string) => request<Area[]>(`/areas${prefecture ? `?prefecture=${encodeURIComponent(prefecture)}` : ""}`),
   createArea: (b: Area) => request<Area>("/areas", { method: "POST", body: JSON.stringify(b) }),
   deleteArea: (code: string) => request<void>(`/areas/${code}`, { method: "DELETE" }),
   // read
