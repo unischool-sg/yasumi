@@ -122,15 +122,25 @@ const breadcrumbJsonLd = {
     const card = document.createElement("div");
     card.className = "sc-card";
 
+    const avatar = document.createElement("div");
+    avatar.className = "sc-avatar";
+    avatar.textContent = "🏫";
+    card.appendChild(avatar);
+
+    const body = document.createElement("div");
+    body.className = "sc-body";
+
     const name = document.createElement("div");
     name.className = "sc-name";
     name.textContent = s.name;
-    card.appendChild(name);
+    body.appendChild(name);
 
     const meta = document.createElement("div");
     meta.className = "sc-meta";
     meta.textContent = s.city ? `${s.prefecture} ${s.city}` : s.prefecture;
-    card.appendChild(meta);
+    body.appendChild(meta);
+
+    card.appendChild(body);
 
     const url = safeUrl(s.websiteUrl);
     if (url) {
@@ -139,7 +149,7 @@ const breadcrumbJsonLd = {
       link.href = url;
       link.target = "_blank";
       link.rel = "noopener";
-      link.textContent = "学校公式サイト →";
+      link.textContent = "公式サイト →";
       card.appendChild(link);
     }
     return card;
@@ -163,10 +173,10 @@ const breadcrumbJsonLd = {
       head.textContent = `${pref} (${items.length})`;
       wrap.appendChild(head);
 
-      const grid = document.createElement("div");
-      grid.className = "sc-grid";
-      for (const s of items) grid.appendChild(schoolCard(s));
-      wrap.appendChild(grid);
+      const listEl = document.createElement("div");
+      listEl.className = "sc-list";
+      for (const s of items) listEl.appendChild(schoolCard(s));
+      wrap.appendChild(listEl);
 
       resultsEl.appendChild(wrap);
     }
@@ -212,7 +222,9 @@ const breadcrumbJsonLd = {
   load();
 </script>
 
-<style>
+<!-- 学校カードは client JS で動的生成するため is:global（scoped だと生成要素に当たらない）。
+     クラスは sc-* 等ページ固有で、このページのバンドルのみ読み込まれるため安全。 -->
+<style is:global>
   .sc-hero {
     padding: 64px 0 24px;
   }
@@ -295,39 +307,59 @@ const breadcrumbJsonLd = {
     margin: 0 0 18px;
     border-bottom: 2px solid var(--blue-soft);
   }
-  .sc-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 16px;
+  /* 縦一列のカード一覧 */
+  .sc-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
   .sc-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
     background: #fff;
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    padding: 20px;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    padding: 16px 18px;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
   }
   .sc-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 12px 28px rgba(60, 64, 67, 0.12);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(60, 64, 67, 0.1);
     border-color: #c6dafc;
+  }
+  .sc-avatar {
+    flex-shrink: 0;
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    background: var(--blue-soft);
+    display: grid;
+    place-items: center;
+    font-size: 22px;
+    line-height: 1;
+  }
+  .sc-body {
+    flex: 1;
+    min-width: 0;
   }
   .sc-name {
     font-weight: 700;
-    font-size: 17px;
-    line-height: 1.4;
+    font-size: 16px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
   }
   .sc-meta {
     color: var(--muted);
-    font-size: 14px;
-    margin-top: 6px;
+    font-size: 13px;
+    margin-top: 3px;
   }
   .sc-site {
-    display: inline-block;
-    margin-top: 12px;
+    flex-shrink: 0;
     color: var(--blue);
     font-weight: 600;
     font-size: 13px;
+    white-space: nowrap;
   }
   .sc-site:hover {
     text-decoration: underline;
