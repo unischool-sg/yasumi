@@ -116,6 +116,10 @@ const jsonLd = [
       * {
         box-sizing: border-box;
       }
+      /* hidden 属性は常に非表示（display 指定に負けないように）。 */
+      [hidden] {
+        display: none !important;
+      }
       html {
         scroll-behavior: smooth;
       }
