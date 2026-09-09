@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import { z } from "zod";
+import { createAdminApp } from "./admin/app.ts";
 import { type AuthDeps, type AuthEnv, authMiddleware } from "./auth.ts";
 import { checkSchoolEditable } from "./authz.ts";
 import { rateLimit } from "./middleware/rate-limit.ts";
@@ -30,6 +31,8 @@ export interface AppDeps extends AuthDeps {
   notificationProvider?: NotificationProvider;
   /** テスト用の現在時刻。 */
   now?: () => Date;
+  /** 管理画面の JWT 署名鍵（設定時のみ /api/admin を有効化）。 */
+  adminJwtSecret?: string;
 }
 
 const checkResultSchema = z.enum(["NORMAL", "WAIT", "AM_OFF", "PM_START", "FULL_OFF", "UNKNOWN"]);
@@ -306,6 +309,14 @@ export function createApp(deps: AppDeps) {
     const rows = await warningChecksRepo.listWarningChecksBySchool(deps.db, c.req.param("id"));
     return c.json(rows);
   });
+
+  // 管理画面 API（LIFF とは別系統・独自 JWT）。/api より先に登録する。
+  if (deps.adminJwtSecret) {
+    app.route(
+      "/api/admin",
+      createAdminApp({ db: deps.db, adminJwtSecret: deps.adminJwtSecret, ...(deps.now ? { now: deps.now } : {}) }),
+    );
+  }
 
   app.route("/api", api);
   return app;

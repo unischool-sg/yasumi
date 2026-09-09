@@ -8,6 +8,10 @@ import { LineNotificationProvider } from "./infrastructure/line/line-notificatio
 const port = Number(process.env.PORT ?? 3000);
 const channelId = process.env.LIFF_CHANNEL_ID ?? "";
 const internalCronToken = process.env.INTERNAL_CRON_TOKEN ?? "";
+// ADMIN_JWT_SECRET が設定されていれば管理画面 API を有効化
+if (!process.env.ADMIN_JWT_SECRET) {
+  console.warn("[yasumi] ADMIN_JWT_SECRET 未設定のため管理画面 API(/api/admin) は無効");
+}
 const adminLineUserIds = (process.env.ADMIN_LINE_USER_IDS ?? "")
   .split(",")
   .map((s) => s.trim())
@@ -19,6 +23,7 @@ const app = createApp({
   adminLineUserIds,
   lineChannelSecret: process.env.LINE_CHANNEL_SECRET ?? "",
   internalCronToken,
+  ...(process.env.ADMIN_JWT_SECRET ? { adminJwtSecret: process.env.ADMIN_JWT_SECRET } : {}),
   warningProvider: new JmaWarningProvider(),
   notificationProvider: new LineNotificationProvider({
     accessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN ?? "",

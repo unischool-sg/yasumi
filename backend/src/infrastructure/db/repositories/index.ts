@@ -1,4 +1,5 @@
 // リポジトリ層のバレル（backend/DB.md §4）。
+export * as adminsRepo from "./admins.ts";
 export * as areasRepo from "./areas.ts";
 export * as notificationsRepo from "./notifications.ts";
 export * as rulesRepo from "./rules.ts";

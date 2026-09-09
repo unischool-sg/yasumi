@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { Db } from "../client.ts";
 import { subscriptions } from "../schema.ts";
 
@@ -34,6 +34,24 @@ export async function removeSubscription(db: Db, userId: string, schoolId: strin
   await db
     .delete(subscriptions)
     .where(and(eq(subscriptions.userId, userId), eq(subscriptions.schoolId, schoolId)));
+}
+
+/** 管理画面: 全購読一覧（新しい順・ページング）。 */
+export async function listAllSubscriptions(
+  db: Db,
+  opts: { limit?: number; offset?: number } = {},
+): Promise<SubscriptionRow[]> {
+  return db
+    .select()
+    .from(subscriptions)
+    .orderBy(desc(subscriptions.createdAt))
+    .limit(opts.limit ?? 100)
+    .offset(opts.offset ?? 0);
+}
+
+export async function countSubscriptions(db: Db): Promise<number> {
+  const rows = await db.select({ schoolId: subscriptions.schoolId }).from(subscriptions);
+  return rows.length;
 }
 
 /** 通知有効な購読ユーザーを学校単位で取得（M7 通知配信）。 */

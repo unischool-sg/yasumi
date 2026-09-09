@@ -1,4 +1,4 @@
-import { eq, ilike } from "drizzle-orm";
+import { desc, eq, ilike } from "drizzle-orm";
 import type { Db } from "../client.ts";
 import { schools } from "../schema.ts";
 
@@ -44,4 +44,23 @@ export async function updateSchool(
     .where(eq(schools.id, id))
     .returning();
   return rows[0];
+}
+
+/** 管理画面: 全学校の一覧（新しい順・ページング）。 */
+export async function listSchools(db: Db, opts: { limit?: number; offset?: number } = {}): Promise<SchoolRow[]> {
+  return db
+    .select()
+    .from(schools)
+    .orderBy(desc(schools.createdAt))
+    .limit(opts.limit ?? 100)
+    .offset(opts.offset ?? 0);
+}
+
+export async function countSchools(db: Db): Promise<number> {
+  const rows = await db.select({ id: schools.id }).from(schools);
+  return rows.length;
+}
+
+export async function deleteSchool(db: Db, id: string): Promise<void> {
+  await db.delete(schools).where(eq(schools.id, id));
 }
