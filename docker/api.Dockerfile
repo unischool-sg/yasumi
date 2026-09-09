@@ -1,25 +1,21 @@
-# やすみ？ API コンテナ（Bun / 本番向け 2 ステージ）
+# やすみ？ API コンテナ（Bun / 単一ステージ）
 # ビルドコンテキストはリポジトリルート（workspace 解決のため）。
-
-# --- deps: 依存インストール（本番のみ） ---
-FROM oven/bun:1 AS deps
+# マルチステージで node_modules をコピーすると Bun の workspace リンク方式により
+# 依存を取りこぼすため、install と実行を同一イメージで行う。
+FROM oven/bun:1
 WORKDIR /app
-# workspace の全メンバー package.json を揃えないと frozen-lockfile 解決が壊れる
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# workspace の全メンバー package.json を揃えて frozen-lockfile を解決
 COPY package.json bun.lock ./
 COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
 COPY landing/package.json ./landing/
 COPY packages/shared/package.json ./packages/shared/
-# --production は workspace メンバーの依存を入れないことがあるため付けない
 RUN bun install --frozen-lockfile
 
-# --- runtime: ソース + 本番依存 ---
-FROM oven/bun:1 AS runtime
-WORKDIR /app
-ENV NODE_ENV=production
-ENV PORT=3000
-
-COPY --from=deps /app/node_modules ./node_modules
+# ソース（api の実行に必要なぶん）
 COPY tsconfig.base.json ./
 COPY packages ./packages
 COPY backend ./backend
