@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "workspaces": [
+    "admin",
     "backend",
     "frontend",
     "landing",
@@ -13,6 +14,7 @@
     "dev:backend": "bun run --cwd backend dev",
     "dev:frontend": "bun run --cwd frontend dev",
     "dev:landing": "bun run --cwd landing dev",
+    "dev:admin": "bun run --cwd admin dev",
     "test": "bun test",
     "typecheck": "bun run --cwd packages/shared typecheck && bun run --cwd backend typecheck && bun run --cwd frontend typecheck"
   },
