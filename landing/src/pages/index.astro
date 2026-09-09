@@ -1,6 +1,9 @@
 ---
 import Layout from "../layouts/Layout.astro";
 
+// LINE 公式アカウント友だち追加（ミニアプリの入口）。
+const LINE_URL = "https://line.me/R/ti/p/%40270qmktw";
+
 const steps = [
   { n: "1", title: "LINEで友だち追加", body: "公式アカウントを追加して、ミニアプリを開きます。" },
   { n: "2", title: "学校を登録・購読", body: "学校を検索して購読。無ければ対象地域・警報・判定時刻を登録します。" },
@@ -34,7 +37,7 @@ const faqs = [
         <a href="#features">特徴</a>
         <a href="#how">使い方</a>
         <a href="#faq">FAQ</a>
-        <a href="#cta" class="btn btn-primary btn-sm">使ってみる</a>
+        <a href={LINE_URL} target="_blank" rel="noopener" class="btn btn-primary btn-sm">LINEで始める</a>
       </nav>
     </div>
   </header>
@@ -198,7 +201,7 @@ const faqs = [
       <div class="cta-card reveal">
         <h2>朝、考えなくていい毎日へ。</h2>
         <p>LINEで友だち追加するだけ。今日から自動で判定します。</p>
-        <a href="#" class="btn btn-white">使ってみる</a>
+        <a href={LINE_URL} target="_blank" rel="noopener" class="btn btn-line">LINEで友だち追加</a>
       </div>
     </div>
   </section>
@@ -211,7 +214,14 @@ const faqs = [
         本サービスは学校公式サービスではありません。気象庁の情報とユーザーが登録した学校規則をもとに自動判定しています。
         最終的な登校判断については、学校からの公式連絡をご確認ください。
       </p>
-      <p class="footer-copy">© 2026 やすみ？</p>
+      <p class="footer-credit">
+        Produced by
+        <a href="https://unischool.jp" target="_blank" rel="noopener">UniSchool</a>
+        <span class="footer-sep">/</span>
+        Developed by
+        <a href="https://x.com/tanahiro2010" target="_blank" rel="noopener">@tanahiro2010</a>
+      </p>
+      <p class="footer-copy">© 2026 やすみ？ / UniSchool</p>
     </div>
   </footer>
 </Layout>
@@ -740,6 +750,16 @@ const faqs = [
     transform: translateY(-1px);
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
   }
+  /* LINE ブランドカラーの友だち追加ボタン */
+  .btn-line {
+    background: #06c755;
+    color: #fff;
+  }
+  .btn-line:hover {
+    background: #05b34c;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(6, 199, 85, 0.35);
+  }
 
   /* Footer */
   .site-footer {
@@ -762,6 +782,22 @@ const faqs = [
     font-size: 13px;
     line-height: 1.8;
     margin: 0 0 20px;
+  }
+  .footer-credit {
+    font-size: 14px;
+    margin: 0 0 8px;
+    color: var(--muted);
+  }
+  .footer-credit a {
+    color: var(--blue);
+    font-weight: 600;
+  }
+  .footer-credit a:hover {
+    text-decoration: underline;
+  }
+  .footer-sep {
+    margin: 0 8px;
+    color: #c6cacf;
   }
   .footer-copy {
     font-size: 13px;
