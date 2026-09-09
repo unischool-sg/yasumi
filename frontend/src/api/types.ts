@@ -1,4 +1,4 @@
-import type { CheckResult, SchoolRule } from "@yasumi/shared";
+import type { CheckResult, SchoolRule, Warning } from "@yasumi/shared";
 
 /** GET /api/me */
 export interface Me {
@@ -36,4 +36,13 @@ export interface Subscription {
   notificationEnabled: boolean;
 }
 
-export type { CheckResult };
+/** GET /api/schools/:id/status（ホームの今日の状態） */
+export interface SchoolStatus {
+  schoolId: string;
+  schoolName: string;
+  date: string;
+  latest: { result: CheckResult; checkedAt: string; warnings: Warning[] } | null;
+  checks: { result: CheckResult; checkedAt: string; targetDate: string }[];
+}
+
+export type { CheckResult, Warning };

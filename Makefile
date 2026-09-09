@@ -1,6 +1,6 @@
 COMPOSE = docker compose --env-file .env -f docker/docker-compose.yml
 
-.PHONY: help install dev dev-backend dev-frontend up down logs migrate generate seed test typecheck clean
+.PHONY: help install dev dev-backend dev-frontend dev-landing up down logs migrate generate seed test typecheck clean
 
 help: ## このヘルプを表示
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -15,6 +15,9 @@ dev-backend: ## backend を開発起動 (--watch)
 
 dev-frontend: ## frontend を開発起動 (Vite)
 	bun run --cwd frontend dev
+
+dev-landing: ## LP を開発起動 (Astro)
+	bun run --cwd landing dev
 
 up: ## api + postgres コンテナを起動
 	$(COMPOSE) up -d --build

@@ -11,7 +11,8 @@ LINE で通知する LINE ミニアプリ / LIFF サービス。
 ```text
 yasumi/
 ├─ backend/          Hono on Bun（API + プロセス内 cron）      … backend/SPEC.md, backend/CRON.md
-├─ frontend/         Vite + React + Tailwind v4 + LIFF          … frontend/SPEC.md
+├─ frontend/         Vite + React + MUI(Material) + LIFF        … frontend/SPEC.md
+├─ landing/          Astro 製ランディングページ（LP）
 ├─ packages/
 │  └─ shared/        backend/frontend 共有の型 (@yasumi/shared)
 ├─ docker/           docker-compose（api + postgres）           … docker/SPEC.md

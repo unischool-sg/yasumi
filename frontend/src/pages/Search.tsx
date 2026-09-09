@@ -1,3 +1,19 @@
+import CheckIcon from "@mui/icons-material/Check";
+import SearchIcon from "@mui/icons-material/Search";
+import {
+  Avatar,
+  Box,
+  Button,
+  Card,
+  InputAdornment,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
+  Paper,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { useState } from "react";
 import type { ApiClient } from "../api/client.ts";
 import type { SchoolSummary } from "../api/types.ts";
@@ -7,10 +23,10 @@ interface Props {
   subscribedIds: Set<string>;
   onSubscribed: () => void;
   onRegister: (name: string) => void;
+  onNotify: (message: string) => void;
 }
 
-/** 学校検索 → 購読（PRD §11, §12）。 */
-export function Search({ api, subscribedIds, onSubscribed, onRegister }: Props) {
+export function Search({ api, subscribedIds, onSubscribed, onRegister, onNotify }: Props) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<SchoolSummary[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -31,65 +47,90 @@ export function Search({ api, subscribedIds, onSubscribed, onRegister }: Props) 
     try {
       await api.subscribe(schoolId);
       onSubscribed();
+      onNotify("通知をONにしました");
     } finally {
       setBusyId(null);
     }
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex gap-2">
-        <input
-          className="flex-1 rounded-lg border border-slate-300 px-3 py-2"
+    <Box>
+      <Paper
+        elevation={2}
+        sx={{ display: "flex", alignItems: "center", gap: 1, p: 0.75, pl: 1.5, borderRadius: 999 }}
+      >
+        <TextField
+          fullWidth
+          size="small"
+          variant="standard"
           placeholder="学校名で検索"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && search()}
+          slotProps={{
+            input: {
+              disableUnderline: true,
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon color="action" />
+                </InputAdornment>
+              ),
+            },
+          }}
         />
-        <button
-          className="rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white disabled:opacity-50"
-          onClick={search}
-          disabled={loading}
-        >
+        <Button variant="contained" onClick={search} disabled={loading || !q.trim()}>
           検索
-        </button>
-      </div>
+        </Button>
+      </Paper>
 
       {results?.length === 0 && (
-        <div className="rounded-xl bg-white p-4 text-center shadow">
-          <p className="text-sm text-slate-500">学校が見つかりません。</p>
-          <button
-            className="mt-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
-            onClick={() => onRegister(q.trim())}
-          >
-            学校を新規登録
-          </button>
-        </div>
+        <Card sx={{ mt: 2, p: 3, textAlign: "center" }}>
+          <Typography variant="body2" color="text.secondary">
+            「{q}」は見つかりませんでした。
+          </Typography>
+          <Button variant="contained" onClick={() => onRegister(q.trim())} sx={{ mt: 2 }}>
+            この学校を新規登録
+          </Button>
+        </Card>
       )}
 
-      <ul className="flex flex-col gap-2">
-        {results?.map((s) => {
-          const subscribed = subscribedIds.has(s.id);
-          return (
-            <li key={s.id} className="flex items-center justify-between rounded-xl bg-white p-4 shadow">
-              <div>
-                <p className="font-semibold">{s.name}</p>
-                <p className="text-sm text-slate-500">
-                  {s.prefecture}
-                  {s.city ? ` ${s.city}` : ""}
-                </p>
-              </div>
-              <button
-                className="rounded-lg border border-emerald-600 px-3 py-1 text-sm font-semibold text-emerald-700 disabled:opacity-50"
-                onClick={() => subscribe(s.id)}
-                disabled={subscribed || busyId === s.id}
-              >
-                {subscribed ? "登録済み" : "この学校を登録"}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+      {results && results.length > 0 && (
+        <Card sx={{ mt: 2 }}>
+          <List disablePadding>
+            {results.map((s, i) => {
+              const subscribed = subscribedIds.has(s.id);
+              return (
+                <ListItem
+                  key={s.id}
+                  divider={i < results.length - 1}
+                  secondaryAction={
+                    subscribed ? (
+                      <Button size="small" color="success" startIcon={<CheckIcon />} disabled>
+                        登録済み
+                      </Button>
+                    ) : (
+                      <Button size="small" variant="contained" disabled={busyId === s.id} onClick={() => subscribe(s.id)}>
+                        登録
+                      </Button>
+                    )
+                  }
+                >
+                  <ListItemAvatar>
+                    <Avatar sx={{ bgcolor: "#e8f0fe", color: "#1a73e8", width: 36, height: 36, fontSize: 16 }}>
+                      {s.name.charAt(0)}
+                    </Avatar>
+                  </ListItemAvatar>
+                  <ListItemText
+                    primary={s.name}
+                    secondary={`${s.prefecture}${s.city ? ` ${s.city}` : ""}`}
+                    slotProps={{ primary: { noWrap: true, sx: { fontWeight: 600 } } }}
+                  />
+                </ListItem>
+              );
+            })}
+          </List>
+        </Card>
+      )}
+    </Box>
   );
 }

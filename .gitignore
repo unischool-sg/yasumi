@@ -12,6 +12,10 @@ build/
 frontend/dist/
 *.local
 
+# astro
+.astro/
+landing/dist/
+
 # env / secrets
 .env
 .env.*

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { type ApiClient, createApiClient } from "../api/client.ts";
+import { createMockClient } from "../api/mock-client.ts";
 import { getIdToken, initLiff } from "../lib/liff.ts";
 
 export interface LiffState {
@@ -14,6 +15,11 @@ export function useLiff(): LiffState {
 
   useEffect(() => {
     let cancelled = false;
+    // デザイン確認用モックモード（VITE_MOCK=1）: LIFF/バックエンド無しで実画面を表示。
+    if (import.meta.env.VITE_MOCK === "1") {
+      setState({ status: "ready", api: createMockClient() });
+      return;
+    }
     (async () => {
       try {
         await initLiff();

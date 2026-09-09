@@ -1,5 +1,24 @@
+import AddIcon from "@mui/icons-material/Add";
+import CloseIcon from "@mui/icons-material/Close";
 import type { CheckResult } from "@yasumi/shared";
-import { type ReactNode, useEffect, useState } from "react";
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  FormControl,
+  IconButton,
+  InputLabel,
+  MenuItem,
+  Select,
+  Stack,
+  Step,
+  StepLabel,
+  Stepper,
+  TextField,
+  Typography,
+} from "@mui/material";
+import { useEffect, useState } from "react";
 import type { ApiClient } from "../api/client.ts";
 import type { Area } from "../api/types.ts";
 import { CHECK_TIME_OPTIONS, RESULT_OPTIONS, WARNING_TYPE_OPTIONS } from "../lib/options.ts";
@@ -16,9 +35,10 @@ interface RuleDraft {
   result: CheckResult;
 }
 
-/** 学校登録（4ステップ / PRD §13）。基本情報 → 対象地域 → 対象警報 → 判定ルール。 */
+const STEPS = ["基本情報", "対象地域", "対象警報", "判定ルール"];
+
 export function Register({ api, initialName, onDone, onCancel }: Props) {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0);
   const [name, setName] = useState(initialName ?? "");
   const [prefecture, setPrefecture] = useState("兵庫県");
   const [city, setCity] = useState("");
@@ -31,15 +51,14 @@ export function Register({ api, initialName, onDone, onCancel }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (step === 2 && areas.length === 0) {
+    if (step === 1 && areas.length === 0) {
       api.listAreas(prefecture).then(setAreas).catch(() => setAreas([]));
     }
   }, [step, prefecture, areas.length, api]);
 
   function toggle(set: Set<string>, key: string, setter: (s: Set<string>) => void) {
     const next = new Set(set);
-    if (next.has(key)) next.delete(key);
-    else next.add(key);
+    next.has(key) ? next.delete(key) : next.add(key);
     setter(next);
   }
 
@@ -65,143 +84,142 @@ export function Register({ api, initialName, onDone, onCancel }: Props) {
     }
   }
 
+  const canNext = step === 0 ? name.trim().length > 0 : true;
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-slate-500">ステップ {step} / 4</p>
-        <button className="text-sm text-slate-400" onClick={onCancel}>
-          キャンセル
-        </button>
-      </div>
+    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "70vh" }}>
+      <Stepper activeStep={step} alternativeLabel sx={{ mb: 3 }}>
+        {STEPS.map((label) => (
+          <Step key={label}>
+            <StepLabel>{label}</StepLabel>
+          </Step>
+        ))}
+      </Stepper>
 
-      {step === 1 && (
-        <div className="flex flex-col gap-3">
-          <Field label="学校名">
-            <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} />
-          </Field>
-          <Field label="都道府県">
-            <input className={inputCls} value={prefecture} onChange={(e) => setPrefecture(e.target.value)} />
-          </Field>
-          <Field label="市区町村">
-            <input className={inputCls} value={city} onChange={(e) => setCity(e.target.value)} />
-          </Field>
-          <Field label="学校公式サイト (任意)">
-            <input className={inputCls} value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} />
-          </Field>
-        </div>
-      )}
-
-      {step === 2 && (
-        <div className="flex flex-col gap-2">
-          <p className="text-sm text-slate-500">警報判定に使う地域を選択（複数可）</p>
-          {areas.map((a) => (
-            <label key={a.code} className="flex items-center gap-2 rounded-lg bg-white p-2 shadow-sm">
-              <input
-                type="checkbox"
-                checked={areaCodes.has(a.code)}
-                onChange={() => toggle(areaCodes, a.code, setAreaCodes)}
-              />
-              {a.name}
-            </label>
-          ))}
-          {areas.length === 0 && <p className="text-sm text-slate-400">対象地域データがありません。</p>}
-        </div>
-      )}
-
-      {step === 3 && (
-        <div className="flex flex-col gap-2">
-          <p className="text-sm text-slate-500">対象とする警報を選択（複数可）</p>
-          {WARNING_TYPE_OPTIONS.map((w) => (
-            <label key={w} className="flex items-center gap-2 rounded-lg bg-white p-2 shadow-sm">
-              <input type="checkbox" checked={warningTypes.has(w)} onChange={() => toggle(warningTypes, w, setWarningTypes)} />
-              {w}
-            </label>
-          ))}
-        </div>
-      )}
-
-      {step === 4 && (
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-slate-500">判定時刻ごとの結果（30分刻み）</p>
-          {rules.map((r, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <select
-                className={inputCls}
-                value={r.checkTime}
-                onChange={(e) => setRules(rules.map((x, j) => (j === i ? { ...x, checkTime: e.target.value } : x)))}
-              >
-                {CHECK_TIME_OPTIONS.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-              <select
-                className={inputCls}
-                value={r.result}
-                onChange={(e) => setRules(rules.map((x, j) => (j === i ? { ...x, result: e.target.value as CheckResult } : x)))}
-              >
-                {RESULT_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-              {rules.length > 1 && (
-                <button className="text-slate-400" onClick={() => setRules(rules.filter((_, j) => j !== i))}>
-                  ×
-                </button>
-              )}
-            </div>
-          ))}
-          <button
-            className="self-start text-sm font-semibold text-emerald-700"
-            onClick={() => setRules([...rules, { checkTime: "10:00", result: "FULL_OFF" }])}
-          >
-            + 判定時刻を追加
-          </button>
-        </div>
-      )}
-
-      {error && <p className="text-sm text-red-600">{error}</p>}
-
-      <div className="mt-2 flex justify-between">
-        <button
-          className="rounded-lg border border-slate-300 px-4 py-2 text-sm disabled:opacity-40"
-          onClick={() => setStep(step - 1)}
-          disabled={step === 1}
-        >
-          戻る
-        </button>
-        {step < 4 ? (
-          <button
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
-            onClick={() => setStep(step + 1)}
-            disabled={step === 1 && !name.trim()}
-          >
-            次へ
-          </button>
-        ) : (
-          <button
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
-            onClick={submit}
-            disabled={submitting || rules.length === 0}
-          >
-            {submitting ? "登録中…" : "登録して購読"}
-          </button>
+      <Box sx={{ flex: 1 }}>
+        {step === 0 && (
+          <Stack spacing={2.5}>
+            <TextField label="学校名" value={name} onChange={(e) => setName(e.target.value)} fullWidth />
+            <TextField label="都道府県" value={prefecture} onChange={(e) => setPrefecture(e.target.value)} fullWidth />
+            <TextField label="市区町村" value={city} onChange={(e) => setCity(e.target.value)} fullWidth />
+            <TextField label="学校公式サイト（任意）" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} fullWidth />
+          </Stack>
         )}
-      </div>
-    </div>
-  );
-}
 
-const inputCls = "flex-1 rounded-lg border border-slate-300 px-3 py-2";
+        {step === 1 && (
+          <Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              警報判定に使う地域を選択（複数可）
+            </Typography>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+              {areas.map((a) => {
+                const on = areaCodes.has(a.code);
+                return (
+                  <Chip
+                    key={a.code}
+                    label={a.name}
+                    clickable
+                    color={on ? "primary" : "default"}
+                    variant={on ? "filled" : "outlined"}
+                    onClick={() => toggle(areaCodes, a.code, setAreaCodes)}
+                  />
+                );
+              })}
+              {areas.length === 0 && (
+                <Typography variant="body2" color="text.disabled">
+                  対象地域データがありません。
+                </Typography>
+              )}
+            </Box>
+          </Box>
+        )}
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1 text-sm font-semibold text-slate-600">
-      {label}
-      {children}
-    </label>
+        {step === 2 && (
+          <Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              対象とする警報を選択（複数可）
+            </Typography>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+              {WARNING_TYPE_OPTIONS.map((w) => {
+                const on = warningTypes.has(w);
+                return (
+                  <Chip
+                    key={w}
+                    label={w}
+                    clickable
+                    color={on ? "primary" : "default"}
+                    variant={on ? "filled" : "outlined"}
+                    onClick={() => toggle(warningTypes, w, setWarningTypes)}
+                  />
+                );
+              })}
+            </Box>
+          </Box>
+        )}
+
+        {step === 3 && (
+          <Stack spacing={1.5}>
+            <Typography variant="body2" color="text.secondary">
+              判定時刻ごとの結果（30分刻み）
+            </Typography>
+            {rules.map((r, i) => (
+              <Stack key={i} direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                <FormControl size="small" sx={{ minWidth: 100 }}>
+                  <InputLabel>時刻</InputLabel>
+                  <Select
+                    label="時刻"
+                    value={r.checkTime}
+                    onChange={(e) => setRules(rules.map((x, j) => (j === i ? { ...x, checkTime: e.target.value } : x)))}
+                  >
+                    {CHECK_TIME_OPTIONS.map((t) => (
+                      <MenuItem key={t} value={t}>{t}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Typography color="text.secondary">→</Typography>
+                <FormControl size="small" fullWidth>
+                  <InputLabel>結果</InputLabel>
+                  <Select
+                    label="結果"
+                    value={r.result}
+                    onChange={(e) => setRules(rules.map((x, j) => (j === i ? { ...x, result: e.target.value as CheckResult } : x)))}
+                  >
+                    {RESULT_OPTIONS.map((o) => (
+                      <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                {rules.length > 1 && (
+                  <IconButton size="small" onClick={() => setRules(rules.filter((_, j) => j !== i))}>
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                )}
+              </Stack>
+            ))}
+            <Button startIcon={<AddIcon />} onClick={() => setRules([...rules, { checkTime: "10:00", result: "FULL_OFF" }])} sx={{ alignSelf: "flex-start" }}>
+              判定時刻を追加
+            </Button>
+          </Stack>
+        )}
+      </Box>
+
+      {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+
+      <Stack direction="row" spacing={1.5} sx={{ mt: 3, position: "sticky", bottom: 0, bgcolor: "background.default", py: 2 }}>
+        <Button onClick={step === 0 ? onCancel : () => setStep(step - 1)} color="inherit">
+          {step === 0 ? "キャンセル" : "戻る"}
+        </Button>
+        <Box sx={{ flex: 1 }} />
+        {step < STEPS.length - 1 ? (
+          <Button variant="contained" onClick={() => setStep(step + 1)} disabled={!canNext}>
+            次へ
+          </Button>
+        ) : (
+          <Button variant="contained" onClick={submit} disabled={submitting || rules.length === 0}>
+            {submitting ? "登録中…" : "登録して通知をON"}
+          </Button>
+        )}
+      </Stack>
+    </Box>
   );
 }

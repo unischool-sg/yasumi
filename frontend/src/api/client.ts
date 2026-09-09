@@ -1,5 +1,5 @@
 import type { CheckResult, SchoolRule } from "@yasumi/shared";
-import type { Area, Me, SchoolDetail, SchoolSummary, Subscription } from "./types.ts";
+import type { Area, Me, SchoolDetail, SchoolStatus, SchoolSummary, Subscription } from "./types.ts";
 
 export interface NewSchoolInput {
   name: string;
@@ -39,6 +39,7 @@ export function createApiClient(idToken: string) {
     searchSchools: (q: string) =>
       request<SchoolSummary[]>(`/api/schools/search?q=${encodeURIComponent(q)}`),
     getSchool: (id: string) => request<SchoolDetail>(`/api/schools/${id}`),
+    getStatus: (id: string) => request<SchoolStatus>(`/api/schools/${id}/status`),
     listAreas: (prefecture?: string) =>
       request<Area[]>(`/api/areas${prefecture ? `?prefecture=${encodeURIComponent(prefecture)}` : ""}`),
     listSubscriptions: () => request<Subscription[]>("/api/me/subscriptions"),
