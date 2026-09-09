@@ -13,6 +13,7 @@ import { createRule } from "../infrastructure/db/repositories/rules.ts";
 import { createSchool } from "../infrastructure/db/repositories/schools.ts";
 import * as schema from "../infrastructure/db/schema.ts";
 import { upsertSubscription } from "../infrastructure/db/repositories/subscriptions.ts";
+import { upsertDeviceToken } from "../infrastructure/db/repositories/device-tokens.ts";
 import { findOrCreateByLineUserId } from "../infrastructure/db/repositories/users.ts";
 import { runCheck } from "./run-check.ts";
 
@@ -42,7 +43,7 @@ suite("runCheck pipeline", () => {
   const sent: { lineUserId: string; text: string }[] = [];
   const notifier: NotificationProvider = {
     send: async (target, message) => {
-      sent.push({ lineUserId: target.lineUserId, text: message.text });
+      sent.push({ lineUserId: target.lineUserId ?? "", text: message.text });
     },
   };
   let schoolId: string;
@@ -119,5 +120,40 @@ suite("runCheck pipeline", () => {
     expect(summary.fetchFailed).toBe(true);
     expect(summary.notificationsSent).toBe(1);
     expect(sent[0]?.text).toContain("判定できませんでした");
+  });
+
+  it("デバイストークン登録済み → FCM(pushProvider)へ送信し LINE には送らない", async () => {
+    const s = await createSchool(db, { name: "FCM校", prefecture: "兵庫県" });
+    await cfg.setAreaCodes(db, s.id, [SANDA]);
+    await cfg.setWarningTypes(db, s.id, ["暴風警報"]);
+    await createRule(db, { schoolId: s.id, checkTime: "09:00", result: "AM_OFF" });
+    const { userId } = await findOrCreateByLineUserId(db, "Ucron_fcm");
+    await upsertSubscription(db, { userId, schoolId: s.id });
+    await upsertDeviceToken(db, { userId, platform: "android", token: "devtok-1" });
+
+    const pushSent: { deviceTokens: string[]; text: string }[] = [];
+    const pushProvider: NotificationProvider = {
+      send: async (target, message) => {
+        pushSent.push({ deviceTokens: target.deviceTokens ?? [], text: message.text });
+      },
+    };
+
+    sent.length = 0;
+    const at0900 = new Date("2026-09-09T09:00:00+09:00");
+    const summary = await runCheck(
+      {
+        db,
+        warningProvider: providerReturning(activeStorm),
+        notificationProvider: notifier,
+        pushProvider,
+        now: () => at0900,
+      },
+      { triggeredAt: at0900 },
+    );
+
+    expect(summary.notificationsSent).toBe(1);
+    expect(pushSent).toHaveLength(1);
+    expect(pushSent[0]?.deviceTokens).toEqual(["devtok-1"]);
+    expect(sent).toHaveLength(0); // LINE には送らない（FCM 優先）
   });
 });

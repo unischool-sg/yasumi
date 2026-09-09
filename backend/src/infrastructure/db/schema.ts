@@ -35,6 +35,17 @@ export const lineAccounts = pgTable("line_accounts", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ネイティブアプリ/PWA の FCM(APNs 含む) デバイストークン（1ユーザー多デバイス）。
+// 無料プッシュ通知の送信先。line_accounts と同じく users.id にひも付く。
+export const deviceTokens = pgTable("device_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull(),
+  platform: varchar("platform", { length: 20 }).notNull(), // 'ios' | 'android' | 'web'
+  token: text("token").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const schools = pgTable("schools", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: varchar("name", { length: 255 }).notNull(),

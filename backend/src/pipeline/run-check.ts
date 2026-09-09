@@ -6,6 +6,7 @@ import { shouldNotify } from "../domain/notification/provider.ts";
 import type { WarningProvider } from "../domain/warning/provider.ts";
 import type { Db } from "../infrastructure/db/client.ts";
 import * as cfg from "../infrastructure/db/repositories/school-config.ts";
+import * as deviceTokensRepo from "../infrastructure/db/repositories/device-tokens.ts";
 import * as notificationsRepo from "../infrastructure/db/repositories/notifications.ts";
 import * as rulesRepo from "../infrastructure/db/repositories/rules.ts";
 import * as subscriptionsRepo from "../infrastructure/db/repositories/subscriptions.ts";
@@ -16,7 +17,10 @@ import { jstDateString, jstHhmm } from "../shared/jst.ts";
 export interface RunCheckDeps {
   db: Db;
   warningProvider: WarningProvider;
+  /** LINE プッシュ（デバイストークン未登録ユーザーへのフォールバック）。 */
   notificationProvider: NotificationProvider;
+  /** FCM プッシュ（デバイストークン登録済みユーザーへ。無料・優先）。未設定なら LINE のみ。 */
+  pushProvider?: NotificationProvider;
   now?: () => Date;
 }
 
@@ -135,10 +139,17 @@ export async function runCheck(
       });
       if (!notifCreated || !notifRow) continue;
 
-      const lineUserId = await usersRepo.getLineUserId(deps.db, sub.userId);
-      if (!lineUserId) continue;
+      // 通知先の解決: デバイストークンがあれば FCM(無料)、無ければ LINE プッシュ(フォールバック)
+      const deviceTokens = await deviceTokensRepo.listTokensByUser(deps.db, sub.userId);
+      const push = deps.pushProvider;
       try {
-        await deps.notificationProvider.send({ lineUserId }, { text });
+        if (deviceTokens.length > 0 && push) {
+          await push.send({ deviceTokens }, { text });
+        } else {
+          const lineUserId = await usersRepo.getLineUserId(deps.db, sub.userId);
+          if (!lineUserId) continue;
+          await deps.notificationProvider.send({ lineUserId }, { text });
+        }
         await notificationsRepo.markNotificationSent(deps.db, notifRow.id, now());
         summary.notificationsSent++;
       } catch {
