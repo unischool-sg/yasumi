@@ -110,15 +110,18 @@ M8 デプロイ / 一般公開
 
 **目的**: LIFF ログイン → User 作成 → 学校検索 → 購読までを API で。
 
-- [ ] LIFF IDトークンのサーバー側検証ミドルウェア（`lineUserId` を信用しない / §21）
-- [ ] `GET /api/me`（初回 users + line_accounts 作成）
-- [ ] `GET /api/schools` / `:id` / `search?q=`
-- [ ] `GET /api/areas` / `?prefecture=`
-- [ ] `GET/POST/DELETE /api/me/subscriptions`
-- [ ] Frontend: `useLiff` / `useMe` / API クライアント / 学校検索・購読画面
-- [ ] Rate Limit / CSRF / 入力バリデーション（§54）
+> 📄 **詳細仕様確定済み**: [backend/API.md](./backend/API.md)
+
+- [x] LIFF IDトークンのサーバー側検証ミドルウェア（`lineUserId` を信用しない / §21）
+- [x] `GET /api/me`（初回 users + line_accounts 作成）
+- [x] `GET /api/schools/:id` / `search?q=`
+- [x] `GET /api/areas` / `?prefecture=`
+- [x] `GET/POST/DELETE /api/me/subscriptions`
+- [x] Frontend: `useLiff` / API クライアント / ホーム(購読一覧)・学校検索・購読画面
+- [x] Rate Limit / secure-headers / cors / 入力バリデーション(zod)（§54）
 
 **完了条件**: LIFF 上でログイン → 学校を検索 → 購読でき、DBに反映される。
+→ **達成**（API 結合テスト 7 件 green・frontend build/typecheck OK。LIFF 実機は要 LINE 環境）
 
 **依存**: M3（DB）
 

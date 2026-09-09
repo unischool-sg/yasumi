@@ -1,18 +1,79 @@
-import { CHECK_RESULT_LABEL, type CheckResult } from "@yasumi/shared";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
+import type { ApiClient } from "./api/client.ts";
+import type { Subscription } from "./api/types.ts";
+import { useLiff } from "./hooks/useLiff.ts";
+import { Home } from "./pages/Home.tsx";
+import { Search } from "./pages/Search.tsx";
 
-// M0 プレースホルダ: Tailwind が効くこと + @yasumi/shared の型 import が
-// 通ることを確認するための最小 UI。本実装は M4/M5 で置き換える。
-const result: CheckResult = "NORMAL";
+type Tab = "home" | "search";
 
 export function App() {
+  const liff = useLiff();
+
+  if (liff.status === "loading") return <Centered>読み込み中…</Centered>;
+  if (liff.status === "error" || !liff.api) {
+    return <Centered>エラー: {liff.error ?? "初期化に失敗しました"}</Centered>;
+  }
+  return <Main api={liff.api} />;
+}
+
+function Main({ api }: { api: ApiClient }) {
+  const [tab, setTab] = useState<Tab>("home");
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+
+  const reload = useCallback(() => {
+    api.listSubscriptions().then(setSubscriptions).catch(() => setSubscriptions([]));
+  }, [api]);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  const subscribedIds = new Set(subscriptions.map((s) => s.schoolId));
+
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-slate-50 p-6 text-slate-800">
-      <h1 className="text-3xl font-bold">やすみ？</h1>
-      <div className="flex items-center gap-2 rounded-2xl bg-white px-6 py-4 shadow">
-        <span className="text-2xl">🟢</span>
-        <span className="text-xl font-semibold">{CHECK_RESULT_LABEL[result]}</span>
-      </div>
-      <p className="text-sm text-slate-500">M0 基盤セットアップ — プレースホルダ画面</p>
-    </main>
+    <div className="min-h-dvh bg-slate-50 text-slate-800">
+      <header className="border-b border-slate-200 bg-white px-4 py-3">
+        <h1 className="text-lg font-bold">やすみ？</h1>
+      </header>
+
+      <nav className="flex border-b border-slate-200 bg-white">
+        <TabButton active={tab === "home"} onClick={() => setTab("home")}>
+          ホーム
+        </TabButton>
+        <TabButton active={tab === "search"} onClick={() => setTab("search")}>
+          学校を探す
+        </TabButton>
+      </nav>
+
+      <main className="mx-auto max-w-md p-4">
+        {tab === "home" ? (
+          <Home api={api} subscriptions={subscriptions} onChanged={reload} />
+        ) : (
+          <Search api={api} subscribedIds={subscribedIds} onSubscribed={reload} />
+        )}
+      </main>
+
+      <footer className="mx-auto max-w-md px-4 pb-8 pt-4 text-xs text-slate-400">
+        本サービスは学校公式ではありません。最終的な登校判断は学校からの公式連絡をご確認ください。
+      </footer>
+    </div>
+  );
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      className={`flex-1 py-3 text-sm font-semibold ${active ? "border-b-2 border-emerald-600 text-emerald-700" : "text-slate-500"}`}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Centered({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex min-h-dvh items-center justify-center p-6 text-center text-slate-600">{children}</div>
   );
 }
