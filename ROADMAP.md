@@ -148,13 +148,16 @@ M8 デプロイ / 一般公開
 
 **目的**: 判定結果を LINE Messaging API で通知できる。
 
-- [ ] `infrastructure/line/`: Push 送信 / Webhook 署名検証（§54）
-- [ ] `NotificationProvider` 抽象 + `LineNotificationProvider`（§50）
-- [ ] 通知文面: 午前休 / 全日休校 / UNKNOWN（§18, §52）
-- [ ] 通知条件: NORMAL は通知しない（§19）
-- [ ] `POST /api/webhooks/line`（友だち追加・メッセージ対応の最小実装）
+> 📄 **詳細仕様確定済み**: [backend/LINE.md](./backend/LINE.md)
+
+- [x] `infrastructure/line/`: Push 送信 / Webhook 署名検証（§54）
+- [x] `NotificationProvider` 抽象 + `LineNotificationProvider`（§50）
+- [x] 通知文面: 午前休 / 全日休校 / UNKNOWN（§18, §52）
+- [x] 通知条件: NORMAL は通知しない（`shouldNotify` §19）
+- [x] `POST /api/webhooks/line`（署名検証・最小実装）
 
 **完了条件**: 任意の User へ判定結果の Push を送れる。署名検証が効いている。
+→ **達成**（provider/メッセージ/署名 のテスト green・Webhook ルート 401/200 確認）
 
 **依存**: M4（User / line_accounts）
 

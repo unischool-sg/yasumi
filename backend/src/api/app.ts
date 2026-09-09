@@ -6,6 +6,7 @@ import { z } from "zod";
 import { type AuthDeps, type AuthEnv, authMiddleware } from "./auth.ts";
 import { checkSchoolEditable } from "./authz.ts";
 import { rateLimit } from "./middleware/rate-limit.ts";
+import { verifySignature } from "../infrastructure/line/webhook.ts";
 import * as areasRepo from "../infrastructure/db/repositories/areas.ts";
 import * as cfg from "../infrastructure/db/repositories/school-config.ts";
 import * as rulesRepo from "../infrastructure/db/repositories/rules.ts";
@@ -15,6 +16,8 @@ import * as subsRepo from "../infrastructure/db/repositories/subscriptions.ts";
 export interface AppDeps extends AuthDeps {
   /** 管理者の LINE ユーザーID（学校/ルール編集の許可 / PRD §23）。 */
   adminLineUserIds?: string[];
+  /** LINE Webhook 署名検証用のチャネルシークレット（PRD §54）。 */
+  lineChannelSecret?: string;
 }
 
 const checkResultSchema = z.enum(["NORMAL", "WAIT", "AM_OFF", "PM_START", "FULL_OFF", "UNKNOWN"]);
@@ -31,6 +34,19 @@ export function createApp(deps: AppDeps) {
   app.use("*", cors());
 
   app.get("/health", (c) => c.json({ status: "ok" }));
+
+  // LINE Webhook（認証不要・署名必須 / PRD §37, §54）。auth より前に登録する。
+  app.post("/api/webhooks/line", async (c) => {
+    const secret = deps.lineChannelSecret;
+    if (!secret) return c.json({ error: "webhook not configured" }, 503);
+    const rawBody = await c.req.text();
+    const signature = c.req.header("x-line-signature");
+    if (!verifySignature(rawBody, signature, secret)) {
+      return c.json({ error: "invalid signature" }, 401);
+    }
+    // MVP: イベントは最小処理（200 応答）。友だち追加/リッチメニューは将来（§20）。
+    return c.json({ ok: true });
+  });
 
   const api = new Hono<AuthEnv>();
   api.use("*", rateLimit());

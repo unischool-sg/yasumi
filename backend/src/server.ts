@@ -13,6 +13,7 @@ const app = createApp({
   db: getDb(),
   verifyIdToken: createLineIdTokenVerifier(channelId),
   adminLineUserIds,
+  lineChannelSecret: process.env.LINE_CHANNEL_SECRET ?? "",
 });
 
 // M7: ここで startCron(app) を呼び、30分ごとに app.fetch("/api/internal/run-check")
