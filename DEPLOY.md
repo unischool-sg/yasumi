@@ -129,11 +129,12 @@ VITE_LIFF_ID=<liff-id> VITE_API_BASE_URL=https://<ドメイン> bun run --cwd fr
 前提: `docker` / `docker compose` / `git` が入っており、実行ユーザーが docker を sudo なしで使える
 （`sudo usermod -aG docker $USER` 後に再ログイン）。
 
-**(a) 秘密情報ファイル `~/yasumi.env` を作成**（runner サービスユーザーのホーム）:
+**(a) 秘密情報ファイル `~/yasumi-prod/.env` を作成**（本番の「やすみ」関連はすべて `~/yasumi-prod/` に集約）:
 
 ```bash
+mkdir -p ~/yasumi-prod
 # 例。実値を設定（.env.example 参照）
-cat > ~/yasumi.env <<'EOF'
+cat > ~/yasumi-prod/.env <<'EOF'
 PORT=3000
 API_PORT=3000
 POSTGRES_PORT=5432
@@ -147,8 +148,11 @@ LIFF_CHANNEL_ID=<...>
 INTERNAL_CRON_TOKEN=<推測困難な値>
 ADMIN_LINE_USER_IDS=<自分のlineUserId>
 EOF
-chmod 600 ~/yasumi.env
+chmod 600 ~/yasumi-prod/.env
 ```
+
+> デプロイ時、ワークフローがソースを `~/yasumi-prod/` に同期し、そこから
+> `docker compose` を実行する。`.env` は同ディレクトリに保持される（同期対象外）。
 
 **(b) self-hosted runner をインストールし常駐**（ラベル `unischool`）:
 
