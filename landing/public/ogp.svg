@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#fff"/>
+
+  <rect x="0" y="0" width="300" height="12" fill="#4285f4"/>
+  <rect x="300" y="0" width="300" height="12" fill="#ea4335"/>
+  <rect x="600" y="0" width="300" height="12" fill="#fbbc04"/>
+  <rect x="900" y="0" width="300" height="12" fill="#34a853"/>
+
+  <g font-family="Hiragino Sans">
+    <text x="116" y="248" fill="#202124" font-size="104" font-weight="800">やすみ？</text>
+    <text x="122" y="330" fill="#5f6368" font-size="38" font-weight="400">今日、学校ある？を自動で。</text>
+
+    <rect x="124" y="420" width="248" height="58" rx="29" fill="#1a73e8"/>
+    <text x="158" y="458" fill="#fff" font-size="28" font-weight="700">LINEで通知</text>
+
+    <rect x="720" y="120" width="348" height="390" rx="28" fill="#f8fafd"/>
+    <rect x="720" y="120" width="348" height="390" rx="28" fill="none" stroke="#dadce0" stroke-width="2"/>
+
+    <rect x="760" y="166" width="168" height="44" rx="22" fill="#e8f0fe"/>
+    <text x="786" y="197" fill="#1967d2" font-size="24" font-weight="700">今日の判定</text>
+
+    <text x="760" y="304" fill="#202124" font-size="64" font-weight="800">午前休</text>
+    <text x="764" y="366" fill="#5f6368" font-size="28" font-weight="400">暴風警報により</text>
+
+    <circle cx="784" cy="438" r="12" fill="#34a853"/>
+    <circle cx="836" cy="438" r="12" fill="#fbbc04"/>
+    <circle cx="888" cy="438" r="12" fill="#ea4335"/>
+    <circle cx="940" cy="438" r="12" fill="#4285f4"/>
+  </g>
+</svg>

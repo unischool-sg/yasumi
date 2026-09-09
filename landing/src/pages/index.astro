@@ -1,8 +1,8 @@
 ---
 import Layout from "../layouts/Layout.astro";
-
-// LINE 公式アカウント友だち追加（ミニアプリの入口）。
-const LINE_URL = "https://line.me/R/ti/p/%40270qmktw";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+import { LINE_URL } from "../consts";
 
 const steps = [
   { n: "1", title: "LINEで友だち追加", body: "公式アカウントを追加して、ミニアプリを開きます。" },
@@ -24,23 +24,23 @@ const faqs = [
   { q: "自分の学校が登録されていません。", a: "アプリから新しく登録できます。対象地域・対象警報・判定時刻（30分刻み）を設定するだけ。登録内容は同じ学校のみんなで共有されます。" },
   { q: "どの地域に対応していますか？", a: "気象庁の地域コードに基づいて判定します。まずは兵庫県から対応を広げています。" },
 ];
+
+// FAQ の構造化データ（検索リッチリザルト狙い）。
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqs.map((f) => ({
+    "@type": "Question",
+    name: f.q,
+    acceptedAnswer: { "@type": "Answer", text: f.a },
+  })),
+};
 ---
 
 <Layout>
-  <!-- Header -->
-  <header class="site-header">
-    <div class="container header-inner">
-      <a href="/" class="brand">
-        <span class="brand-name">やすみ？</span>
-      </a>
-      <nav class="header-nav">
-        <a href="#features">特徴</a>
-        <a href="#how">使い方</a>
-        <a href="#faq">FAQ</a>
-        <a href={LINE_URL} target="_blank" rel="noopener" class="btn btn-primary btn-sm">LINEで始める</a>
-      </nav>
-    </div>
-  </header>
+  <script slot="head" type="application/ld+json" set:html={JSON.stringify(faqJsonLd)} />
+
+  <Header />
 
   <!-- Hero -->
   <section class="hero">
@@ -206,24 +206,7 @@ const faqs = [
     </div>
   </section>
 
-  <!-- Footer -->
-  <footer class="site-footer">
-    <div class="container footer-inner">
-      <div class="footer-brand">やすみ？</div>
-      <p class="footer-disclaimer">
-        本サービスは学校公式サービスではありません。気象庁の情報とユーザーが登録した学校規則をもとに自動判定しています。
-        最終的な登校判断については、学校からの公式連絡をご確認ください。
-      </p>
-      <p class="footer-credit">
-        Produced by
-        <a href="https://unischool.jp" target="_blank" rel="noopener">UniSchool</a>
-        <span class="footer-sep">/</span>
-        Developed by
-        <a href="https://x.com/tanahiro2010" target="_blank" rel="noopener">@tanahiro2010</a>
-      </p>
-      <p class="footer-copy">© 2026 やすみ？ / UniSchool</p>
-    </div>
-  </footer>
+  <Footer />
 </Layout>
 
 <script>
@@ -244,49 +227,6 @@ const faqs = [
 </script>
 
 <style>
-  /* Header */
-  .site-header {
-    position: sticky;
-    top: 0;
-    z-index: 50;
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--line);
-  }
-  .header-inner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 68px;
-  }
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 700;
-    font-size: 20px;
-  }
-  .header-nav {
-    display: flex;
-    align-items: center;
-    gap: 32px;
-    font-weight: 500;
-    color: var(--muted);
-    font-size: 15px;
-  }
-  .header-nav a:not(.btn):hover {
-    color: var(--ink);
-  }
-  .btn-sm {
-    padding: 10px 22px;
-    font-size: 14px;
-  }
-  @media (max-width: 700px) {
-    .header-nav a:not(.btn) {
-      display: none;
-    }
-  }
-
   /* Buttons: Google-ish */
   :global(.btn-outline) {
     background: #fff;
@@ -761,47 +701,4 @@ const faqs = [
     box-shadow: 0 10px 24px rgba(6, 199, 85, 0.35);
   }
 
-  /* Footer */
-  .site-footer {
-    background: #fff;
-    border-top: 1px solid var(--line);
-    padding: 48px 0;
-    color: var(--muted);
-  }
-  .footer-brand {
-    font-weight: 700;
-    color: var(--ink);
-    font-size: 18px;
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .footer-disclaimer {
-    max-width: 720px;
-    font-size: 13px;
-    line-height: 1.8;
-    margin: 0 0 20px;
-  }
-  .footer-credit {
-    font-size: 14px;
-    margin: 0 0 8px;
-    color: var(--muted);
-  }
-  .footer-credit a {
-    color: var(--blue);
-    font-weight: 600;
-  }
-  .footer-credit a:hover {
-    text-decoration: underline;
-  }
-  .footer-sep {
-    margin: 0 8px;
-    color: #c6cacf;
-  }
-  .footer-copy {
-    font-size: 13px;
-    color: #9aa0a6;
-    margin: 0;
-  }
 </style>

@@ -51,6 +51,15 @@ suite("API integration", () => {
     expect(b1.userId).toBe(b2.userId);
   });
 
+  it("GET /public/schools → 認証不要で公開情報のみ（PII なし）", async () => {
+    const res = await req("/public/schools");
+    expect(res.status).toBe(200);
+    const rows = (await res.json()) as Record<string, unknown>[];
+    expect(rows.some((s) => s.id === schoolId)).toBe(true);
+    // createdBy などの PII を含まない
+    expect(rows.every((s) => !("createdBy" in s))).toBe(true);
+  });
+
   it("GET /api/schools/search → 部分一致", async () => {
     const res = await req("/api/schools/search?q=APIテスト", { headers: auth("Uapi1") });
     expect(res.status).toBe(200);

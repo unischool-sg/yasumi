@@ -1,0 +1,62 @@
+---
+import { LINE_URL } from "../consts";
+---
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a href="/" class="brand">
+      <span class="brand-name">やすみ？</span>
+    </a>
+    <nav class="header-nav">
+      <a href="/#features">特徴</a>
+      <a href="/#how">使い方</a>
+      <a href="/schools">学校一覧</a>
+      <a href="/#faq">FAQ</a>
+      <a href={LINE_URL} target="_blank" rel="noopener" class="btn btn-primary btn-sm">LINEで始める</a>
+    </nav>
+  </div>
+</header>
+
+<style>
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 68px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 20px;
+  }
+  .header-nav {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    font-weight: 500;
+    color: var(--muted);
+    font-size: 15px;
+  }
+  .header-nav a:not(.btn):hover {
+    color: var(--ink);
+  }
+  .btn-sm {
+    padding: 10px 22px;
+    font-size: 14px;
+  }
+  @media (max-width: 700px) {
+    .header-nav a:not(.btn) {
+      display: none;
+    }
+  }
+</style>
