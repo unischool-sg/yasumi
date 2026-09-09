@@ -1,5 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { app } from "./app.ts";
+import { createApp } from "./api/app.ts";
+import type { Db } from "./infrastructure/db/client.ts";
+
+// /health は無認証・DB 非依存。ダミー依存で app を組み立てて確認する。
+const app = createApp({
+  db: {} as Db,
+  verifyIdToken: async () => ({ lineUserId: "dummy" }),
+});
 
 describe("GET /health", () => {
   it("returns 200 with status ok", async () => {

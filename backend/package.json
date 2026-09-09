@@ -10,10 +10,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@hono/zod-validator": "^0.9.1",
     "@yasumi/shared": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.6.14",
-    "postgres": "^3.4.9"
+    "postgres": "^3.4.9",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "drizzle-kit": "^0.31.10"

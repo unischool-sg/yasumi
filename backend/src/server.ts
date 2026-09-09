@@ -1,6 +1,14 @@
-import { app } from "./app.ts";
+import { createApp } from "./api/app.ts";
+import { createLineIdTokenVerifier } from "./api/auth.ts";
+import { getDb } from "./infrastructure/db/client.ts";
 
 const port = Number(process.env.PORT ?? 3000);
+const channelId = process.env.LIFF_CHANNEL_ID ?? "";
+
+const app = createApp({
+  db: getDb(),
+  verifyIdToken: createLineIdTokenVerifier(channelId),
+});
 
 // M7: ここで startCron(app) を呼び、30分ごとに app.fetch("/api/internal/run-check")
 // を叩く同一プロセス cron を起動する（backend/CRON.md 参照）。
