@@ -122,6 +122,26 @@ suite("API integration", () => {
     expect((detail as { warningTypes: string[] }).warningTypes).toContain("暴風警報");
   });
 
+  it("GET /api/me/schools → 自分が作成した学校のみ返す", async () => {
+    const created = (await (
+      await req("/api/schools", {
+        method: "POST",
+        headers: { ...auth("Umine"), "content-type": "application/json" },
+        body: JSON.stringify({ name: "自分の学校", prefecture: "兵庫県" }),
+      })
+    ).json()) as { id: string };
+
+    const mine = await req("/api/me/schools", { headers: auth("Umine") });
+    expect(mine.status).toBe(200);
+    const rows = (await mine.json()) as { id: string }[];
+    expect(rows.some((s) => s.id === created.id)).toBe(true);
+
+    // 他人には見えない
+    const others = await req("/api/me/schools", { headers: auth("Uother") });
+    const otherRows = (await others.json()) as { id: string }[];
+    expect(otherRows.some((s) => s.id === created.id)).toBe(false);
+  });
+
   it("ルール: 30分刻みのみ許可・作成者は作成/削除でき、他人は403", async () => {
     const created = (await (
       await req("/api/schools", {

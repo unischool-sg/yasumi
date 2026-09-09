@@ -1,4 +1,6 @@
 import AddIcon from "@mui/icons-material/Add";
+import EditNoteIcon from "@mui/icons-material/EditNote";
+import EditNoteOutlinedIcon from "@mui/icons-material/EditNoteOutlined";
 import HomeIcon from "@mui/icons-material/Home";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import SearchIcon from "@mui/icons-material/Search";
@@ -20,12 +22,14 @@ import { type ReactNode, useCallback, useEffect, useState } from "react";
 import type { ApiClient } from "./api/client.ts";
 import type { Subscription } from "./api/types.ts";
 import { useLiff } from "./hooks/useLiff.ts";
+import { EditSchool } from "./pages/EditSchool.tsx";
 import { Home } from "./pages/Home.tsx";
+import { MySchools } from "./pages/MySchools.tsx";
 import { Register } from "./pages/Register.tsx";
 import { Search } from "./pages/Search.tsx";
 
-type Tab = "home" | "search";
-type View = { kind: "tabs" } | { kind: "register"; name: string };
+type Tab = "home" | "search" | "manage";
+type View = { kind: "tabs" } | { kind: "register"; name: string } | { kind: "edit"; schoolId: string };
 
 export function App() {
   const liff = useLiff();
@@ -48,20 +52,21 @@ function Main({ api }: { api: ApiClient }) {
   useEffect(() => reload(), [reload]);
 
   const subscribedIds = new Set(subscriptions.map((s) => s.schoolId));
-  const inRegister = view.kind === "register";
+  const isModal = view.kind !== "tabs";
+  const title = view.kind === "register" ? "学校を登録" : view.kind === "edit" ? "学校を編集" : "やすみ？";
 
   return (
     <Box sx={{ maxWidth: 480, mx: "auto", minHeight: "100dvh", bgcolor: "background.default", position: "relative" }}>
       <AppBar position="sticky" elevation={0} sx={{ borderBottom: "1px solid #e8eaed" }}>
         <Toolbar variant="dense" sx={{ minHeight: 56 }}>
           <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            {inRegister ? "学校を登録" : "やすみ？"}
+            {title}
           </Typography>
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="sm" sx={{ pt: 2, pb: inRegister ? 4 : 12 }}>
-        {inRegister ? (
+      <Container maxWidth="sm" sx={{ pt: 2, pb: isModal ? 4 : 12 }}>
+        {view.kind === "register" ? (
           <Register
             api={api}
             initialName={view.name}
@@ -73,6 +78,8 @@ function Main({ api }: { api: ApiClient }) {
             }}
             onCancel={() => setView({ kind: "tabs" })}
           />
+        ) : view.kind === "edit" ? (
+          <EditSchool api={api} schoolId={view.schoolId} onBack={() => setView({ kind: "tabs" })} onNotify={setSnack} />
         ) : tab === "home" ? (
           <Home
             api={api}
@@ -81,7 +88,7 @@ function Main({ api }: { api: ApiClient }) {
             onGoSearch={() => setTab("search")}
             onNotify={setSnack}
           />
-        ) : (
+        ) : tab === "search" ? (
           <Search
             api={api}
             subscribedIds={subscribedIds}
@@ -89,9 +96,11 @@ function Main({ api }: { api: ApiClient }) {
             onRegister={(name) => setView({ kind: "register", name })}
             onNotify={setSnack}
           />
+        ) : (
+          <MySchools api={api} onEdit={(schoolId) => setView({ kind: "edit", schoolId })} />
         )}
 
-        {!inRegister && (
+        {!isModal && (
           <Typography variant="caption" align="center" color="text.secondary" sx={{ display: "block", mt: 4 }}>
             本サービスは学校公式ではありません。最終的な登校判断は学校からの公式連絡をご確認ください。
           </Typography>
@@ -99,7 +108,7 @@ function Main({ api }: { api: ApiClient }) {
       </Container>
 
       {/* 主要アクションの FAB（Material） */}
-      {!inRegister && tab === "home" && (
+      {!isModal && tab === "home" && (
         <Fab
           color="primary"
           variant="extended"
@@ -111,7 +120,7 @@ function Main({ api }: { api: ApiClient }) {
         </Fab>
       )}
 
-      {!inRegister && (
+      {!isModal && (
         <Paper
           elevation={0}
           sx={{ position: "fixed", bottom: 0, left: 0, right: 0, maxWidth: 480, mx: "auto", borderTop: "1px solid #e8eaed", borderRadius: 0 }}
@@ -119,6 +128,7 @@ function Main({ api }: { api: ApiClient }) {
           <BottomNavigation value={tab} onChange={(_, v) => setTab(v as Tab)} showLabels>
             <BottomNavigationAction value="home" label="ホーム" icon={tab === "home" ? <HomeIcon /> : <HomeOutlinedIcon />} />
             <BottomNavigationAction value="search" label="さがす" icon={<SearchIcon />} />
+            <BottomNavigationAction value="manage" label="編集" icon={tab === "manage" ? <EditNoteIcon /> : <EditNoteOutlinedIcon />} />
           </BottomNavigation>
         </Paper>
       )}

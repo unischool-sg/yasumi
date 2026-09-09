@@ -4,6 +4,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { api } from "../api/client.ts";
 import { AreaBlocksPicker } from "../components/AreaBlocksPicker.tsx";
+import { useToast } from "../components/Toast.tsx";
 import { PREFECTURES } from "../lib/prefectures.ts";
 
 const WARNING_TYPES = ["暴風警報", "大雨警報", "洪水警報", "大雪警報", "暴風雪警報", "高潮警報", "波浪警報"];
@@ -19,6 +20,7 @@ const TIMES = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).
 export function SchoolDetail({ id }: { id: string }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const toast = useToast();
   const { data } = useQuery({ queryKey: ["school", id], queryFn: () => api.getSchool(id) });
   // 学校の都道府県の地域のみ取得（全国 1806 件を出さない）
   const { data: allAreas = [] } = useQuery({
@@ -42,12 +44,22 @@ export function SchoolDetail({ id }: { id: string }) {
   }, [data]);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["school", id] });
+  const onError = (e: unknown) => toast.error(`保存に失敗しました: ${(e as Error).message}`);
   const save = useMutation({
     mutationFn: () => api.updateSchool(id, { name, city: city || null, areaCodes: [...areaCodes], warningTypes: [...warnings] }),
-    onSuccess: invalidate,
+    onSuccess: () => { invalidate(); toast.success("保存しました"); },
+    onError,
   });
-  const addRule = useMutation({ mutationFn: () => api.createRule(id, rule), onSuccess: invalidate });
-  const delRule = useMutation({ mutationFn: (rid: string) => api.deleteRule(rid), onSuccess: invalidate });
+  const addRule = useMutation({
+    mutationFn: () => api.createRule(id, rule),
+    onSuccess: () => { invalidate(); toast.success("ルールを追加しました"); },
+    onError,
+  });
+  const delRule = useMutation({
+    mutationFn: (rid: string) => api.deleteRule(rid),
+    onSuccess: () => { invalidate(); toast.success("ルールを削除しました"); },
+    onError,
+  });
 
   function toggle(set: Set<string>, key: string, setter: (s: Set<string>) => void) {
     const n = new Set(set);

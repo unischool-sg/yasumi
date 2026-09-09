@@ -46,6 +46,15 @@ export async function updateSchool(
   return rows[0];
 }
 
+/** 自分が作成した学校の一覧（LIFF「編集」タブ / 新しい順）。 */
+export async function listSchoolsByCreator(db: Db, userId: string): Promise<SchoolRow[]> {
+  return db
+    .select()
+    .from(schools)
+    .where(eq(schools.createdBy, userId))
+    .orderBy(desc(schools.createdAt));
+}
+
 /** 管理画面: 全学校の一覧（新しい順・ページング）。 */
 export async function listSchools(db: Db, opts: { limit?: number; offset?: number } = {}): Promise<SchoolRow[]> {
   return db

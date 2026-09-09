@@ -1,5 +1,5 @@
 import type { CheckResult, SchoolRule } from "@yasumi/shared";
-import type { ApiClient, NewSchoolInput } from "./client.ts";
+import type { ApiClient, NewSchoolInput, SchoolPatch } from "./client.ts";
 import type { Area, SchoolDetail, SchoolStatus, SchoolSummary, Subscription } from "./types.ts";
 
 // デザイン確認用のモッククライアント（VITE_MOCK=1 のとき useLiff が使用）。
@@ -28,11 +28,15 @@ const areas: Area[] = [
 
 let subscriptions: Subscription[] = [{ userId: "me", schoolId: "s1", notificationEnabled: true }];
 
+// モックでは自分が作成した学校として s1 を扱う（編集タブ表示確認用）。
+const mySchoolIds = new Set<string>(["s1"]);
+
 const delay = <T>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 150));
 
 export function createMockClient(): ApiClient {
   return {
     me: () => delay({ userId: "me" }),
+    listMySchools: () => delay(schools.filter((s) => mySchoolIds.has(s.id))),
     searchSchools: (q: string) => delay(schools.filter((s) => s.name.includes(q))),
     getSchool: (id: string) => {
       const s = schools.find((x) => x.id === id) ?? schools[0]!;
@@ -88,9 +92,28 @@ export function createMockClient(): ApiClient {
         rulesUrl: null,
       };
       schools.push(s);
+      mySchoolIds.add(s.id);
       return delay(s);
     },
-    createRule: (schoolId: string, input: { checkTime: string; result: CheckResult }) =>
-      delay({ id: `r${Date.now()}`, schoolId, condition: { type: "WARNING_ACTIVE" }, ...input }),
+    updateSchool: (id, patch) => {
+      const s = schools.find((x) => x.id === id);
+      if (s) {
+        if (patch.name !== undefined) s.name = patch.name;
+        if (patch.city !== undefined) s.city = patch.city;
+        if (patch.websiteUrl !== undefined) s.websiteUrl = patch.websiteUrl;
+      }
+      return delay((s ?? schools[0]!) as SchoolSummary);
+    },
+    createRule: (schoolId: string, input: { checkTime: string; result: CheckResult }) => {
+      const rule: SchoolRule = { id: `r${Date.now()}`, schoolId, condition: { type: "WARNING_ACTIVE" }, ...input };
+      (rulesBySchool[schoolId] ??= []).push(rule);
+      return delay(rule);
+    },
+    deleteRule: (ruleId: string) => {
+      for (const k of Object.keys(rulesBySchool)) {
+        rulesBySchool[k] = rulesBySchool[k]!.filter((r) => r.id !== ruleId);
+      }
+      return delay(undefined as void);
+    },
   };
 }

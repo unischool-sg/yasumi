@@ -10,6 +10,15 @@ export interface NewSchoolInput {
   warningTypes?: string[];
 }
 
+/** PATCH /api/schools/:id の部分更新入力（編集タブ）。 */
+export interface SchoolPatch {
+  name?: string;
+  city?: string | null;
+  websiteUrl?: string | null;
+  areaCodes?: string[];
+  warningTypes?: string[];
+}
+
 const BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
 export class ApiError extends Error {
@@ -36,6 +45,8 @@ export function createApiClient(idToken: string) {
 
   return {
     me: () => request<Me>("/api/me"),
+    /** 自分が作成した学校の一覧（編集タブ）。 */
+    listMySchools: () => request<SchoolSummary[]>("/api/me/schools"),
     searchSchools: (q: string) =>
       request<SchoolSummary[]>(`/api/schools/search?q=${encodeURIComponent(q)}`),
     getSchool: (id: string) => request<SchoolDetail>(`/api/schools/${id}`),
@@ -52,11 +63,16 @@ export function createApiClient(idToken: string) {
       request<void>(`/api/me/subscriptions/${schoolId}`, { method: "DELETE" }),
     createSchool: (input: NewSchoolInput) =>
       request<SchoolSummary>("/api/schools", { method: "POST", body: JSON.stringify(input) }),
+    /** 学校を更新（作成者/管理者のみ）。 */
+    updateSchool: (id: string, patch: SchoolPatch) =>
+      request<SchoolSummary>(`/api/schools/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
     createRule: (schoolId: string, input: { checkTime: string; result: CheckResult }) =>
       request<SchoolRule>(`/api/schools/${schoolId}/rules`, {
         method: "POST",
         body: JSON.stringify(input),
       }),
+    deleteRule: (ruleId: string) =>
+      request<void>(`/api/rules/${ruleId}`, { method: "DELETE" }),
   };
 }
 
