@@ -11,6 +11,10 @@ LINE Messaging API プッシュは無料枠超で従量課金。ネイティブ�
 - **C2**: `NotificationTarget` 拡張＋`FcmNotificationProvider`(HTTP v1)＋`run-check` の送り分け（デバイストークン→FCM、無ければLINE）＋テスト。
 - **A**: フロントの認証プロバイダ抽象化（`useLiff`→`useAuth`、LIFF/native/mock）。web 無回帰。
 - **B**: Capacitor シェル（iOS/Android）＋`@capacitor-firebase/messaging`＋LINEログイン(native OAuth)。
+  → **`native/` ディレクトリに配置**（root workspaces に含めない独立プロジェクト。web/docker ビルドに
+  Capacitor の重い依存を持ち込まない）。React ソースは `frontend/` を共有し、`VITE_PLATFORM=native`
+  でビルドした成果物を `native/www/` に置いて webview 表示。backend の FCM 送信コード
+  （`backend/src/infrastructure/fcm/`）はサーバー機能なので backend に残す。
 - **D**: Firebase/FCM サービスアカウント（サーバー限定 secret）、APNs キー、ストア、env。
 
 ## C1 詳細
