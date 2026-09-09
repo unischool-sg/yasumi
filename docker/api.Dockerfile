@@ -10,7 +10,8 @@ COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
 COPY landing/package.json ./landing/
 COPY packages/shared/package.json ./packages/shared/
-RUN bun install --frozen-lockfile --production
+# --production は workspace メンバーの依存を入れないことがあるため付けない
+RUN bun install --frozen-lockfile
 
 # --- runtime: ソース + 本番依存 ---
 FROM oven/bun:1 AS runtime
