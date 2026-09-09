@@ -73,12 +73,12 @@ M8 デプロイ / 一般公開
 > 📄 **詳細仕様確定済み**: [backend/RULE_ENGINE.md](./backend/RULE_ENGINE.md)
 > （型設計 / 確定シグネチャ / アルゴリズム / エッジケース / テストマトリクス T1〜T13 / TDD ステップ）
 
-- [ ] `@yasumi/shared`: `RuleCondition` / `School` / `SchoolRule` / `EvaluationResult` 型を追加
-- [ ] `domain/rule/evaluate.ts`: `evaluateSchoolRule({ school, rule, activeWarnings }): EvaluationResult`（純粋関数）
-- [ ] MVP判定: 対象地域いずれか AND 対象警報いずれか（§29 OR判定）+ 判定根拠 `matchedWarnings` を返す
-- [ ] 将来の複雑ルール（§30）を見据えた `RuleCondition` 判別ユニオン設計（型のみ、実装しない）
+- [x] `@yasumi/shared`: `RuleCondition` / `School` / `SchoolRule` / `EvaluationResult` 型を追加
+- [x] `domain/rule/evaluate.ts`: `evaluateSchoolRule({ school, rule, activeWarnings }): EvaluationResult`（純粋関数）
+- [x] MVP判定: 対象地域いずれか AND 対象警報いずれか（§29 OR判定）+ 判定根拠 `matchedWarnings` を返す
+- [x] 将来の複雑ルール（§30）を見据えた `RuleCondition` 判別ユニオン設計（型のみ、実装しない）
 
-**完了条件**: 判定例（§28）を含むテストマトリクス（T1〜T13）が green。DB・ネットワーク・時刻に非依存。
+**完了条件**: 判定例（§28）を含むテストマトリクス（T1〜T13）が green。DB・ネットワーク・時刻に非依存。→ **達成**（13 テスト green / typecheck OK）
 
 **依存**: 既存 `@yasumi/shared`（`CheckResult` / `Warning`）のみ。M1 と**並行着手可能**。
 
