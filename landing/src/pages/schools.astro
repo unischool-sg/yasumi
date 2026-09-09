@@ -124,7 +124,9 @@ const breadcrumbJsonLd = {
 
     const avatar = document.createElement("div");
     avatar.className = "sc-avatar";
-    avatar.textContent = "🏫";
+    // MUI School アイコン相当の SVG（静的・ユーザー入力なしなので innerHTML で安全）。
+    avatar.innerHTML =
+      '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M12 3 1 9l11 6 9-4.91V17h2V9L12 3zM5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg>';
     card.appendChild(avatar);
 
     const body = document.createElement("div");
@@ -334,10 +336,9 @@ const breadcrumbJsonLd = {
     height: 46px;
     border-radius: 14px;
     background: var(--blue-soft);
+    color: var(--blue);
     display: grid;
     place-items: center;
-    font-size: 22px;
-    line-height: 1;
   }
   .sc-body {
     flex: 1;
