@@ -31,6 +31,7 @@ export function SchoolDetail({ id }: { id: string }) {
 
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
   const [areaCodes, setAreaCodes] = useState<Set<string>>(new Set());
   const [warnings, setWarnings] = useState<Set<string>>(new Set());
   const [rule, setRule] = useState({ checkTime: "08:00", result: "AM_OFF" });
@@ -39,6 +40,7 @@ export function SchoolDetail({ id }: { id: string }) {
     if (!data) return;
     setName(data.name);
     setCity(data.city ?? "");
+    setWebsiteUrl(data.websiteUrl ?? "");
     setAreaCodes(new Set(data.areaCodes));
     setWarnings(new Set(data.warningTypes));
   }, [data]);
@@ -46,7 +48,14 @@ export function SchoolDetail({ id }: { id: string }) {
   const invalidate = () => qc.invalidateQueries({ queryKey: ["school", id] });
   const onError = (e: unknown) => toast.error(`保存に失敗しました: ${(e as Error).message}`);
   const save = useMutation({
-    mutationFn: () => api.updateSchool(id, { name, city: city || null, areaCodes: [...areaCodes], warningTypes: [...warnings] }),
+    mutationFn: () =>
+      api.updateSchool(id, {
+        name,
+        city: city || null,
+        websiteUrl: websiteUrl || null,
+        areaCodes: [...areaCodes],
+        warningTypes: [...warnings],
+      }),
     onSuccess: () => { invalidate(); toast.success("保存しました"); },
     onError,
   });
@@ -92,6 +101,15 @@ export function SchoolDetail({ id }: { id: string }) {
               renderInput={(params) => <TextField {...params} label="市区町村" />}
             />
           </Stack>
+          <TextField
+            size="small"
+            fullWidth
+            label="学校公式サイトURL（任意）"
+            placeholder="https://example.ed.jp"
+            value={websiteUrl}
+            onChange={(e) => setWebsiteUrl(e.target.value)}
+            sx={{ mb: 2 }}
+          />
           <Typography variant="subtitle2" sx={{ mb: 1 }}>対象地域（都道府県ごとに追加・県跨ぎOK）</Typography>
           <Box sx={{ mb: 2 }}>
             <AreaBlocksPicker
