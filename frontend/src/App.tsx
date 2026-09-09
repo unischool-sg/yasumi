@@ -22,6 +22,7 @@ import { type ReactNode, useCallback, useEffect, useState } from "react";
 import type { ApiClient } from "./api/client.ts";
 import type { Subscription } from "./api/types.ts";
 import { useAuth } from "./hooks/useAuth.ts";
+import { registerPushToken } from "./native/push.ts";
 import { EditSchool } from "./pages/EditSchool.tsx";
 import { Home } from "./pages/Home.tsx";
 import { MySchools } from "./pages/MySchools.tsx";
@@ -50,6 +51,11 @@ function Main({ api }: { api: ApiClient }) {
     api.listSubscriptions().then(setSubscriptions).catch(() => setSubscriptions([]));
   }, [api]);
   useEffect(() => reload(), [reload]);
+
+  // ネイティブアプリ実行時は FCM デバイストークンを登録（無料プッシュの送信先）。web は no-op。
+  useEffect(() => {
+    registerPushToken(api);
+  }, [api]);
 
   const subscribedIds = new Set(subscriptions.map((s) => s.schoolId));
   const isModal = view.kind !== "tabs";
