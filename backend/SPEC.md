@@ -103,25 +103,30 @@ interface Warning {
 }
 ```
 
-### 4.3 Rule Engine（PRD §27〜§29）
+### 4.3 Rule Engine（PRD §27〜§29 / 詳細は [RULE_ENGINE.md](./RULE_ENGINE.md)）
 
-警報取得と判定を分離する。純粋関数として実装。
+警報取得と判定を分離する純粋関数。**実装済み**（`backend/src/domain/rule/evaluate.ts`、テスト T1〜T13）。
+型は `@yasumi/shared`（`School` / `SchoolRule` / `RuleCondition` / `EvaluationResult`）を再利用する。
 
 ```ts
-function evaluateSchoolRule(params: {
-  school: School;          // 対象地域・対象警報を含む
-  rule: SchoolRule;        // check_time / result
+function evaluateSchoolRule(input: {
+  school: School;          // 対象地域(areaCodes)・対象警報(warningTypes)を含む
+  rule: SchoolRule;        // checkTime / condition / result
   activeWarnings: Warning[];
-}): { matched: boolean; result: CheckResult };
+}): EvaluationResult;       // { matched, result, matchedWarnings }
 ```
+
+`matchedWarnings` は判定根拠（ホーム/通知の「理由」表示 / PRD §16, §17, §64）。
 
 MVP の判定条件（PRD §29 OR判定）:
 
 ```text
 （対象地域のいずれか）AND（対象警報のいずれか）が status="active"
-→ matched = true → rule.result を採用
-→ matched = false → NORMAL
+→ matched = true  → result = rule.result、matchedWarnings = 該当警報（重複排除）
+→ matched = false → result = NORMAL、matchedWarnings = []
 ```
+
+> 取得失敗時の `UNKNOWN` は engine の責務外。呼び出し側（M7）が engine を呼ばず確定する（§51）。
 
 将来の複雑ルール（AND / 特別警報即休校 / 解除条件 / 交通機関）は
 MVP では実装しないが、拡張可能な構造にする（PRD §30）。
