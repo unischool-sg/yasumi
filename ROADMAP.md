@@ -188,15 +188,19 @@ M8 デプロイ / 一般公開
 
 **目的**: 本番運用開始。
 
-- [ ] `backend/Dockerfile`（マルチステージ / entrypoint `dist/server.js`）
-- [ ] Frontend ビルド配信（Cloudflare Pages 等 / docker SPEC §6 で確定させる）
-- [ ] Cloudflare Tunnel 設定（api のみ公開）
-- [ ] LINE 公式アカウント / LIFF / リッチメニュー（§20）設定
-- [ ] 本番 `.env` / Secret 管理 / DB バックアップ運用
-- [ ] 免責表示の常設（§53）
-- [ ] 動作確認 → 一般公開
+> 📄 **手順書**: [DEPLOY.md](./DEPLOY.md)
+
+- [x] `docker/api.Dockerfile`（oven/bun 2ステージ / `bun run src/server.ts`）
+- [x] Frontend ビルド配信方針を確定（Cloudflare Pages / docker SPEC §6・DEPLOY §5）
+- [x] 免責表示の常設（§53 / フッター + 通知文面）
+- [x] 本番イメージのコンテナ E2E 確認（health / migrate / seed / run-check / 実 JMA 取得）
+- [ ] Cloudflare Tunnel 設定（api のみ公開）※要インフラ環境
+- [ ] LINE 公式アカウント / LIFF / リッチメニュー（§20）設定 ※要 LINE 環境
+- [ ] 本番 `.env` / Secret 管理 / DB バックアップ運用 ※要インフラ環境
+- [ ] 実ユーザーでの動作確認 → 一般公開 ※要 LINE 環境
 
 **完了条件**: 本番環境で §59 のシナリオが実ユーザーで成立する。
+→ コードは完成。残るはインフラ/外部サービス設定（DEPLOY.md 手順に沿って実施）。
 
 ---
 

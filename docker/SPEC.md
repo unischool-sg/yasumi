@@ -112,14 +112,14 @@ CMD ["bun", "run", "backend/src/server.ts"]   … API + cron 同居
 
 ---
 
-## 6. Frontend の扱い
+## 6. Frontend の扱い（M8 で確定）
 
-LIFF は静的アセットとしてビルド（`vite build`）。配信方法は 2 択:
+LIFF は静的アセットとしてビルド（`vite build`）。
 
-- **A**: Cloudflare Pages 等の静的ホスティングに配置（Docker 外）
-- **B**: `api` コンテナ / 別 nginx コンテナから静的配信
-
-MVP は運用が簡単な方を選ぶ（推奨: A の静的ホスティング）。本書では未確定として記録。
+- **採用: A — Cloudflare Pages 等の静的ホスティング（Docker 外）**。
+  `VITE_LIFF_ID` / `VITE_API_BASE_URL` を設定してビルドし、`frontend/dist` を配信する。
+  api コンテナを軽く保て、CDN 配信で安価・高速。手順は [DEPLOY.md](../DEPLOY.md) §4-5。
+- 代替 B: 自前配信が必要なら nginx コンテナを compose に追加して `frontend/dist` を配信。
 
 ---
 
