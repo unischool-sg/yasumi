@@ -11,6 +11,11 @@
   },
   "dependencies": {
     "@yasumi/shared": "workspace:*",
-    "hono": "^4.6.14"
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.6.14",
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.10"
   }
 }

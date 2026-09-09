@@ -1,6 +1,6 @@
 COMPOSE = docker compose --env-file .env -f docker/docker-compose.yml
 
-.PHONY: help install dev dev-backend dev-frontend up down logs migrate test typecheck clean
+.PHONY: help install dev dev-backend dev-frontend up down logs migrate generate seed test typecheck clean
 
 help: ## このヘルプを表示
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -25,8 +25,14 @@ down: ## コンテナを停止・削除
 logs: ## コンテナのログを表示
 	$(COMPOSE) logs -f
 
-migrate: ## DB マイグレーション適用 (M3 で実装予定)
-	@echo "migrate: not implemented yet (see ROADMAP M3)"
+generate: ## Drizzle マイグレーションSQLを生成
+	bunx --cwd backend drizzle-kit generate
+
+migrate: ## DB マイグレーションを適用 (api コンテナ内で実行)
+	$(COMPOSE) run --rm -T api bun run backend/src/infrastructure/db/migrate.ts
+
+seed: ## 地域マスタ等の初期データを投入 (api コンテナ内で実行)
+	$(COMPOSE) run --rm -T api bun run backend/src/infrastructure/db/seed-areas.ts
 
 test: ## テストを実行 (bun test)
 	bun test

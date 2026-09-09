@@ -91,13 +91,16 @@ M8 デプロイ / 一般公開
 
 **目的**: School / Area / Rule / Subscription 等を永続化。
 
-- [ ] `infrastructure/db/`: Drizzle スキーマ（全10テーブル）
-- [ ] UNIQUE制約: `warning_checks`(§35) / `notifications`(§36)
-- [ ] マイグレーション生成・適用フロー（`drizzle.config.ts` / `make migrate`）
-- [ ] リポジトリ層（School/Area/Rule/Subscription/WarningCheck/Notification）
-- [ ] `areas` の初期データ投入（気象庁地域コード / まず対象都道府県）
+> 📄 **詳細仕様確定済み**: [backend/DB.md](./backend/DB.md)
+
+- [x] `infrastructure/db/schema.ts`: Drizzle スキーマ（全10テーブル）
+- [x] UNIQUE制約: `warning_checks`(§35) / `notifications`(§36)
+- [x] マイグレーション生成・適用フロー（`drizzle.config.ts` / `migrate.ts` / `make migrate` / `make generate`）
+- [x] リポジトリ層（users/schools/areas/school-config/rules/subscriptions/warning-checks/notifications）
+- [x] `areas` の初期データ投入（気象庁 class20s コード / 兵庫県阪神地域 / `make seed`）
 
 **完了条件**: マイグレーションが通り、各リポジトリの CRUD が結合テストで動く。
+→ **達成**（migrate/seed OK・結合スモークで CRUD + UNIQUE 冪等 §35/§36 + Rule Engine 連携を確認）
 
 **依存**: なし（M1/M2 と並行可）
 
