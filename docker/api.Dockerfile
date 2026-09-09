@@ -4,9 +4,11 @@
 # --- deps: 依存インストール（本番のみ） ---
 FROM oven/bun:1 AS deps
 WORKDIR /app
+# workspace の全メンバー package.json を揃えないと frozen-lockfile 解決が壊れる
 COPY package.json bun.lock ./
 COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
+COPY landing/package.json ./landing/
 COPY packages/shared/package.json ./packages/shared/
 RUN bun install --frozen-lockfile --production
 
