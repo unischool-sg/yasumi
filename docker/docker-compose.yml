@@ -5,7 +5,7 @@ services:
       dockerfile: docker/api.Dockerfile
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${API_PORT:-3000}:3000"
     environment:
       PORT: 3000
       DATABASE_URL: ${DATABASE_URL}
@@ -19,7 +19,7 @@ services:
     image: postgres:17
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
