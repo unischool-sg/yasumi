@@ -76,6 +76,8 @@ const jsonLd = [
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImageUrl} />
     <meta name="twitter:image:alt" content={ogImageAlt} />
+    <meta name="twitter:site" content="@tanahiro2010" />
+    <meta name="twitter:creator" content="@tanahiro2010" />
 
     <!-- 構造化データ -->
     {jsonLd.map((d) => <script type="application/ld+json" set:html={JSON.stringify(d)} />)}
