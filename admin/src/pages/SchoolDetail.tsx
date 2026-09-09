@@ -83,7 +83,8 @@ export function SchoolDetail({ id }: { id: string }) {
           <Typography variant="subtitle2" sx={{ mb: 1 }}>対象地域（都道府県ごとに追加・県跨ぎOK）</Typography>
           <Box sx={{ mb: 2 }}>
             <AreaBlocksPicker
-              value={[...areaCodes]}
+              key={data.id}
+              value={data.areaCodes}
               onChange={(codes) => setAreaCodes(new Set(codes))}
               loadAreas={api.listAreas}
               prefectures={PREFECTURES}
