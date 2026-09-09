@@ -1,0 +1,16 @@
+{
+  "name": "@yasumi/backend",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/server.ts",
+    "start": "bun run src/server.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@yasumi/shared": "workspace:*",
+    "hono": "^4.6.14"
+  }
+}
