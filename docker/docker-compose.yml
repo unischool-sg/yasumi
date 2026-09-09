@@ -13,6 +13,8 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       LINE_CHANNEL_SECRET: ${LINE_CHANNEL_SECRET}
       LINE_CHANNEL_ACCESS_TOKEN: ${LINE_CHANNEL_ACCESS_TOKEN}
+      LIFF_CHANNEL_ID: ${LIFF_CHANNEL_ID}
+      ADMIN_LINE_USER_IDS: ${ADMIN_LINE_USER_IDS}
       INTERNAL_CRON_TOKEN: ${INTERNAL_CRON_TOKEN}
     depends_on:
       - postgres
@@ -20,8 +22,8 @@ services:
   postgres:
     image: postgres:17
     restart: unless-stopped
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    # 本番ではホストに公開しない（api とは compose 内部ネットワークで接続 / docker/SPEC.md §7）。
+    # ローカルで直接接続したい場合は override で ports を足す。
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
