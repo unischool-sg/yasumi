@@ -7,6 +7,7 @@ import "@fontsource/roboto/500.css";
 import "@fontsource/roboto/700.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { ToastProvider } from "./components/Toast.tsx";
 import { router } from "./router.tsx";
 import { theme } from "./theme.ts";
 
@@ -22,7 +23,9 @@ createRoot(rootEl).render(
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
+        <ToastProvider>
+          <RouterProvider router={router} />
+        </ToastProvider>
       </QueryClientProvider>
     </ThemeProvider>
   </StrictMode>,

@@ -4,9 +4,11 @@ import { type ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
 import { type Area, api } from "../api/client.ts";
 import { DataTable } from "../components/DataTable.tsx";
+import { useToast } from "../components/Toast.tsx";
 
 export function Areas() {
   const qc = useQueryClient();
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ code: "", name: "", prefecture: "兵庫県" });
   const { data = [] } = useQuery({ queryKey: ["areas"], queryFn: () => api.listAreas() });
@@ -17,9 +19,15 @@ export function Areas() {
       qc.invalidateQueries({ queryKey: ["areas"] });
       setOpen(false);
       setForm({ code: "", name: "", prefecture: "兵庫県" });
+      toast.success("地域を追加しました");
     },
+    onError: (e) => toast.error(`追加に失敗しました: ${(e as Error).message}`),
   });
-  const del = useMutation({ mutationFn: (code: string) => api.deleteArea(code), onSuccess: () => qc.invalidateQueries({ queryKey: ["areas"] }) });
+  const del = useMutation({
+    mutationFn: (code: string) => api.deleteArea(code),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["areas"] }); toast.success("地域を削除しました"); },
+    onError: (e) => toast.error(`削除に失敗しました: ${(e as Error).message}`),
+  });
 
   const columns: ColumnDef<Area, unknown>[] = [
     { header: "コード", accessorKey: "code" },

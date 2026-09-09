@@ -4,21 +4,29 @@ import { type ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
 import { type Admin, type Role, api } from "../api/client.ts";
 import { DataTable } from "../components/DataTable.tsx";
+import { useToast } from "../components/Toast.tsx";
 import { getAuth } from "../lib/auth.ts";
 
 export function Admins() {
   const qc = useQueryClient();
+  const toast = useToast();
   const meId = getAuth()?.admin.id;
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<{ username: string; password: string; role: Role }>({ username: "", password: "", role: "admin" });
   const { data = [] } = useQuery({ queryKey: ["admins"], queryFn: api.listAdmins });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admins"] });
+  const onError = (e: unknown) => toast.error(`更新に失敗しました: ${(e as Error).message}`);
   const create = useMutation({
     mutationFn: () => api.createAdmin(form),
-    onSuccess: () => { invalidate(); setOpen(false); setForm({ username: "", password: "", role: "admin" }); },
+    onSuccess: () => { invalidate(); setOpen(false); setForm({ username: "", password: "", role: "admin" }); toast.success("管理者を追加しました"); },
+    onError,
   });
-  const patch = useMutation({ mutationFn: (v: { id: string; body: Parameters<typeof api.updateAdmin>[1] }) => api.updateAdmin(v.id, v.body), onSuccess: invalidate });
+  const patch = useMutation({
+    mutationFn: (v: { id: string; body: Parameters<typeof api.updateAdmin>[1] }) => api.updateAdmin(v.id, v.body),
+    onSuccess: () => { invalidate(); toast.success("更新しました"); },
+    onError,
+  });
 
   const columns: ColumnDef<Admin, unknown>[] = [
     { header: "ユーザー名", accessorKey: "username", cell: (c) => <b>{c.getValue() as string}</b> },
