@@ -35,7 +35,12 @@ jobs:
             ./ "$DEST/"
 
       - name: ビルド & 起動
-        run: cd "$HOME/$DEPLOY_SUBDIR" && docker compose --env-file .env -f docker/docker-compose.yml up -d --build
+        run: |
+          cd "$HOME/$DEPLOY_SUBDIR"
+          # landing は BuildKit の `COPY --from` が更新後の dist を取りこぼしてキャッシュヒットし、
+          # 旧ビルドが残ることがあるため毎回クリーンビルドする（デプロイ頻度が低く小さいので許容）。
+          docker compose --env-file .env -f docker/docker-compose.yml build --no-cache landing
+          docker compose --env-file .env -f docker/docker-compose.yml up -d --build
 
       - name: PostgreSQL の起動を待機
         run: |
