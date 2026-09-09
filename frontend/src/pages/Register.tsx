@@ -22,6 +22,7 @@ import {
 import { useEffect, useState } from "react";
 import type { ApiClient } from "../api/client.ts";
 import type { Area } from "../api/types.ts";
+import { AreaBlocksPicker } from "../components/AreaBlocksPicker.tsx";
 import { CHECK_TIME_OPTIONS, PREFECTURES, RESULT_OPTIONS, WARNING_TYPE_OPTIONS } from "../lib/options.ts";
 
 interface Props {
@@ -51,10 +52,9 @@ export function Register({ api, initialName, onDone, onCancel }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 都道府県が変わるたびに対象地域を取得し、市区町村・地域選択をリセット。
+  // 学校所在の都道府県が変わったら市区町村候補を再取得（対象地域は Step2 で独立管理）。
   useEffect(() => {
     api.listAreas(prefecture).then(setAreas).catch(() => setAreas([]));
-    setAreaCodes(new Set());
     setCity("");
   }, [prefecture, api]);
 
@@ -124,28 +124,14 @@ export function Register({ api, initialName, onDone, onCancel }: Props) {
         {step === 1 && (
           <Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-              警報判定に使う地域を選択（複数可）
+              警報判定に使う地域を、都道府県ごとに追加（複数可・県跨ぎOK）
             </Typography>
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-              {areas.map((a) => {
-                const on = areaCodes.has(a.code);
-                return (
-                  <Chip
-                    key={a.code}
-                    label={a.name}
-                    clickable
-                    color={on ? "primary" : "default"}
-                    variant={on ? "filled" : "outlined"}
-                    onClick={() => toggle(areaCodes, a.code, setAreaCodes)}
-                  />
-                );
-              })}
-              {areas.length === 0 && (
-                <Typography variant="body2" color="text.disabled">
-                  対象地域データがありません。
-                </Typography>
-              )}
-            </Box>
+            <AreaBlocksPicker
+              value={[...areaCodes]}
+              onChange={(codes) => setAreaCodes(new Set(codes))}
+              loadAreas={api.listAreas}
+              prefectures={PREFECTURES}
+            />
           </Box>
         )}
 

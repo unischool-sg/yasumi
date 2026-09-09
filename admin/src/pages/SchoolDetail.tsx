@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { api } from "../api/client.ts";
+import { AreaBlocksPicker } from "../components/AreaBlocksPicker.tsx";
+import { PREFECTURES } from "../lib/prefectures.ts";
 
 const WARNING_TYPES = ["暴風警報", "大雨警報", "洪水警報", "大雪警報", "暴風雪警報", "高潮警報", "波浪警報"];
 const RESULTS = [
@@ -78,17 +80,14 @@ export function SchoolDetail({ id }: { id: string }) {
               renderInput={(params) => <TextField {...params} label="市区町村" />}
             />
           </Stack>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>対象地域</Typography>
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2 }}>
-            {allAreas.map((a) => (
-              <Chip
-                key={a.code}
-                label={a.name}
-                color={areaCodes.has(a.code) ? "primary" : "default"}
-                variant={areaCodes.has(a.code) ? "filled" : "outlined"}
-                onClick={() => toggle(areaCodes, a.code, setAreaCodes)}
-              />
-            ))}
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>対象地域（都道府県ごとに追加・県跨ぎOK）</Typography>
+          <Box sx={{ mb: 2 }}>
+            <AreaBlocksPicker
+              value={[...areaCodes]}
+              onChange={(codes) => setAreaCodes(new Set(codes))}
+              loadAreas={api.listAreas}
+              prefectures={PREFECTURES}
+            />
           </Box>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>対象警報</Typography>
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2 }}>
