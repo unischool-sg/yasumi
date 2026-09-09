@@ -21,7 +21,7 @@ import {
 import { useEffect, useState } from "react";
 import type { ApiClient } from "../api/client.ts";
 import type { Area } from "../api/types.ts";
-import { CHECK_TIME_OPTIONS, RESULT_OPTIONS, WARNING_TYPE_OPTIONS } from "../lib/options.ts";
+import { CHECK_TIME_OPTIONS, PREFECTURES, RESULT_OPTIONS, WARNING_TYPE_OPTIONS } from "../lib/options.ts";
 
 interface Props {
   api: ApiClient;
@@ -100,7 +100,24 @@ export function Register({ api, initialName, onDone, onCancel }: Props) {
         {step === 0 && (
           <Stack spacing={2.5}>
             <TextField label="学校名" value={name} onChange={(e) => setName(e.target.value)} fullWidth />
-            <TextField label="都道府県" value={prefecture} onChange={(e) => setPrefecture(e.target.value)} fullWidth />
+            <TextField
+              label="都道府県"
+              select
+              value={prefecture}
+              onChange={(e) => {
+                setPrefecture(e.target.value);
+                // 都道府県が変わったら対象地域を再取得・選択をリセット
+                setAreas([]);
+                setAreaCodes(new Set());
+              }}
+              fullWidth
+            >
+              {PREFECTURES.map((p) => (
+                <MenuItem key={p} value={p}>
+                  {p}
+                </MenuItem>
+              ))}
+            </TextField>
             <TextField label="市区町村" value={city} onChange={(e) => setCity(e.target.value)} fullWidth />
             <TextField label="学校公式サイト（任意）" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} fullWidth />
           </Stack>
