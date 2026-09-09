@@ -1,10 +1,11 @@
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField, Typography } from "@mui/material";
+import { Autocomplete, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField, Typography } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { type ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
 import { type School, api } from "../api/client.ts";
 import { DataTable } from "../components/DataTable.tsx";
+import { PREFECTURES } from "../lib/prefectures.ts";
 
 export function Schools() {
   const qc = useQueryClient();
@@ -15,6 +16,12 @@ export function Schools() {
   const [form, setForm] = useState({ name: "", prefecture: "兵庫県", city: "" });
 
   const { data = [] } = useQuery({ queryKey: ["schools", search], queryFn: () => api.listSchools(search || undefined) });
+  // 作成ダイアログの市区町村候補（選択中の都道府県の地域）
+  const { data: areaOptions = [] } = useQuery({
+    queryKey: ["areas", form.prefecture],
+    queryFn: () => api.listAreas(form.prefecture),
+    enabled: open,
+  });
 
   const create = useMutation({
     mutationFn: () => api.createSchool({ name: form.name, prefecture: form.prefecture, city: form.city || undefined }),
@@ -76,8 +83,20 @@ export function Schools() {
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField label="学校名" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            <TextField label="都道府県" value={form.prefecture} onChange={(e) => setForm({ ...form, prefecture: e.target.value })} />
-            <TextField label="市区町村" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+            <TextField label="都道府県" select value={form.prefecture} onChange={(e) => setForm({ ...form, prefecture: e.target.value, city: "" })}>
+              {PREFECTURES.map((p) => (
+                <MenuItem key={p} value={p}>
+                  {p}
+                </MenuItem>
+              ))}
+            </TextField>
+            <Autocomplete
+              options={areaOptions.map((a) => a.name)}
+              value={form.city || null}
+              onChange={(_, v) => setForm({ ...form, city: v ?? "" })}
+              noOptionsText="地域データがありません"
+              renderInput={(params) => <TextField {...params} label="市区町村" />}
+            />
           </Stack>
         </DialogContent>
         <DialogActions>

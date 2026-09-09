@@ -3,6 +3,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import type { CheckResult } from "@yasumi/shared";
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Chip,
@@ -50,11 +51,12 @@ export function Register({ api, initialName, onDone, onCancel }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 都道府県が変わるたびに対象地域を取得し、市区町村・地域選択をリセット。
   useEffect(() => {
-    if (step === 1 && areas.length === 0) {
-      api.listAreas(prefecture).then(setAreas).catch(() => setAreas([]));
-    }
-  }, [step, prefecture, areas.length, api]);
+    api.listAreas(prefecture).then(setAreas).catch(() => setAreas([]));
+    setAreaCodes(new Set());
+    setCity("");
+  }, [prefecture, api]);
 
   function toggle(set: Set<string>, key: string, setter: (s: Set<string>) => void) {
     const next = new Set(set);
@@ -100,25 +102,21 @@ export function Register({ api, initialName, onDone, onCancel }: Props) {
         {step === 0 && (
           <Stack spacing={2.5}>
             <TextField label="学校名" value={name} onChange={(e) => setName(e.target.value)} fullWidth />
-            <TextField
-              label="都道府県"
-              select
-              value={prefecture}
-              onChange={(e) => {
-                setPrefecture(e.target.value);
-                // 都道府県が変わったら対象地域を再取得・選択をリセット
-                setAreas([]);
-                setAreaCodes(new Set());
-              }}
-              fullWidth
-            >
+            <TextField label="都道府県" select value={prefecture} onChange={(e) => setPrefecture(e.target.value)} fullWidth>
               {PREFECTURES.map((p) => (
                 <MenuItem key={p} value={p}>
                   {p}
                 </MenuItem>
               ))}
             </TextField>
-            <TextField label="市区町村" value={city} onChange={(e) => setCity(e.target.value)} fullWidth />
+            <Autocomplete
+              options={areas.map((a) => a.name)}
+              value={city || null}
+              onChange={(_, v) => setCity(v ?? "")}
+              noOptionsText="地域データがありません"
+              renderInput={(params) => <TextField {...params} label="市区町村" />}
+              fullWidth
+            />
             <TextField label="学校公式サイト（任意）" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} fullWidth />
           </Stack>
         )}

@@ -1,4 +1,4 @@
-import { Box, Button, Card, CardContent, Chip, Divider, MenuItem, Stack, TextField, Typography } from "@mui/material";
+import { Autocomplete, Box, Button, Card, CardContent, Chip, Divider, MenuItem, Stack, TextField, Typography } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -18,7 +18,12 @@ export function SchoolDetail({ id }: { id: string }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { data } = useQuery({ queryKey: ["school", id], queryFn: () => api.getSchool(id) });
-  const { data: allAreas = [] } = useQuery({ queryKey: ["areas"], queryFn: api.listAreas });
+  // 学校の都道府県の地域のみ取得（全国 1806 件を出さない）
+  const { data: allAreas = [] } = useQuery({
+    queryKey: ["areas", data?.prefecture],
+    queryFn: () => api.listAreas(data!.prefecture),
+    enabled: !!data,
+  });
 
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
@@ -64,7 +69,14 @@ export function SchoolDetail({ id }: { id: string }) {
           <Typography variant="subtitle2" sx={{ mb: 1.5 }}>基本情報</Typography>
           <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
             <TextField size="small" label="学校名" value={name} onChange={(e) => setName(e.target.value)} />
-            <TextField size="small" label="市区町村" value={city} onChange={(e) => setCity(e.target.value)} />
+            <Autocomplete
+              size="small"
+              options={allAreas.map((a) => a.name)}
+              value={city || null}
+              onChange={(_, v) => setCity(v ?? "")}
+              sx={{ minWidth: 200 }}
+              renderInput={(params) => <TextField {...params} label="市区町村" />}
+            />
           </Stack>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>対象地域</Typography>
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2 }}>
