@@ -131,13 +131,14 @@ M8 デプロイ / 一般公開
 
 **目的**: 学校名 → 対象地域 → 対象警報 → 判定時刻を登録できる。
 
-- [ ] `POST /api/schools` / `PATCH /api/schools/:id`（作成者/管理者のみ / §23）
-- [ ] `GET/POST /api/schools/:id/rules` / `PATCH,DELETE /api/rules/:id`
-- [ ] Frontend: 4ステップ登録（基本情報 / 地域複数選択 / 警報複数選択 / ルール）
-- [ ] **`check_time` は30分刻み（HH:00 / HH:30）に制限**（UI + API バリデーション）
-- [ ] 学校編集権限チェック
+- [x] `POST /api/schools` / `PATCH /api/schools/:id`（作成者/管理者のみ / §23）
+- [x] `GET/POST /api/schools/:id/rules` / `PATCH,DELETE /api/rules/:id`
+- [x] Frontend: 4ステップ登録（基本情報 / 地域複数選択 / 警報複数選択 / ルール）
+- [x] **`check_time` は30分刻み（HH:00 / HH:30）に制限**（UI select + API zod 正規表現）
+- [x] 学校編集権限チェック（`authz.ts` / 作成者 or 管理者 §23）
 
 **完了条件**: 未登録学校を新規登録し、地域・警報・30分刻みルールまで保存できる。
+→ **達成**（API 結合テストで作成/30分検証/権限403/削除を確認・frontend build OK）
 
 **依存**: M4（認証・User）、M3（DB）
 

@@ -3,9 +3,11 @@ import type { ApiClient } from "./api/client.ts";
 import type { Subscription } from "./api/types.ts";
 import { useLiff } from "./hooks/useLiff.ts";
 import { Home } from "./pages/Home.tsx";
+import { Register } from "./pages/Register.tsx";
 import { Search } from "./pages/Search.tsx";
 
 type Tab = "home" | "search";
+type View = { kind: "tabs" } | { kind: "register"; name: string };
 
 export function App() {
   const liff = useLiff();
@@ -19,6 +21,7 @@ export function App() {
 
 function Main({ api }: { api: ApiClient }) {
   const [tab, setTab] = useState<Tab>("home");
+  const [view, setView] = useState<View>({ kind: "tabs" });
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
 
   const reload = useCallback(() => {
@@ -37,20 +40,38 @@ function Main({ api }: { api: ApiClient }) {
         <h1 className="text-lg font-bold">やすみ？</h1>
       </header>
 
-      <nav className="flex border-b border-slate-200 bg-white">
-        <TabButton active={tab === "home"} onClick={() => setTab("home")}>
-          ホーム
-        </TabButton>
-        <TabButton active={tab === "search"} onClick={() => setTab("search")}>
-          学校を探す
-        </TabButton>
-      </nav>
+      {view.kind === "tabs" && (
+        <nav className="flex border-b border-slate-200 bg-white">
+          <TabButton active={tab === "home"} onClick={() => setTab("home")}>
+            ホーム
+          </TabButton>
+          <TabButton active={tab === "search"} onClick={() => setTab("search")}>
+            学校を探す
+          </TabButton>
+        </nav>
+      )}
 
       <main className="mx-auto max-w-md p-4">
-        {tab === "home" ? (
+        {view.kind === "register" ? (
+          <Register
+            api={api}
+            initialName={view.name}
+            onDone={() => {
+              reload();
+              setView({ kind: "tabs" });
+              setTab("home");
+            }}
+            onCancel={() => setView({ kind: "tabs" })}
+          />
+        ) : tab === "home" ? (
           <Home api={api} subscriptions={subscriptions} onChanged={reload} />
         ) : (
-          <Search api={api} subscribedIds={subscribedIds} onSubscribed={reload} />
+          <Search
+            api={api}
+            subscribedIds={subscribedIds}
+            onSubscribed={reload}
+            onRegister={(name) => setView({ kind: "register", name })}
+          />
         )}
       </main>
 

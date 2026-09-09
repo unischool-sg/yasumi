@@ -4,6 +4,7 @@ import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import { z } from "zod";
 import { type AuthDeps, type AuthEnv, authMiddleware } from "./auth.ts";
+import { checkSchoolEditable } from "./authz.ts";
 import { rateLimit } from "./middleware/rate-limit.ts";
 import * as areasRepo from "../infrastructure/db/repositories/areas.ts";
 import * as cfg from "../infrastructure/db/repositories/school-config.ts";
@@ -11,7 +12,14 @@ import * as rulesRepo from "../infrastructure/db/repositories/rules.ts";
 import * as schoolsRepo from "../infrastructure/db/repositories/schools.ts";
 import * as subsRepo from "../infrastructure/db/repositories/subscriptions.ts";
 
-export type AppDeps = AuthDeps;
+export interface AppDeps extends AuthDeps {
+  /** 管理者の LINE ユーザーID（学校/ルール編集の許可 / PRD §23）。 */
+  adminLineUserIds?: string[];
+}
+
+const checkResultSchema = z.enum(["NORMAL", "WAIT", "AM_OFF", "PM_START", "FULL_OFF", "UNKNOWN"]);
+// check_time は 30分刻み（HH:00 / HH:30）のみ許可（PRD §13 Step4 / M5）。
+const checkTimeSchema = z.string().regex(/^([01]\d|2[0-3]):(00|30)$/, "HH:00 または HH:30 のみ");
 
 /**
  * Hono アプリの factory（backend/API.md §2）。依存注入でテスト可能にする。
@@ -51,6 +59,139 @@ export function createApp(deps: AppDeps) {
       rulesRepo.listRulesBySchool(deps.db, id),
     ]);
     return c.json({ ...school, areaCodes, warningTypes, rules: rules.map(rulesRepo.toSchoolRule) });
+  });
+
+  // 学校作成（PRD §13 / created_by = 自分）
+  api.post(
+    "/schools",
+    zValidator(
+      "json",
+      z.object({
+        name: z.string().min(1),
+        prefecture: z.string().min(1),
+        city: z.string().optional(),
+        websiteUrl: z.string().url().optional(),
+        rulesUrl: z.string().url().optional(),
+        areaCodes: z.array(z.string()).optional(),
+        warningTypes: z.array(z.string()).optional(),
+      }),
+    ),
+    async (c) => {
+      const body = c.req.valid("json");
+      const school = await schoolsRepo.createSchool(deps.db, {
+        name: body.name,
+        prefecture: body.prefecture,
+        city: body.city ?? null,
+        websiteUrl: body.websiteUrl ?? null,
+        rulesUrl: body.rulesUrl ?? null,
+        createdBy: c.get("userId"),
+      });
+      if (body.areaCodes) await cfg.setAreaCodes(deps.db, school.id, body.areaCodes);
+      if (body.warningTypes) await cfg.setWarningTypes(deps.db, school.id, body.warningTypes);
+      return c.json(school, 201);
+    },
+  );
+
+  // 学校更新（作成者/管理者のみ / PRD §23）
+  api.patch(
+    "/schools/:id",
+    zValidator(
+      "json",
+      z.object({
+        name: z.string().min(1).optional(),
+        prefecture: z.string().min(1).optional(),
+        city: z.string().nullable().optional(),
+        websiteUrl: z.string().url().nullable().optional(),
+        rulesUrl: z.string().url().nullable().optional(),
+        areaCodes: z.array(z.string()).optional(),
+        warningTypes: z.array(z.string()).optional(),
+      }),
+    ),
+    async (c) => {
+      const id = c.req.param("id");
+      const perm = await checkSchoolEditable(deps.db, {
+        schoolId: id,
+        userId: c.get("userId"),
+        lineUserId: c.get("lineUserId"),
+        adminLineUserIds: deps.adminLineUserIds ?? [],
+      });
+      if (perm === "not_found") return c.json({ error: "not found" }, 404);
+      if (perm === "forbidden") return c.json({ error: "forbidden" }, 403);
+
+      const body = c.req.valid("json");
+      const { areaCodes, warningTypes, ...patch } = body;
+      if (Object.keys(patch).length > 0) await schoolsRepo.updateSchool(deps.db, id, patch);
+      if (areaCodes) await cfg.setAreaCodes(deps.db, id, areaCodes);
+      if (warningTypes) await cfg.setWarningTypes(deps.db, id, warningTypes);
+      const updated = await schoolsRepo.findSchoolById(deps.db, id);
+      return c.json(updated);
+    },
+  );
+
+  // --- Rules（PRD §13 Step4 / §37）---
+  api.get("/schools/:id/rules", async (c) => {
+    const rows = await rulesRepo.listRulesBySchool(deps.db, c.req.param("id"));
+    return c.json(rows.map(rulesRepo.toSchoolRule));
+  });
+
+  api.post(
+    "/schools/:id/rules",
+    zValidator("json", z.object({ checkTime: checkTimeSchema, result: checkResultSchema, message: z.string().optional() })),
+    async (c) => {
+      const schoolId = c.req.param("id");
+      const perm = await checkSchoolEditable(deps.db, {
+        schoolId,
+        userId: c.get("userId"),
+        lineUserId: c.get("lineUserId"),
+        adminLineUserIds: deps.adminLineUserIds ?? [],
+      });
+      if (perm === "not_found") return c.json({ error: "not found" }, 404);
+      if (perm === "forbidden") return c.json({ error: "forbidden" }, 403);
+
+      const body = c.req.valid("json");
+      const row = await rulesRepo.createRule(deps.db, {
+        schoolId,
+        checkTime: body.checkTime,
+        result: body.result,
+        message: body.message ?? null,
+      });
+      return c.json(rulesRepo.toSchoolRule(row), 201);
+    },
+  );
+
+  api.patch(
+    "/rules/:id",
+    zValidator("json", z.object({ checkTime: checkTimeSchema.optional(), result: checkResultSchema.optional(), message: z.string().nullable().optional() })),
+    async (c) => {
+      const ruleId = c.req.param("id");
+      const rule = await rulesRepo.findRuleById(deps.db, ruleId);
+      if (!rule) return c.json({ error: "not found" }, 404);
+      const perm = await checkSchoolEditable(deps.db, {
+        schoolId: rule.schoolId,
+        userId: c.get("userId"),
+        lineUserId: c.get("lineUserId"),
+        adminLineUserIds: deps.adminLineUserIds ?? [],
+      });
+      if (perm !== "ok") return c.json({ error: perm === "forbidden" ? "forbidden" : "not found" }, perm === "forbidden" ? 403 : 404);
+
+      const updated = await rulesRepo.updateRule(deps.db, ruleId, c.req.valid("json"));
+      return c.json(updated ? rulesRepo.toSchoolRule(updated) : null);
+    },
+  );
+
+  api.delete("/rules/:id", async (c) => {
+    const ruleId = c.req.param("id");
+    const rule = await rulesRepo.findRuleById(deps.db, ruleId);
+    if (!rule) return c.json({ error: "not found" }, 404);
+    const perm = await checkSchoolEditable(deps.db, {
+      schoolId: rule.schoolId,
+      userId: c.get("userId"),
+      lineUserId: c.get("lineUserId"),
+      adminLineUserIds: deps.adminLineUserIds ?? [],
+    });
+    if (perm !== "ok") return c.json({ error: perm === "forbidden" ? "forbidden" : "not found" }, perm === "forbidden" ? 403 : 404);
+    await rulesRepo.deleteRule(deps.db, ruleId);
+    return c.body(null, 204);
   });
 
   // --- Areas ---

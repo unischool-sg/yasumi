@@ -101,4 +101,64 @@ suite("API integration", () => {
     });
     expect(res.status).toBe(404);
   });
+
+  // --- M5: 学校登録 + ルール + 権限 ---
+  it("POST /api/schools → 作成し created_by=自分。地域/警報も設定", async () => {
+    const res = await req("/api/schools", {
+      method: "POST",
+      headers: { ...auth("Uowner"), "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "登録テスト校",
+        prefecture: "兵庫県",
+        city: "三田市",
+        areaCodes: ["2834100"],
+        warningTypes: ["暴風警報"],
+      }),
+    });
+    expect(res.status).toBe(201);
+    const created = (await res.json()) as { id: string };
+    const detail = await (await req(`/api/schools/${created.id}`, { headers: auth("Uowner") })).json();
+    expect((detail as { areaCodes: string[] }).areaCodes).toContain("2834100");
+    expect((detail as { warningTypes: string[] }).warningTypes).toContain("暴風警報");
+  });
+
+  it("ルール: 30分刻みのみ許可・作成者は作成/削除でき、他人は403", async () => {
+    const created = (await (
+      await req("/api/schools", {
+        method: "POST",
+        headers: { ...auth("Uowner2"), "content-type": "application/json" },
+        body: JSON.stringify({ name: "ルール校", prefecture: "兵庫県" }),
+      })
+    ).json()) as { id: string };
+
+    // 08:15 は不正（30分刻みでない）→ 400
+    const bad = await req(`/api/schools/${created.id}/rules`, {
+      method: "POST",
+      headers: { ...auth("Uowner2"), "content-type": "application/json" },
+      body: JSON.stringify({ checkTime: "08:15", result: "AM_OFF" }),
+    });
+    expect(bad.status).toBe(400);
+
+    // 08:00 AM_OFF → 201
+    const ok = await req(`/api/schools/${created.id}/rules`, {
+      method: "POST",
+      headers: { ...auth("Uowner2"), "content-type": "application/json" },
+      body: JSON.stringify({ checkTime: "08:00", result: "AM_OFF" }),
+    });
+    expect(ok.status).toBe(201);
+    const rule = (await ok.json()) as { id: string; checkTime: string };
+    expect(rule.checkTime).toBe("08:00");
+
+    // 他人がルール作成 → 403
+    const forbidden = await req(`/api/schools/${created.id}/rules`, {
+      method: "POST",
+      headers: { ...auth("Ustranger"), "content-type": "application/json" },
+      body: JSON.stringify({ checkTime: "10:00", result: "FULL_OFF" }),
+    });
+    expect(forbidden.status).toBe(403);
+
+    // 作成者が削除 → 204
+    const del = await req(`/api/rules/${rule.id}`, { method: "DELETE", headers: auth("Uowner2") });
+    expect(del.status).toBe(204);
+  });
 });

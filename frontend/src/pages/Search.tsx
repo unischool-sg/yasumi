@@ -6,10 +6,11 @@ interface Props {
   api: ApiClient;
   subscribedIds: Set<string>;
   onSubscribed: () => void;
+  onRegister: (name: string) => void;
 }
 
 /** 学校検索 → 購読（PRD §11, §12）。 */
-export function Search({ api, subscribedIds, onSubscribed }: Props) {
+export function Search({ api, subscribedIds, onSubscribed, onRegister }: Props) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<SchoolSummary[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -55,7 +56,15 @@ export function Search({ api, subscribedIds, onSubscribed }: Props) {
       </div>
 
       {results?.length === 0 && (
-        <p className="text-sm text-slate-500">学校が見つかりません。</p>
+        <div className="rounded-xl bg-white p-4 text-center shadow">
+          <p className="text-sm text-slate-500">学校が見つかりません。</p>
+          <button
+            className="mt-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
+            onClick={() => onRegister(q.trim())}
+          >
+            学校を新規登録
+          </button>
+        </div>
       )}
 
       <ul className="flex flex-col gap-2">

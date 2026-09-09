@@ -1,4 +1,14 @@
+import type { CheckResult, SchoolRule } from "@yasumi/shared";
 import type { Area, Me, SchoolDetail, SchoolSummary, Subscription } from "./types.ts";
+
+export interface NewSchoolInput {
+  name: string;
+  prefecture: string;
+  city?: string;
+  websiteUrl?: string;
+  areaCodes?: string[];
+  warningTypes?: string[];
+}
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
@@ -39,6 +49,13 @@ export function createApiClient(idToken: string) {
       }),
     unsubscribe: (schoolId: string) =>
       request<void>(`/api/me/subscriptions/${schoolId}`, { method: "DELETE" }),
+    createSchool: (input: NewSchoolInput) =>
+      request<SchoolSummary>("/api/schools", { method: "POST", body: JSON.stringify(input) }),
+    createRule: (schoolId: string, input: { checkTime: string; result: CheckResult }) =>
+      request<SchoolRule>(`/api/schools/${schoolId}/rules`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
   };
 }
 

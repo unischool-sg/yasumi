@@ -20,6 +20,11 @@ export async function listRulesBySchool(db: Db, schoolId: string): Promise<RuleR
   return db.select().from(schoolRules).where(eq(schoolRules.schoolId, schoolId));
 }
 
+export async function findRuleById(db: Db, id: string): Promise<RuleRow | undefined> {
+  const rows = await db.select().from(schoolRules).where(eq(schoolRules.id, id)).limit(1);
+  return rows[0];
+}
+
 export async function createRule(
   db: Db,
   input: { schoolId: string; checkTime: string; result: CheckResult; message?: string | null },

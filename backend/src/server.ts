@@ -4,10 +4,15 @@ import { getDb } from "./infrastructure/db/client.ts";
 
 const port = Number(process.env.PORT ?? 3000);
 const channelId = process.env.LIFF_CHANNEL_ID ?? "";
+const adminLineUserIds = (process.env.ADMIN_LINE_USER_IDS ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 const app = createApp({
   db: getDb(),
   verifyIdToken: createLineIdTokenVerifier(channelId),
+  adminLineUserIds,
 });
 
 // M7: ここで startCron(app) を呼び、30分ごとに app.fetch("/api/internal/run-check")
