@@ -55,6 +55,16 @@ Frontend(LIFF) … 静的ビルドを Cloudflare Pages 等でホスティング�
 | `ADMIN_LINE_USER_IDS` | 管理者（学校/ルール編集許可 §23） |
 | `API_PORT` / `POSTGRES_PORT` | ホスト公開ポート（既定 3000/5432） |
 | `VITE_LIFF_ID` / `VITE_API_BASE_URL` | Frontend ビルド時 |
+| `ADMIN_JWT_SECRET` / `VITE_ADMIN_API_BASE_URL` / `ADMIN_PORT` | 管理画面（既定 8083） |
+| `SCHOOL_JWT_SECRET` | 先生ダッシュボード API 有効化（**未設定なら `/api/school` は無効**） |
+| `VITE_SCHOOL_API_BASE_URL` / `SCHOOL_PORT` | 先生ダッシュボード フロント（既定 8084・API base は `https://yasumi-api.unischool.jp`） |
+
+### 先生ダッシュボード（school）の公開手順（別サブドメイン）
+1. prod `.env` に `SCHOOL_JWT_SECRET`（強ランダム・`ADMIN_JWT_SECRET` とは別値）と
+   `VITE_SCHOOL_API_BASE_URL=https://yasumi-api.unischool.jp` を設定。
+2. Cloudflare Tunnel の ingress に **`yasumi-school.unischool.jp` → `http://localhost:${SCHOOL_PORT:-8084}`** を追加、DNS を向ける。
+   ※ Cloudflare Universal SSL は `*.unischool.jp` の1段のみ。`school.yasumi.*`（2段）は不可なので `yasumi-school` にする。
+3. 教員アカウントは管理画面（学校詳細 → 教員アカウント）で発行。プランも同画面で設定。
 
 ---
 

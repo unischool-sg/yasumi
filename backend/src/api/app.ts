@@ -4,16 +4,20 @@ import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import { z } from "zod";
 import { createAdminApp } from "./admin/app.ts";
+import { createSchoolApp } from "./school/app.ts";
 import { type AuthDeps, type AuthEnv, authMiddleware } from "./auth.ts";
 import { checkSchoolEditable } from "./authz.ts";
 import { notifyUser } from "../domain/notification/dispatch.ts";
+import { absenceEnabled } from "../domain/plan.ts";
 import { exchangeLineCode } from "./line-login.ts";
 import { rateLimit } from "./middleware/rate-limit.ts";
 import type { NotificationProvider } from "../domain/notification/provider.ts";
 import type { WarningProvider } from "../domain/warning/provider.ts";
 import { verifySignature } from "../infrastructure/line/webhook.ts";
+import * as absenceReportsRepo from "../infrastructure/db/repositories/absence-reports.ts";
 import * as areasRepo from "../infrastructure/db/repositories/areas.ts";
 import * as deviceTokensRepo from "../infrastructure/db/repositories/device-tokens.ts";
+import * as studentProfilesRepo from "../infrastructure/db/repositories/student-profiles.ts";
 import * as cfg from "../infrastructure/db/repositories/school-config.ts";
 import * as rulesRepo from "../infrastructure/db/repositories/rules.ts";
 import * as schoolsRepo from "../infrastructure/db/repositories/schools.ts";
@@ -38,6 +42,8 @@ export interface AppDeps extends AuthDeps {
   now?: () => Date;
   /** 管理画面の JWT 署名鍵（設定時のみ /api/admin を有効化）。 */
   adminJwtSecret?: string;
+  /** 先生ダッシュボードの JWT 署名鍵（設定時のみ /api/school を有効化）。 */
+  schoolJwtSecret?: string;
   /** ネイティブ LINE ログインのトークン交換用（LIFF と同じ LINE Login チャネル）。 */
   lineLoginChannelId?: string;
   lineLoginChannelSecret?: string;
@@ -366,6 +372,91 @@ export function createApp(deps: AppDeps) {
     },
   );
 
+  // --- 生徒プロフィール / 欠席連絡（M13・premium 校のみ受付）---
+  const ymdSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD");
+  const absenceTypeSchema = z.enum(["欠席", "遅刻", "早退", "休校"]);
+
+  api.get("/me/student-profiles", async (c) =>
+    c.json(await studentProfilesRepo.listByOwner(deps.db, c.get("userId"))),
+  );
+
+  api.post(
+    "/me/student-profiles",
+    zValidator("json", z.object({
+      schoolId: z.string().uuid(),
+      studentName: z.string().min(1).max(100),
+      grade: z.string().max(20).optional(),
+      className: z.string().max(20).optional(),
+    })),
+    async (c) => {
+      const b = c.req.valid("json");
+      const school = await schoolsRepo.findSchoolById(deps.db, b.schoolId);
+      if (!school) return c.json({ error: "school not found" }, 404);
+      const row = await studentProfilesRepo.createProfile(deps.db, {
+        schoolId: b.schoolId,
+        ownerUserId: c.get("userId"),
+        studentName: b.studentName,
+        grade: b.grade ?? null,
+        className: b.className ?? null,
+      });
+      return c.json(row, 201);
+    },
+  );
+
+  // 自分の購読校のうち、欠席受付が使える（premium 有効）学校
+  api.get("/me/absence-schools", async (c) => {
+    const now = deps.now?.() ?? new Date();
+    const subs = await subsRepo.listSubscriptionsByUser(deps.db, c.get("userId"));
+    const out: { id: string; name: string }[] = [];
+    for (const s of subs) {
+      const school = await schoolsRepo.findSchoolById(deps.db, s.schoolId);
+      if (school && absenceEnabled(school, now)) out.push({ id: school.id, name: school.name });
+    }
+    return c.json(out);
+  });
+
+  api.get("/me/absence-reports", async (c) =>
+    c.json(await absenceReportsRepo.listByReporter(deps.db, c.get("userId"))),
+  );
+
+  api.post(
+    "/me/absence-reports",
+    zValidator("json", z.object({
+      schoolId: z.string().uuid(),
+      studentProfileId: z.string().uuid(),
+      date: ymdSchema,
+      type: absenceTypeSchema,
+      reason: z.string().max(1000).optional(),
+      note: z.string().max(1000).optional(),
+    })),
+    async (c) => {
+      const b = c.req.valid("json");
+      const userId = c.get("userId");
+      // 所有権: 自分のプロフィールのみ
+      const profile = await studentProfilesRepo.findByIdForOwner(deps.db, b.studentProfileId, userId);
+      if (!profile) return c.json({ error: "profile not found" }, 404);
+      if (profile.schoolId !== b.schoolId) return c.json({ error: "school mismatch" }, 400);
+      const school = await schoolsRepo.findSchoolById(deps.db, b.schoolId);
+      if (!school) return c.json({ error: "school not found" }, 404);
+      if (!absenceEnabled(school, deps.now?.() ?? new Date())) {
+        return c.json({ error: "この学校は欠席受付に対応していません" }, 403);
+      }
+      // 休校の正当性: その日その学校で警報が出ていたかを自動タグ
+      const warningActive = await warningChecksRepo.hasActiveWarningOnDate(deps.db, b.schoolId, b.date);
+      const row = await absenceReportsRepo.createReport(deps.db, {
+        schoolId: b.schoolId,
+        studentProfileId: b.studentProfileId,
+        reportedByUserId: userId,
+        date: b.date,
+        type: b.type,
+        reason: b.reason ?? null,
+        note: b.note ?? null,
+        warningActive,
+      });
+      return c.json(row, 201);
+    },
+  );
+
   // --- Status / History（PRD §15〜§17, §37 / ホーム画面）---
   api.get("/schools/:id/status", async (c) => {
     const id = c.req.param("id");
@@ -399,6 +490,20 @@ export function createApp(deps: AppDeps) {
         adminJwtSecret: deps.adminJwtSecret,
         ...(deps.now ? { now: deps.now } : {}),
         ...(deps.lineChannelAccessToken ? { lineAccessToken: deps.lineChannelAccessToken } : {}),
+        ...(deps.notificationProvider ? { notificationProvider: deps.notificationProvider } : {}),
+        ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
+      }),
+    );
+  }
+
+  // 先生ダッシュボード API（教員アカウント認証・自校スコープ）。/api より先に登録する。
+  if (deps.schoolJwtSecret) {
+    app.route(
+      "/api/school",
+      createSchoolApp({
+        db: deps.db,
+        schoolJwtSecret: deps.schoolJwtSecret,
+        ...(deps.now ? { now: deps.now } : {}),
         ...(deps.notificationProvider ? { notificationProvider: deps.notificationProvider } : {}),
         ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
       }),

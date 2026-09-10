@@ -13,6 +13,9 @@ const internalCronToken = process.env.INTERNAL_CRON_TOKEN ?? "";
 if (!process.env.ADMIN_JWT_SECRET) {
   console.warn("[yasumi] ADMIN_JWT_SECRET 未設定のため管理画面 API(/api/admin) は無効");
 }
+if (!process.env.SCHOOL_JWT_SECRET) {
+  console.warn("[yasumi] SCHOOL_JWT_SECRET 未設定のため先生ダッシュボード API(/api/school) は無効");
+}
 const adminLineUserIds = (process.env.ADMIN_LINE_USER_IDS ?? "")
   .split(",")
   .map((s) => s.trim())
@@ -40,6 +43,7 @@ const app = createApp({
   lineChannelSecret: process.env.LINE_CHANNEL_SECRET ?? "",
   internalCronToken,
   ...(process.env.ADMIN_JWT_SECRET ? { adminJwtSecret: process.env.ADMIN_JWT_SECRET } : {}),
+  ...(process.env.SCHOOL_JWT_SECRET ? { schoolJwtSecret: process.env.SCHOOL_JWT_SECRET } : {}),
   // ネイティブ LINE ログイン（LIFF と同じチャネル）。secret 未設定なら /api/auth/line/token は 503。
   lineLoginChannelId: channelId,
   lineLoginChannelSecret: process.env.LINE_LOGIN_CHANNEL_SECRET ?? "",

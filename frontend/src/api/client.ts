@@ -1,5 +1,8 @@
 import type { CheckResult, SchoolRule } from "@yasumi/shared";
-import type { Area, Me, SchoolDetail, SchoolStatus, SchoolSummary, Subscription } from "./types.ts";
+import type {
+  AbsenceReport, AbsenceSchool, AbsenceType, Area, Me, SchoolDetail, SchoolStatus,
+  SchoolSummary, StudentProfile, Subscription,
+} from "./types.ts";
 
 export interface NewSchoolInput {
   name: string;
@@ -73,6 +76,16 @@ export function createApiClient(idToken: string) {
       }),
     deleteRule: (ruleId: string) =>
       request<void>(`/api/rules/${ruleId}`, { method: "DELETE" }),
+    /** 欠席受付が使える学校（premium・購読中）。 */
+    listAbsenceSchools: () => request<AbsenceSchool[]>("/api/me/absence-schools"),
+    /** 自分の生徒プロフィール一覧。 */
+    listStudentProfiles: () => request<StudentProfile[]>("/api/me/student-profiles"),
+    createStudentProfile: (input: { schoolId: string; studentName: string; grade?: string; className?: string }) =>
+      request<StudentProfile>("/api/me/student-profiles", { method: "POST", body: JSON.stringify(input) }),
+    /** 欠席・遅刻・早退・休校を連絡（premium校のみ）。 */
+    createAbsenceReport: (input: {
+      schoolId: string; studentProfileId: string; date: string; type: AbsenceType; reason?: string; note?: string;
+    }) => request<AbsenceReport>("/api/me/absence-reports", { method: "POST", body: JSON.stringify(input) }),
     /** ネイティブ/PWA の FCM デバイストークンを登録（無料プッシュの送信先 / Part B）。 */
     registerDeviceToken: (input: { token: string; platform: "ios" | "android" | "web" }) =>
       request<void>("/api/me/device-tokens", { method: "POST", body: JSON.stringify(input) }),

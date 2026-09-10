@@ -1,6 +1,6 @@
-import { desc, eq, ilike } from "drizzle-orm";
+import { count, desc, eq, ilike, sql } from "drizzle-orm";
 import type { Db } from "../client.ts";
-import { schools } from "../schema.ts";
+import { schools, subscriptions } from "../schema.ts";
 
 export type SchoolRow = typeof schools.$inferSelect;
 export type NewSchool = {
@@ -9,6 +9,9 @@ export type NewSchool = {
   city?: string | null;
   websiteUrl?: string | null;
   rulesUrl?: string | null;
+  studentCount?: number | null;
+  plan?: string | null;
+  planExpiresAt?: Date | null;
   createdBy?: string | null;
 };
 
@@ -85,6 +88,39 @@ export async function listSchools(db: Db, opts: { limit?: number; offset?: numbe
     .orderBy(desc(schools.createdAt))
     .limit(opts.limit ?? 100)
     .offset(opts.offset ?? 0);
+}
+
+/**
+ * 管理画面(営業指標): 学校ごとの購読者数・通知ON数・浸透率の分母(生徒数)を集計。
+ * 購読者数の多い順 = セールスで狙える「校内密度が高い」学校の順。浸透率は分母がある学校のみ算出可。
+ */
+export type SchoolStatsRow = {
+  id: string;
+  name: string;
+  prefecture: string;
+  city: string | null;
+  studentCount: number | null;
+  subscriberCount: number;
+  enabledCount: number;
+  createdAt: Date;
+};
+
+export async function listSchoolsWithStats(db: Db): Promise<SchoolStatsRow[]> {
+  return db
+    .select({
+      id: schools.id,
+      name: schools.name,
+      prefecture: schools.prefecture,
+      city: schools.city,
+      studentCount: schools.studentCount,
+      subscriberCount: count(subscriptions.userId),
+      enabledCount: sql<number>`count(*) filter (where ${subscriptions.notificationEnabled})`.mapWith(Number),
+      createdAt: schools.createdAt,
+    })
+    .from(schools)
+    .leftJoin(subscriptions, eq(subscriptions.schoolId, schools.id))
+    .groupBy(schools.id)
+    .orderBy(desc(count(subscriptions.userId)), desc(schools.createdAt));
 }
 
 export async function countSchools(db: Db): Promise<number> {

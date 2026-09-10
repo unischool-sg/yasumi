@@ -15,6 +15,7 @@ import * as notificationsRepo from "../../infrastructure/db/repositories/notific
 import * as rulesRepo from "../../infrastructure/db/repositories/rules.ts";
 import * as schoolsRepo from "../../infrastructure/db/repositories/schools.ts";
 import * as subsRepo from "../../infrastructure/db/repositories/subscriptions.ts";
+import * as teachersRepo from "../../infrastructure/db/repositories/teachers.ts";
 import * as usersRepo from "../../infrastructure/db/repositories/users.ts";
 import * as wcRepo from "../../infrastructure/db/repositories/warning-checks.ts";
 import { jstDateString } from "../../shared/jst.ts";
@@ -103,6 +104,8 @@ export function createAdminApp(deps: AdminAppDeps) {
     const { q } = c.req.valid("query");
     return c.json(q ? await schoolsRepo.searchSchools(db, q, 200) : await schoolsRepo.listSchools(db, { limit: 200 }));
   });
+  // 学校ごとの購読者数・浸透率（営業指標。校内密度の高い順）
+  app.get("/schools/overview", async (c) => c.json(await schoolsRepo.listSchoolsWithStats(db)));
   app.get("/schools/:id", async (c) => {
     const id = c.req.param("id");
     const school = await schoolsRepo.findSchoolById(db, id);
@@ -121,6 +124,7 @@ export function createAdminApp(deps: AdminAppDeps) {
       prefecture: z.string().min(1),
       city: z.string().optional(),
       websiteUrl: z.string().url().optional(),
+      studentCount: z.number().int().positive().optional(),
       areaCodes: z.array(z.string()).optional(),
       warningTypes: z.array(z.string()).optional(),
     })),
@@ -131,6 +135,7 @@ export function createAdminApp(deps: AdminAppDeps) {
         prefecture: b.prefecture,
         city: b.city ?? null,
         websiteUrl: b.websiteUrl ?? null,
+        studentCount: b.studentCount ?? null,
         createdBy: null,
       });
       if (b.areaCodes) await cfg.setAreaCodes(db, school.id, b.areaCodes);
@@ -145,6 +150,9 @@ export function createAdminApp(deps: AdminAppDeps) {
       prefecture: z.string().min(1).optional(),
       city: z.string().nullable().optional(),
       websiteUrl: z.string().url().nullable().optional(),
+      studentCount: z.number().int().positive().nullable().optional(),
+      plan: z.enum(["basic", "standard", "premium"]).nullable().optional(),
+      planExpiresAt: z.string().datetime().nullable().optional(),
       areaCodes: z.array(z.string()).optional(),
       warningTypes: z.array(z.string()).optional(),
     })),
@@ -152,7 +160,11 @@ export function createAdminApp(deps: AdminAppDeps) {
       const id = c.req.param("id");
       const school = await schoolsRepo.findSchoolById(db, id);
       if (!school) return c.json({ error: "not found" }, 404);
-      const { areaCodes, warningTypes, ...patch } = c.req.valid("json");
+      const { areaCodes, warningTypes, planExpiresAt, ...rest } = c.req.valid("json");
+      const patch = {
+        ...rest,
+        ...(planExpiresAt !== undefined ? { planExpiresAt: planExpiresAt ? new Date(planExpiresAt) : null } : {}),
+      };
       if (Object.keys(patch).length > 0) await schoolsRepo.updateSchool(db, id, patch);
       if (areaCodes) await cfg.setAreaCodes(db, id, areaCodes);
       if (warningTypes) await cfg.setWarningTypes(db, id, warningTypes);
@@ -218,6 +230,63 @@ export function createAdminApp(deps: AdminAppDeps) {
   app.get("/schools/:id/subscribers", async (c) =>
     c.json(await subsRepo.listSubscribersBySchool(db, c.req.param("id"))),
   );
+
+  // --- 教員アカウントのプロビジョニング（社内 admin が手で発行）---
+  app.get("/schools/:id/teachers", async (c) =>
+    c.json(await teachersRepo.listTeachersBySchool(db, c.req.param("id"))),
+  );
+  app.post(
+    "/schools/:id/teachers",
+    zValidator("json", z.object({
+      email: z.string().email(),
+      password: z.string().min(8),
+      name: z.string().min(1),
+      role: z.enum(["owner", "teacher"]).optional(),
+    })),
+    async (c) => {
+      const schoolId = c.req.param("id");
+      const school = await schoolsRepo.findSchoolById(db, schoolId);
+      if (!school) return c.json({ error: "school not found" }, 404);
+      const b = c.req.valid("json");
+      if (await teachersRepo.findTeacherByEmail(db, b.email)) return c.json({ error: "email taken" }, 409);
+      const passwordHash = await Bun.password.hash(b.password);
+      const row = await teachersRepo.createTeacher(db, {
+        schoolId,
+        email: b.email,
+        passwordHash,
+        name: b.name,
+        ...(b.role ? { role: b.role } : {}),
+      });
+      const { passwordHash: _omit, ...safe } = row;
+      return c.json(safe, 201);
+    },
+  );
+  app.patch(
+    "/teachers/:id",
+    zValidator("json", z.object({
+      role: z.enum(["owner", "teacher"]).optional(),
+      disabled: z.boolean().optional(),
+      password: z.string().min(8).optional(),
+      name: z.string().min(1).optional(),
+    })),
+    async (c) => {
+      const b = c.req.valid("json");
+      const patch: { role?: "owner" | "teacher"; disabled?: boolean; passwordHash?: string; name?: string } = {};
+      if (b.role !== undefined) patch.role = b.role;
+      if (b.disabled !== undefined) patch.disabled = b.disabled;
+      if (b.name !== undefined) patch.name = b.name;
+      if (b.password !== undefined) patch.passwordHash = await Bun.password.hash(b.password);
+      const updated = await teachersRepo.updateTeacher(db, c.req.param("id"), patch);
+      if (!updated) return c.json({ error: "not found" }, 404);
+      const { passwordHash: _omit, ...safe } = updated;
+      return c.json(safe);
+    },
+  );
+  app.delete("/teachers/:id", async (c) => {
+    const t = await teachersRepo.findTeacherById(db, c.req.param("id"));
+    if (t) await teachersRepo.deleteTeacherInSchool(db, t.schoolId, t.id);
+    return c.body(null, 204);
+  });
 
   // 一斉メッセージ送信（全ユーザー / 特定学校の購読者）。デバイストークンあれば FCM / 無ければ LINE。
   app.post(

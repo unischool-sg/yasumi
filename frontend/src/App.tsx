@@ -23,6 +23,7 @@ import type { ApiClient } from "./api/client.ts";
 import type { Subscription } from "./api/types.ts";
 import { useAuth } from "./hooks/useAuth.ts";
 import { registerPushToken } from "./native/push.ts";
+import { AbsenceReport } from "./pages/AbsenceReport.tsx";
 import { EditSchool } from "./pages/EditSchool.tsx";
 import { Home } from "./pages/Home.tsx";
 import { MySchools } from "./pages/MySchools.tsx";
@@ -30,7 +31,11 @@ import { Register } from "./pages/Register.tsx";
 import { Search } from "./pages/Search.tsx";
 
 type Tab = "home" | "search" | "manage";
-type View = { kind: "tabs" } | { kind: "register"; name: string } | { kind: "edit"; schoolId: string };
+type View =
+  | { kind: "tabs" }
+  | { kind: "register"; name: string }
+  | { kind: "edit"; schoolId: string }
+  | { kind: "absence" };
 
 export function App() {
   const auth = useAuth();
@@ -46,9 +51,12 @@ function Main({ api }: { api: ApiClient }) {
   const [view, setView] = useState<View>({ kind: "tabs" });
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [snack, setSnack] = useState<string | null>(null);
+  const [hasAbsence, setHasAbsence] = useState(false);
 
   const reload = useCallback(() => {
     api.listSubscriptions().then(setSubscriptions).catch(() => setSubscriptions([]));
+    // 欠席受付が使える学校（premium・購読中）があるかで導線を出し分け
+    api.listAbsenceSchools().then((s) => setHasAbsence(s.length > 0)).catch(() => setHasAbsence(false));
   }, [api]);
   useEffect(() => reload(), [reload]);
 
@@ -59,7 +67,11 @@ function Main({ api }: { api: ApiClient }) {
 
   const subscribedIds = new Set(subscriptions.map((s) => s.schoolId));
   const isModal = view.kind !== "tabs";
-  const title = view.kind === "register" ? "学校を登録" : view.kind === "edit" ? "学校を編集" : "やすみ？";
+  const title =
+    view.kind === "register" ? "学校を登録"
+    : view.kind === "edit" ? "学校を編集"
+    : view.kind === "absence" ? "欠席を連絡"
+    : "やすみ？";
 
   return (
     <Box sx={{ maxWidth: 480, mx: "auto", minHeight: "100dvh", bgcolor: "background.default", position: "relative" }}>
@@ -86,6 +98,8 @@ function Main({ api }: { api: ApiClient }) {
           />
         ) : view.kind === "edit" ? (
           <EditSchool api={api} schoolId={view.schoolId} onBack={() => setView({ kind: "tabs" })} onNotify={setSnack} />
+        ) : view.kind === "absence" ? (
+          <AbsenceReport api={api} onBack={() => setView({ kind: "tabs" })} onNotify={setSnack} />
         ) : tab === "home" ? (
           <Home
             api={api}
@@ -93,6 +107,8 @@ function Main({ api }: { api: ApiClient }) {
             onChanged={reload}
             onGoSearch={() => setTab("search")}
             onNotify={setSnack}
+            showAbsence={hasAbsence}
+            onAbsence={() => setView({ kind: "absence" })}
           />
         ) : tab === "search" ? (
           <Search

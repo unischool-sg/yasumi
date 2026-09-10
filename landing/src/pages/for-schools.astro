@@ -1,0 +1,820 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+import { SCHOOL_CONTACT_EMAIL } from "../consts";
+
+const mailto = `mailto:${SCHOOL_CONTACT_EMAIL}?subject=${encodeURIComponent("やすみ？ 学校向けプランについて")}`;
+
+// 学校が抱える連絡の課題（アイコンは Google 4色でアクセント。fix は「やすみ？なら」の解決）
+const icons: Record<string, string> = {
+  phone: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`,
+  mail: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg>`,
+  app: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>`,
+  clock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`,
+};
+const problems = [
+  { color: "#4285f4", icon: "phone", title: "電話連絡網が遅い", body: "担任から順番に電話。全員に伝わる頃には登校時刻を過ぎている。", fix: "1通で全保護者へ同時に届く" },
+  { color: "#ea4335", icon: "mail", title: "一斉メールは開かれない", body: "迷惑メール扱いやアドレス変更で不達。届いた確証も持てない。", fix: "既読・到達がその場で見える" },
+  { color: "#f9ab00", icon: "app", title: "専用アプリは入らない", body: "新しいアプリのインストールは保護者に敬遠され、浸透しない。", fix: "普段使いのLINEでそのまま" },
+  { color: "#34a853", icon: "clock", title: "朝の欠席電話がパンク", body: "始業前に電話が集中。折り返しや聞き漏らしも起きてしまう。", fix: "アプリで受付、記録も自動" },
+];
+
+// できること
+const features = [
+  { tag: "公式配信", title: "休校・緊急を、1操作で全保護者へ", body: "警報での休校・行事変更・不審者情報・登校時刻の変更を、その場で一斉送信。学校公式の認証バッジ付きで届きます。" },
+  { tag: "自動化", title: "気象警報との連動は無制限", body: "対象地域・警報・判定時刻を登録すれば、朝の判定は自動。休校・緊急連絡の送信は全プランで通数無制限です。" },
+  { tag: "届く", title: "既読・到達が見える", body: "誰に届いたか・どれだけ開かれたかを可視化。「送ったのに知らなかった」をなくします。" },
+  { tag: "双方向", title: "欠席連絡をアプリで受付", body: "保護者はアプリから欠席・遅刻を連絡。朝の電話対応から解放され、記録も自動で残ります。（プレミアム）" },
+];
+
+const steps = [
+  { n: "1", title: "お問い合わせ", body: "御校の生徒の利用状況・お困りごとをヒアリング。最短で無料トライアルをご用意します。" },
+  { n: "2", title: "公式アカウント発行", body: "御校を公式アカウントとして認証。学年・クラスの配信設定や職員アカウントを準備します。" },
+  { n: "3", title: "保護者へ案内", body: "既にやすみ？を使っている生徒はそのまま。案内文と導線もこちらで用意します。" },
+  { n: "4", title: "運用開始", body: "休校連絡はもちろん、日々のお知らせ・欠席受付まで。困ったら導入サポートが伴走します。" },
+];
+
+const plans = [
+  {
+    name: "ベーシック", price: "2,500", unit: "円 / 月", accent: false,
+    tagline: "まず公式で休校連絡を",
+    feats: ["公式認証バッジ", "警報連動・休校・緊急の一斉送信（無制限）", "任意のお知らせ配信 月10通", "到達状況の確認", "職員アカウント 1"],
+  },
+  {
+    name: "スタンダード", price: "7,000", unit: "円 / 月", accent: true,
+    tagline: "日々の連絡もこれ一つで",
+    feats: ["ベーシックの全機能", "任意のお知らせ配信 月50通", "メッセージ分類（休校/行事/防犯/保健）", "開封率アナリティクス", "学年・クラス別の配信", "職員アカウント 5・ロゴ表示"],
+  },
+  {
+    name: "プレミアム", price: "18,000〜", unit: "円 / 月", accent: false,
+    tagline: "欠席受付で朝の電話をゼロに",
+    feats: ["スタンダードの全機能", "欠席連絡の受付（双方向）", "お知らせ配信 無制限", "詳細分析＋CSV書き出し", "職員アカウント無制限・権限管理", "導入サポート付き"],
+  },
+];
+
+const faqs = [
+  { q: "『学校公式ではない』サービスと聞きました。", a: "やすみ？は元々、保護者・生徒が自分で登録して警報から自動判定する無料サービスです。学校向けプランにご契約いただくと、その学校が“公式の発信元”として認証され、確実な連絡を直接送れるようになります。" },
+  { q: "保護者は新しくアプリを入れる必要がありますか？", a: "いいえ。多くの生徒・保護者が普段使うLINEから利用できます。既に御校の生徒が使っている場合、そのまま公式連絡を受け取れるようになります。" },
+  { q: "導入までどのくらいかかりますか？", a: "公式アカウントの発行と配信設定は短期間で可能です。まずはお問い合わせください。御校の利用状況に合わせてご案内します。" },
+  { q: "生徒・保護者の個人情報はどう扱われますか？", a: "配信は学校アカウントの権限内で行われ、個人情報は目的外に利用しません。詳細は契約時にご説明します。" },
+  { q: "料金はいつでも見直せますか？", a: "はい。プラン変更・解約は柔軟に対応します。年払いには割引もご用意しています。" },
+];
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqs.map((f) => ({
+    "@type": "Question",
+    name: f.q,
+    acceptedAnswer: { "@type": "Answer", text: f.a },
+  })),
+};
+---
+
+<Layout
+  title="やすみ？ 学校向けプラン | 保護者への連絡を、学校公式で確実に。"
+  description="休校・緊急連絡・欠席受付をLINEで。私立学校のための公式配信プラン。電話連絡網・一斉メール・専用アプリの課題を、生徒がすでに使う『やすみ？』で解決します。"
+  type="website"
+>
+  <script slot="head" type="application/ld+json" set:html={JSON.stringify(faqJsonLd)} />
+
+  <Header />
+
+  <!-- Hero -->
+  <section class="s-hero">
+    <div class="blob blob-a"></div>
+    <div class="blob blob-b"></div>
+    <div class="container s-hero-grid">
+      <div class="s-hero-copy reveal in">
+        <p class="eyebrow">私立学校の先生・事務室の方へ</p>
+        <h1>保護者への連絡を、<br /><span class="grad-text">学校公式</span>で確実に。</h1>
+        <p class="lead">
+          休校・緊急連絡・欠席受付を、生徒がすでに使う「やすみ？」から。
+          電話連絡網も、開かれない一斉メールも、入れてもらえない専用アプリも、もう要りません。
+        </p>
+        <div class="s-hero-cta">
+          <a href={mailto} class="btn btn-primary">資料・お見積りをもらう</a>
+          <a href="#pricing" class="btn btn-outline">料金を見る</a>
+        </div>
+        <p class="hero-note">生徒はずっと無料。学校は「公式の発信元」になれます。</p>
+      </div>
+      <div class="s-hero-visual">
+        <div class="line-mock float">
+          <div class="line-header"><span class="line-badge">公式</span>三田学園</div>
+          <div class="line-bubble">
+            <b>【重要】本日は暴風警報のため休校です</b><br /><br />
+            本日 8:00 時点で三田市に暴風警報が発表されています。
+            生徒の安全確保のため、本日は<b>全日休校</b>とします。<br /><br />
+            ・登校の必要はありません<br />
+            ・詳細は追ってご連絡します<br /><br />
+            三田学園中学校・高等学校
+          </div>
+          <div class="line-verified">✓ 学校公式アカウントからの送信</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Problem -->
+  <section class="s-problem">
+    <div class="container section-head reveal">
+      <p class="eyebrow">よくある課題</p>
+      <h2>電話・メール・専用アプリ。<br />どれも、確実じゃない。</h2>
+    </div>
+    <div class="container problem-grid">
+      {problems.map((p, i) => (
+        <div class="problem-card reveal" style={`--c:${p.color};--delay:${i * 0.08}s`}>
+          <span class="p-icon" set:html={icons[p.icon]} />
+          <h3>{p.title}</h3>
+          <p>{p.body}</p>
+          <div class="p-fix"><span class="p-fix-mark">やすみ？なら</span>{p.fix}</div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- Why -->
+  <section class="s-why">
+    <div class="container why-inner reveal">
+      <div class="why-copy">
+        <p class="eyebrow">なぜ、やすみ？</p>
+        <h2>“生徒がすでに使っている”ことが、最大の強み。</h2>
+        <p>
+          新しいアプリを配って浸透を待つ必要はありません。やすみ？は御校の生徒が休校情報のために自発的に使うサービス。
+          学校はそこに<strong>公式の発信元として乗るだけ</strong>で、確実な連絡網が手に入ります。
+        </p>
+        <ul class="why-points">
+          <li><b>公式バッジ</b>で「本当に学校からの連絡」だと保護者が確信できる</li>
+          <li><b>警報連動・緊急連絡は無制限</b>。いざという時に気兼ねなく打てる</li>
+          <li>スマホに<b>プッシュで直接</b>届き、既読・到達も見える</li>
+        </ul>
+      </div>
+      <div class="why-stat">
+        <div class="stat-num">1操作</div>
+        <div class="stat-label">で全保護者へ<br />公式一斉連絡</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="s-features">
+    <div class="container section-head reveal">
+      <p class="eyebrow">できること</p>
+      <h2>連絡の“ぜんぶ”を、ここで。</h2>
+    </div>
+    <div class="container feature-grid">
+      {features.map((f, i) => (
+        <div class="s-feature-card reveal" style={`--delay:${i * 0.08}s`}>
+          <span class="f-tag">{f.tag}</span>
+          <h3>{f.title}</h3>
+          <p>{f.body}</p>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- Steps -->
+  <section class="s-steps">
+    <div class="container section-head reveal">
+      <p class="eyebrow">導入の流れ</p>
+      <h2>最短で、はじめられます。</h2>
+    </div>
+    <div class="container steps">
+      {steps.map((s, i) => (
+        <div class="step reveal" style={`--delay:${i * 0.08}s`}>
+          <div class="step-n">{s.n}</div>
+          <h3>{s.title}</h3>
+          <p>{s.body}</p>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- Pricing -->
+  <section id="pricing" class="s-pricing">
+    <div class="container section-head reveal">
+      <p class="eyebrow">料金プラン</p>
+      <h2>学校の規模と使い方に合わせて。</h2>
+      <p class="pricing-note">すべての有料プランで、警報連動・休校・緊急連絡の一斉送信は<b>無制限</b>。生徒・保護者の利用は無料です。</p>
+    </div>
+    <div class="container plan-grid">
+      {plans.map((p) => (
+        <div class={`plan-card reveal${p.accent ? " plan-accent" : ""}`}>
+          {p.accent && <span class="plan-badge">人気</span>}
+          <h3 class="plan-name">{p.name}</h3>
+          <p class="plan-tagline">{p.tagline}</p>
+          <div class="plan-price"><span class="plan-amt">{p.price}</span><span class="plan-unit">{p.unit}</span></div>
+          <ul class="plan-feats">
+            {p.feats.map((f) => <li>{f}</li>)}
+          </ul>
+          <a href={mailto} class={`btn ${p.accent ? "btn-primary" : "btn-outline"} plan-cta`}>相談する</a>
+        </div>
+      ))}
+    </div>
+    <p class="container plan-foot">※ 年払いは2ヶ月分無料。生徒数が多い場合の従量プラン・複数校のまとめ契約もご相談ください。</p>
+  </section>
+
+  <!-- FAQ -->
+  <section class="s-faq">
+    <div class="container faq-inner">
+      <div class="section-head reveal">
+        <p class="eyebrow">FAQ</p>
+        <h2>学校の方からよくある質問</h2>
+      </div>
+      <div class="faq-list reveal">
+        {faqs.map((f) => (
+          <details class="faq-item">
+            <summary>{f.q}</summary>
+            <p>{f.a}</p>
+          </details>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="s-cta">
+    <div class="container">
+      <div class="cta-card reveal">
+        <h2>朝の連絡を、学校の負担にしない。</h2>
+        <p>御校の生徒がどれだけ使っているか、無料トライアルもご案内します。まずはお気軽にご相談ください。</p>
+        <a href={mailto} class="btn btn-white">メールで相談する</a>
+      </div>
+    </div>
+  </section>
+
+  <Footer />
+</Layout>
+
+<script>
+  const items = document.querySelectorAll<HTMLElement>(".reveal:not(.in)");
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) {
+          e.target.classList.add("in");
+          io.unobserve(e.target);
+        }
+      }
+    },
+    { threshold: 0.12, rootMargin: "0px 0px -8% 0px" },
+  );
+  items.forEach((el) => io.observe(el));
+</script>
+
+<style>
+  :global(.btn-outline) {
+    background: #fff;
+    color: var(--blue);
+    border: 1px solid #dadce0;
+  }
+  :global(.btn-outline:hover) {
+    background: #f8faff;
+    border-color: #c6dafc;
+  }
+
+  /* Hero */
+  .s-hero {
+    padding: 72px 0 48px;
+    position: relative;
+    overflow: hidden;
+  }
+  .s-hero .container {
+    position: relative;
+    z-index: 2;
+  }
+  .blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(70px);
+    opacity: 0.5;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .blob-a {
+    width: 360px;
+    height: 360px;
+    background: #4285f4;
+    top: -120px;
+    right: -60px;
+    animation: blob 14s ease-in-out infinite;
+  }
+  .blob-b {
+    width: 300px;
+    height: 300px;
+    background: #34a853;
+    top: 120px;
+    right: 240px;
+    opacity: 0.32;
+    animation: blob 18s ease-in-out infinite reverse;
+  }
+  .grad-text {
+    background: linear-gradient(90deg, #4285f4, #0f9d58, #4285f4);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: gradientShift 6s ease infinite;
+  }
+  .s-hero-grid {
+    display: grid;
+    grid-template-columns: 1fr 0.9fr;
+    gap: 56px;
+    align-items: center;
+  }
+  .s-hero-copy h1 {
+    font-size: clamp(34px, 5.4vw, 56px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-top: 12px;
+  }
+  .lead {
+    color: var(--muted);
+    font-size: 18px;
+    margin: 22px 0 30px;
+    max-width: 32em;
+  }
+  .s-hero-cta {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .hero-note {
+    margin-top: 16px;
+    font-size: 13px;
+    color: #80868b;
+  }
+  .s-hero-visual {
+    display: grid;
+    place-items: center;
+  }
+  .line-mock {
+    width: 320px;
+    background: #fff;
+    border-radius: 22px;
+    overflow: hidden;
+    box-shadow: 0 20px 48px rgba(32, 33, 36, 0.18);
+  }
+  .line-header {
+    background: #06c755;
+    color: #fff;
+    font-weight: 700;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .line-badge {
+    background: rgba(255, 255, 255, 0.9);
+    color: #06962f;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 6px;
+  }
+  .line-bubble {
+    margin: 16px 16px 10px;
+    background: #f1f3f4;
+    border-radius: 4px 16px 16px 16px;
+    padding: 14px 16px;
+    font-size: 14px;
+    color: #3c4043;
+    line-height: 1.75;
+  }
+  .line-verified {
+    margin: 0 16px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--green);
+  }
+  @media (max-width: 820px) {
+    .s-hero {
+      padding: 40px 0 24px;
+    }
+    .s-hero-grid {
+      grid-template-columns: 1fr;
+      gap: 36px;
+    }
+  }
+
+  /* Section head */
+  .section-head {
+    text-align: center;
+    max-width: 680px;
+    margin: 0 auto 44px;
+  }
+  .section-head h2 {
+    font-size: clamp(26px, 4vw, 38px);
+    font-weight: 700;
+    margin-top: 8px;
+  }
+
+  /* Problem — Google Workspace 風: アイコンタイル(4色)・控えめな影・余白広め */
+  .s-problem {
+    background: #fff;
+  }
+  .problem-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+  }
+  .problem-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 32px 28px;
+    display: flex;
+    flex-direction: column;
+    transition:
+      transform 0.25s ease,
+      box-shadow 0.25s ease;
+  }
+  .problem-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 30px rgba(60, 64, 67, 0.1);
+  }
+  .p-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    margin-bottom: 20px;
+    color: var(--c);
+    background: color-mix(in srgb, var(--c) 12%, #fff);
+  }
+  .p-icon :global(svg) {
+    width: 26px;
+    height: 26px;
+  }
+  .problem-card h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .problem-card p {
+    color: var(--muted);
+    margin: 0 0 20px;
+    font-size: 14.5px;
+    flex: 1;
+  }
+  .p-fix {
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .p-fix-mark {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--c);
+    margin-bottom: 4px;
+  }
+  @media (max-width: 900px) {
+    .problem-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media (max-width: 520px) {
+    .problem-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* Why */
+  .why-inner {
+    display: grid;
+    grid-template-columns: 1.4fr 0.8fr;
+    gap: 40px;
+    align-items: center;
+    background: var(--blue-soft);
+    border-radius: var(--radius-lg);
+    padding: 56px;
+  }
+  .why-copy h2 {
+    font-size: clamp(24px, 3.4vw, 34px);
+    font-weight: 700;
+    margin: 8px 0 14px;
+  }
+  .why-copy > p {
+    color: #3c4043;
+    font-size: 17px;
+    margin: 0 0 20px;
+  }
+  .why-points {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+    display: grid;
+    gap: 12px;
+  }
+  .why-points li {
+    position: relative;
+    padding-left: 30px;
+    color: #3c4043;
+    font-size: 15px;
+  }
+  .why-points li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    top: -1px;
+    color: var(--blue);
+    font-weight: 800;
+  }
+  .why-stat {
+    background: #fff;
+    border-radius: var(--radius);
+    padding: 36px 24px;
+    text-align: center;
+    box-shadow: 0 12px 32px rgba(26, 115, 232, 0.14);
+  }
+  .stat-num {
+    font-size: 52px;
+    font-weight: 800;
+    color: var(--blue);
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+  .stat-label {
+    margin-top: 10px;
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 15px;
+  }
+  @media (max-width: 820px) {
+    .why-inner {
+      grid-template-columns: 1fr;
+      padding: 36px 28px;
+    }
+  }
+
+  /* Features */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+  .s-feature-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 28px 30px;
+    transition:
+      transform 0.25s ease,
+      box-shadow 0.25s ease;
+  }
+  .s-feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 14px 32px rgba(60, 64, 67, 0.12);
+  }
+  .f-tag {
+    display: inline-block;
+    background: var(--blue-soft);
+    color: var(--blue);
+    font-weight: 700;
+    font-size: 12px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    margin-bottom: 12px;
+  }
+  .s-feature-card h3 {
+    font-size: 19px;
+    margin-bottom: 8px;
+  }
+  .s-feature-card p {
+    color: var(--muted);
+    margin: 0;
+    font-size: 15px;
+  }
+  @media (max-width: 700px) {
+    .feature-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* Steps */
+  .s-steps {
+    background: var(--surface);
+  }
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+  }
+  .step {
+    text-align: center;
+    background: #fff;
+    border-radius: var(--radius);
+    padding: 30px 22px;
+    box-shadow: 0 1px 3px rgba(60, 64, 67, 0.1);
+  }
+  .step-n {
+    width: 44px;
+    height: 44px;
+    margin: 0 auto 14px;
+    display: grid;
+    place-items: center;
+    background: var(--blue);
+    color: #fff;
+    font-weight: 700;
+    font-size: 18px;
+    border-radius: 999px;
+  }
+  .step h3 {
+    font-size: 17px;
+    margin-bottom: 8px;
+  }
+  .step p {
+    color: var(--muted);
+    margin: 0;
+    font-size: 14px;
+  }
+  @media (max-width: 820px) {
+    .steps {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media (max-width: 520px) {
+    .steps {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* Pricing */
+  .pricing-note {
+    color: var(--muted);
+    font-size: 15px;
+    margin-top: 12px;
+  }
+  .plan-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    align-items: stretch;
+  }
+  .plan-card {
+    position: relative;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 34px 30px;
+    display: flex;
+    flex-direction: column;
+  }
+  .plan-accent {
+    border: 2px solid var(--blue);
+    box-shadow: 0 18px 44px rgba(26, 115, 232, 0.16);
+  }
+  .plan-badge {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--blue);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 16px;
+    border-radius: 999px;
+  }
+  .plan-name {
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .plan-tagline {
+    color: var(--muted);
+    font-size: 14px;
+    margin: 6px 0 16px;
+  }
+  .plan-price {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  .plan-amt {
+    font-size: 40px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .plan-unit {
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .plan-feats {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 24px;
+    display: grid;
+    gap: 12px;
+    flex: 1;
+  }
+  .plan-feats li {
+    position: relative;
+    padding-left: 26px;
+    font-size: 14.5px;
+    color: #3c4043;
+  }
+  .plan-feats li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: var(--green);
+    font-weight: 800;
+  }
+  .plan-cta {
+    width: 100%;
+  }
+  .plan-foot {
+    text-align: center;
+    color: #80868b;
+    font-size: 13px;
+    margin-top: 24px;
+  }
+  @media (max-width: 900px) {
+    .plan-grid {
+      grid-template-columns: 1fr;
+      max-width: 460px;
+      margin: 0 auto;
+    }
+  }
+
+  /* FAQ */
+  .faq-inner {
+    max-width: 760px;
+  }
+  .faq-list {
+    display: grid;
+    gap: 12px;
+  }
+  .faq-item {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 4px 20px;
+    background: #fff;
+  }
+  .faq-item summary {
+    cursor: pointer;
+    font-weight: 600;
+    padding: 16px 0;
+    list-style: none;
+    position: relative;
+  }
+  .faq-item summary::-webkit-details-marker {
+    display: none;
+  }
+  .faq-item summary::after {
+    content: "+";
+    position: absolute;
+    right: 0;
+    color: var(--blue);
+    font-size: 22px;
+  }
+  .faq-item[open] summary::after {
+    content: "−";
+  }
+  .faq-item p {
+    margin: 0 0 16px;
+    color: var(--muted);
+  }
+
+  /* CTA */
+  .s-cta {
+    padding: 40px 0 88px;
+  }
+  .cta-card {
+    background: linear-gradient(120deg, #1a73e8, #00b4d8, #1a73e8);
+    background-size: 200% auto;
+    animation: gradientShift 9s ease infinite;
+    color: #fff;
+    text-align: center;
+    border-radius: var(--radius-lg);
+    padding: 64px 32px;
+  }
+  .cta-card h2 {
+    font-size: clamp(26px, 4vw, 40px);
+    font-weight: 700;
+  }
+  .cta-card p {
+    opacity: 0.92;
+    font-size: 18px;
+    margin: 12px auto 28px;
+    max-width: 34em;
+  }
+  .btn-white {
+    background: #fff;
+    color: var(--blue);
+  }
+  .btn-white:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+  }
+</style>

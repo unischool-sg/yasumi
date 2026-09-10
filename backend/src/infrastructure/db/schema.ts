@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  integer,
   jsonb,
   pgTable,
   primaryKey,
@@ -53,9 +54,70 @@ export const schools = pgTable("schools", {
   city: varchar("city", { length: 100 }),
   websiteUrl: text("website_url"),
   rulesUrl: text("rules_url"),
+  // 全校生徒数（浸透率＝購読者数/生徒数 の分母。任意入力・営業指標用）。
+  studentCount: integer("student_count"),
+  // 有料プラン（学校向けSaaS）。null=無料/未契約。手動プロビジョニング（社内admin）で設定。
+  plan: varchar("plan", { length: 20 }), // 'basic' | 'standard' | 'premium'
+  planExpiresAt: timestamp("plan_expires_at", { withTimezone: true }),
   createdBy: uuid("created_by"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// 学校の職員アカウント（先生ダッシュボード認証。テナント＝schoolId 境界）。
+// 社内 admin / LINE エンドユーザーとは別系統。1教員=1レコード、role で権限。
+export const teachers = pgTable("teachers", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  schoolId: uuid("school_id").notNull(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  role: varchar("role", { length: 20 }).notNull().default("teacher"), // 'owner' | 'teacher'
+  name: varchar("name", { length: 100 }).notNull(),
+  disabled: boolean("disabled").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// 先生ダッシュボードからの公式一斉送信ログ（到達状況の可視化＋任意送信の通数集計元）。
+export const schoolMessages = pgTable("school_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  schoolId: uuid("school_id").notNull(),
+  teacherId: uuid("teacher_id").notNull(),
+  category: varchar("category", { length: 20 }).notNull(), // 'emergency'(無制限) | 'announcement'(計上)
+  text: text("text").notNull(),
+  total: integer("total").notNull(),
+  sent: integer("sent").notNull(),
+  failed: integer("failed").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// 生徒プロフィール（欠席連絡の主体。保護者/生徒が自校ぶんを登録。テナント＝schoolId）。
+// linkToken/linkedStudentUserId は Phase3+ の保護者↔生徒クロス紐付け用に予約（MVP未使用）。
+export const studentProfiles = pgTable("student_profiles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  schoolId: uuid("school_id").notNull(),
+  ownerUserId: uuid("owner_user_id").notNull(),
+  studentName: varchar("student_name", { length: 100 }).notNull(),
+  grade: varchar("grade", { length: 20 }),
+  className: varchar("class_name", { length: 20 }),
+  linkToken: varchar("link_token", { length: 64 }),
+  linkedStudentUserId: uuid("linked_student_user_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// 欠席・遅刻・早退・休校の連絡（PII: 生徒名・理由）。テナント＝schoolId で厳格スコープ。
+export const absenceReports = pgTable("absence_reports", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  schoolId: uuid("school_id").notNull(),
+  studentProfileId: uuid("student_profile_id").notNull(),
+  reportedByUserId: uuid("reported_by_user_id").notNull(),
+  date: date("date").notNull(),
+  type: varchar("type", { length: 20 }).notNull(), // '欠席' | '遅刻' | '早退' | '休校'
+  reason: text("reason"),
+  note: text("note"),
+  // その日その学校で警報が出ていたか（自動タグ。休校の正当性チェック用）。
+  warningActive: boolean("warning_active").notNull().default(false),
+  status: varchar("status", { length: 20 }).notNull().default("unread"), // 'unread' | 'confirmed'
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const areas = pgTable("areas", {

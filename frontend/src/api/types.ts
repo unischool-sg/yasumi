@@ -45,4 +45,32 @@ export interface SchoolStatus {
   checks: { result: CheckResult; checkedAt: string; targetDate: string }[];
 }
 
+/** 欠席受付が使える学校（premium・自分の購読校）。 */
+export interface AbsenceSchool {
+  id: string;
+  name: string;
+}
+
+/** 生徒プロフィール（欠席連絡の主体）。 */
+export interface StudentProfile {
+  id: string;
+  schoolId: string;
+  studentName: string;
+  grade: string | null;
+  className: string | null;
+}
+
+export type AbsenceType = "欠席" | "遅刻" | "早退" | "休校";
+export interface AbsenceReport {
+  id: string;
+  schoolId: string;
+  studentProfileId: string;
+  date: string;
+  type: AbsenceType;
+  reason: string | null;
+  note: string | null;
+  status: string;
+  createdAt: string;
+}
+
 export type { CheckResult, Warning };

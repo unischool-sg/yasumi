@@ -45,12 +45,35 @@ export interface Stats {
   checksToday: number;
   notificationsToday: number;
 }
+export type Plan = "basic" | "standard" | "premium";
 export interface School {
   id: string;
   name: string;
   prefecture: string;
   city: string | null;
   websiteUrl: string | null;
+  studentCount: number | null;
+  plan: Plan | null;
+  planExpiresAt: string | null;
+  createdAt: string;
+}
+export interface Teacher {
+  id: string;
+  schoolId: string;
+  email: string;
+  role: "owner" | "teacher";
+  name: string;
+  disabled: boolean;
+  createdAt: string;
+}
+export interface SchoolStats {
+  id: string;
+  name: string;
+  prefecture: string;
+  city: string | null;
+  studentCount: number | null;
+  subscriberCount: number;
+  enabledCount: number;
   createdAt: string;
 }
 export interface SchoolDetail extends School {
@@ -118,8 +141,16 @@ export const api = {
     request<Admin>(`/admins/${id}`, { method: "PATCH", body: JSON.stringify(b) }),
   // schools
   listSchools: (q?: string) => request<School[]>(`/schools${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+  getSchoolsOverview: () => request<SchoolStats[]>("/schools/overview"),
   getSchool: (id: string) => request<SchoolDetail>(`/schools/${id}`),
   getSchoolSubscribers: (id: string) => request<SchoolSubscriber[]>(`/schools/${id}/subscribers`),
+  // teachers（教員アカウントのプロビジョニング）
+  getSchoolTeachers: (id: string) => request<Teacher[]>(`/schools/${id}/teachers`),
+  createTeacher: (id: string, b: { email: string; password: string; name: string; role?: "owner" | "teacher" }) =>
+    request<Teacher>(`/schools/${id}/teachers`, { method: "POST", body: JSON.stringify(b) }),
+  updateTeacher: (id: string, b: { role?: "owner" | "teacher"; disabled?: boolean; password?: string; name?: string }) =>
+    request<Teacher>(`/teachers/${id}`, { method: "PATCH", body: JSON.stringify(b) }),
+  deleteTeacher: (id: string) => request<void>(`/teachers/${id}`, { method: "DELETE" }),
   createSchool: (b: { name: string; prefecture: string; city?: string; areaCodes?: string[]; warningTypes?: string[] }) =>
     request<School>("/schools", { method: "POST", body: JSON.stringify(b) }),
   updateSchool: (id: string, b: Record<string, unknown>) =>

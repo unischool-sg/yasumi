@@ -1,4 +1,4 @@
-import { Autocomplete, Box, Button, Card, CardContent, Chip, Divider, MenuItem, Stack, TextField, Typography } from "@mui/material";
+import { Autocomplete, Box, Button, Card, CardContent, Chip, Divider, MenuItem, Stack, Switch, TextField, Typography } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -23,6 +23,7 @@ export function SchoolDetail({ id }: { id: string }) {
   const toast = useToast();
   const { data } = useQuery({ queryKey: ["school", id], queryFn: () => api.getSchool(id) });
   const { data: subscribers = [] } = useQuery({ queryKey: ["school-subscribers", id], queryFn: () => api.getSchoolSubscribers(id) });
+  const { data: teachers = [] } = useQuery({ queryKey: ["school-teachers", id], queryFn: () => api.getSchoolTeachers(id) });
   // 学校の都道府県の地域のみ取得（全国 1806 件を出さない）
   const { data: allAreas = [] } = useQuery({
     queryKey: ["areas", data?.prefecture],
@@ -33,16 +34,23 @@ export function SchoolDetail({ id }: { id: string }) {
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
+  const [studentCount, setStudentCount] = useState("");
   const [areaCodes, setAreaCodes] = useState<Set<string>>(new Set());
   const [warnings, setWarnings] = useState<Set<string>>(new Set());
   const [rule, setRule] = useState({ checkTime: "08:00", result: "AM_OFF" });
   const [bcast, setBcast] = useState("");
+  const [plan, setPlan] = useState("");
+  const [planExpiresAt, setPlanExpiresAt] = useState("");
+  const [newTeacher, setNewTeacher] = useState({ email: "", name: "", role: "owner", password: "" });
 
   useEffect(() => {
     if (!data) return;
     setName(data.name);
     setCity(data.city ?? "");
     setWebsiteUrl(data.websiteUrl ?? "");
+    setStudentCount(data.studentCount != null ? String(data.studentCount) : "");
+    setPlan(data.plan ?? "");
+    setPlanExpiresAt(data.planExpiresAt ? data.planExpiresAt.slice(0, 10) : "");
     setAreaCodes(new Set(data.areaCodes));
     setWarnings(new Set(data.warningTypes));
   }, [data]);
@@ -55,6 +63,7 @@ export function SchoolDetail({ id }: { id: string }) {
         name,
         city: city || null,
         websiteUrl: websiteUrl || null,
+        studentCount: studentCount.trim() ? Number(studentCount) : null,
         areaCodes: [...areaCodes],
         warningTypes: [...warnings],
       }),
@@ -80,6 +89,42 @@ export function SchoolDetail({ id }: { id: string }) {
     if (!window.confirm(`この学校の購読者（${subscribers.length}名）にメッセージを送信します。よろしいですか？`)) return;
     broadcastSubs.mutate();
   };
+
+  const savePlan = useMutation({
+    mutationFn: () =>
+      api.updateSchool(id, {
+        plan: plan || null,
+        planExpiresAt: planExpiresAt ? new Date(`${planExpiresAt}T00:00:00.000Z`).toISOString() : null,
+      }),
+    onSuccess: () => { invalidate(); toast.success("プランを保存しました"); },
+    onError,
+  });
+  const invalidateTeachers = () => qc.invalidateQueries({ queryKey: ["school-teachers", id] });
+  const addTeacher = useMutation({
+    mutationFn: () =>
+      api.createTeacher(id, {
+        email: newTeacher.email,
+        password: newTeacher.password,
+        name: newTeacher.name,
+        role: newTeacher.role as "owner" | "teacher",
+      }),
+    onSuccess: () => {
+      invalidateTeachers();
+      setNewTeacher({ email: "", name: "", role: "owner", password: "" });
+      toast.success("教員アカウントを発行しました");
+    },
+    onError,
+  });
+  const toggleTeacher = useMutation({
+    mutationFn: (t: { id: string; disabled: boolean }) => api.updateTeacher(t.id, { disabled: t.disabled }),
+    onSuccess: () => { invalidateTeachers(); toast.success("更新しました"); },
+    onError,
+  });
+  const delTeacher = useMutation({
+    mutationFn: (tid: string) => api.deleteTeacher(tid),
+    onSuccess: () => { invalidateTeachers(); toast.success("削除しました"); },
+    onError,
+  });
 
   function toggle(set: Set<string>, key: string, setter: (s: Set<string>) => void) {
     const n = new Set(set);
@@ -112,15 +157,26 @@ export function SchoolDetail({ id }: { id: string }) {
               renderInput={(params) => <TextField {...params} label="市区町村" />}
             />
           </Stack>
-          <TextField
-            size="small"
-            fullWidth
-            label="学校公式サイトURL（任意）"
-            placeholder="https://example.ed.jp"
-            value={websiteUrl}
-            onChange={(e) => setWebsiteUrl(e.target.value)}
-            sx={{ mb: 2 }}
-          />
+          <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+            <TextField
+              size="small"
+              fullWidth
+              label="学校公式サイトURL（任意）"
+              placeholder="https://example.ed.jp"
+              value={websiteUrl}
+              onChange={(e) => setWebsiteUrl(e.target.value)}
+            />
+            <TextField
+              size="small"
+              type="number"
+              label="全校生徒数（任意）"
+              placeholder="例: 480"
+              helperText="浸透率の分母"
+              value={studentCount}
+              onChange={(e) => setStudentCount(e.target.value)}
+              sx={{ width: 200, flexShrink: 0 }}
+            />
+          </Stack>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>対象地域（都道府県ごとに追加・県跨ぎOK）</Typography>
           <Box sx={{ mb: 2 }}>
             <AreaBlocksPicker
@@ -146,6 +202,67 @@ export function SchoolDetail({ id }: { id: string }) {
           <Button variant="contained" onClick={() => save.mutate()} disabled={save.isPending}>
             保存
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card variant="outlined" sx={{ mb: 2 }}>
+        <CardContent>
+          <Typography variant="subtitle2" sx={{ mb: 1.5 }}>有料プラン（学校向けSaaS）</Typography>
+          <Stack direction="row" spacing={2} sx={{ mb: 2, alignItems: "center" }}>
+            <TextField size="small" select label="プラン" value={plan} onChange={(e) => setPlan(e.target.value)} sx={{ width: 200 }}>
+              <MenuItem value="">未契約（無料）</MenuItem>
+              <MenuItem value="basic">ベーシック</MenuItem>
+              <MenuItem value="standard">スタンダード</MenuItem>
+              <MenuItem value="premium">プレミアム</MenuItem>
+            </TextField>
+            <TextField
+              size="small"
+              type="date"
+              label="有効期限"
+              value={planExpiresAt}
+              onChange={(e) => setPlanExpiresAt(e.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+              sx={{ width: 180 }}
+            />
+            <Button variant="contained" onClick={() => savePlan.mutate()} disabled={savePlan.isPending}>
+              プラン保存
+            </Button>
+          </Stack>
+
+          <Divider sx={{ my: 2 }} />
+
+          <Typography variant="subtitle2" sx={{ mb: 1.5 }}>教員アカウント（先生ダッシュボード）</Typography>
+          <Stack spacing={1} sx={{ mb: 2 }}>
+            {teachers.map((t) => (
+              <Stack key={t.id} direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                <Typography sx={{ fontWeight: 600, minWidth: 120 }}>{t.name}</Typography>
+                <code style={{ fontSize: 12, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{t.email}</code>
+                <Chip size="small" label={t.role === "owner" ? "管理者" : "教員"} variant="outlined" />
+                <Typography variant="caption" color={t.disabled ? "text.secondary" : "success.main"} sx={{ width: 56 }}>
+                  {t.disabled ? "無効" : "有効"}
+                </Typography>
+                <Switch size="small" checked={!t.disabled} onChange={(e) => toggleTeacher.mutate({ id: t.id, disabled: !e.target.checked })} />
+                <Button size="small" color="error" onClick={() => confirm("削除しますか？") && delTeacher.mutate(t.id)}>削除</Button>
+              </Stack>
+            ))}
+            {teachers.length === 0 && <Typography variant="body2" color="text.secondary">教員アカウントがありません</Typography>}
+          </Stack>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+            <TextField size="small" label="氏名" value={newTeacher.name} onChange={(e) => setNewTeacher({ ...newTeacher, name: e.target.value })} sx={{ width: 130 }} />
+            <TextField size="small" label="メール" value={newTeacher.email} onChange={(e) => setNewTeacher({ ...newTeacher, email: e.target.value })} sx={{ width: 200 }} />
+            <TextField size="small" select label="権限" value={newTeacher.role} onChange={(e) => setNewTeacher({ ...newTeacher, role: e.target.value })} sx={{ width: 110 }}>
+              <MenuItem value="owner">管理者</MenuItem>
+              <MenuItem value="teacher">教員</MenuItem>
+            </TextField>
+            <TextField size="small" type="password" label="初期パスワード(8字以上)" value={newTeacher.password} onChange={(e) => setNewTeacher({ ...newTeacher, password: e.target.value })} sx={{ width: 200 }} />
+            <Button
+              variant="outlined"
+              disabled={!newTeacher.name || !newTeacher.email || newTeacher.password.length < 8 || addTeacher.isPending}
+              onClick={() => addTeacher.mutate()}
+            >
+              発行
+            </Button>
+          </Stack>
         </CardContent>
       </Card>
 
@@ -178,7 +295,14 @@ export function SchoolDetail({ id }: { id: string }) {
 
       <Card variant="outlined" sx={{ mt: 2 }}>
         <CardContent>
-          <Typography variant="subtitle2" sx={{ mb: 1.5 }}>購読中のユーザー（{subscribers.length}）</Typography>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "baseline", mb: 1.5 }}>
+            <Typography variant="subtitle2">購読中のユーザー（{subscribers.length}）</Typography>
+            {data.studentCount != null && data.studentCount > 0 && (
+              <Typography variant="caption" color="primary.main" sx={{ fontWeight: 700 }}>
+                浸透率 {Math.round((subscribers.length / data.studentCount) * 100)}%（{subscribers.length}/{data.studentCount}人）
+              </Typography>
+            )}
+          </Stack>
           <Stack direction="row" spacing={2} sx={{ alignItems: "flex-start", mb: 2 }}>
             <TextField
               size="small"
