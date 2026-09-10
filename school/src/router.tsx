@@ -1,6 +1,7 @@
 import { Outlet, createRootRoute, createRoute, createRouter, redirect } from "@tanstack/react-router";
 import { Layout } from "./components/Layout.tsx";
 import { getAuth } from "./lib/auth.ts";
+import { Absences } from "./pages/Absences.tsx";
 import { Dashboard } from "./pages/Dashboard.tsx";
 import { Login } from "./pages/Login.tsx";
 
@@ -18,8 +19,9 @@ const protectedRoute = createRoute({
 });
 
 const dashboardRoute = createRoute({ getParentRoute: () => protectedRoute, path: "/", component: Dashboard });
+const absencesRoute = createRoute({ getParentRoute: () => protectedRoute, path: "/absences", component: Absences });
 
-const routeTree = rootRoute.addChildren([loginRoute, protectedRoute.addChildren([dashboardRoute])]);
+const routeTree = rootRoute.addChildren([loginRoute, protectedRoute.addChildren([dashboardRoute, absencesRoute])]);
 
 export const router = createRouter({ routeTree });
 

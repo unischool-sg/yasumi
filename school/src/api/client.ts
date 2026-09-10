@@ -55,6 +55,20 @@ export interface BroadcastResult {
   sent: number;
   failed: number;
 }
+export type AbsenceStatus = "unread" | "confirmed";
+export interface AbsenceReport {
+  id: string;
+  date: string;
+  type: string;
+  reason: string | null;
+  note: string | null;
+  warningActive: boolean;
+  status: AbsenceStatus;
+  createdAt: string;
+  studentName: string;
+  grade: string | null;
+  className: string | null;
+}
 
 export const api = {
   login: (email: string, password: string) =>
@@ -64,4 +78,8 @@ export const api = {
   getMessages: () => request<SchoolMessage[]>("/messages"),
   broadcast: (text: string, category: MessageCategory) =>
     request<BroadcastResult>("/broadcast", { method: "POST", body: JSON.stringify({ text, category }) }),
+  getAbsences: (status?: AbsenceStatus) =>
+    request<AbsenceReport[]>(`/absences${status ? `?status=${status}` : ""}`),
+  setAbsenceStatus: (id: string, status: AbsenceStatus) =>
+    request<AbsenceReport>(`/absences/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
 };

@@ -5,6 +5,22 @@ import { warningChecks } from "../schema.ts";
 
 export type WarningCheckRow = typeof warningChecks.$inferSelect;
 
+/** その日その学校で警報が出ていたか（欠席受付の「休校」正当性の自動タグ用 / M13）。 */
+export async function hasActiveWarningOnDate(db: Db, schoolId: string, date: string): Promise<boolean> {
+  const rows = await db
+    .select({ id: warningChecks.id })
+    .from(warningChecks)
+    .where(
+      and(
+        eq(warningChecks.schoolId, schoolId),
+        eq(warningChecks.targetDate, date),
+        eq(warningChecks.warningActive, true),
+      ),
+    )
+    .limit(1);
+  return rows.length > 0;
+}
+
 export interface WarningCheckInput {
   schoolId: string;
   ruleId: string;

@@ -342,23 +342,20 @@ M14 [Phase 3] 通数カウンタ／請求運用の型／(後で)Stripe・生徒�
 
 ---
 
-## M13. [Phase 2] 欠席受付（プレミアムの目玉）
+## M13. [Phase 2] 欠席受付（プレミアムの目玉）  ✅ 実装済み（develop）
 
-**目的**: 保護者/生徒がアプリから欠席連絡し、先生が受信箱で捌ける。朝の欠席電話をゼロに。
+> 📄 [docs/plans/2026-09-11-m13-absence-reception.md](./docs/plans/2026-09-11-m13-absence-reception.md)
+> ⚠️ **PII**（生徒名・健康理由）を扱う。テナントスコープ厳守。
 
-> ⚠️ **PII**（生徒名・健康理由）を扱う。テナントスコープ厳守。**マージ前に security-review スキル必須**。
+- [x] `student_profiles` / `absence_reports`（migration `0006`。linkToken 等は Phase3+ 予約）
+- [x] **LIFF**: `student_profile` 登録＋「欠席を連絡」フォーム（frontend `AbsenceReport.tsx`・premium校のみ導線 `showAbsence`）
+- [x] 送信時に**警報有無を自動判定**（`warning-checks.hasActiveWarningOnDate`）→ `warningActive` 記録
+- [x] 先生ダッシュボード**受信箱（未読/確認済み）＋「要確認（警報なし休校）」タブ**（school `Absences.tsx`）
+- [x] **plan gate**: `domain/plan.ts` の `absenceEnabled`（premium 有効）。非premium は 403＋LIFF導線非表示
+- [x] **security-review 実行**: High=0。Med 1件（無効化教員のトークンが最大12h有効）→ **修正済み**（`teacherAuthMiddleware` で毎リクエスト DB 再検証・削除/無効化を即失効）
 
-- [ ] `student_profiles`（`{ id, schoolId, ownerUserId, studentName, grade, class, linkToken?, linkedStudentUserId?, createdAt }`）
-      ※ linkToken/linkedStudentUserId は Phase3+ 用に予約・MVPでは未使用
-- [ ] `absence_reports`（`{ id, schoolId, studentProfileId, reportedByUserId, date, type(欠席|遅刻|早退|休校), reason, note, warningActive, status(unread|confirmed), createdAt }`）
-- [ ] **LIFF**: `student_profile` 登録（1回・名前/学年組）＋「欠席を連絡する」フォーム → 自校スコープでPOST
-- [ ] 送信時に**その日の警報有無を自動判定**（`warning_checks` 由来）→ `warningActive` 記録
-- [ ] 先生ダッシュボードに**受信箱（未読/確認済み）**＋**「要確認（警報なし休校）」タブ**（不正使用の監視導線）
-- [ ] **plan gate**: 欠席受付は premium のみ。premium でない学校では LIFF の導線も出さない
-- [ ] **security-review スキル実行**（PII・テナント越境）
-
-**完了条件**: premium 校で、保護者/生徒が欠席を送信 → 先生ダッシュボードの受信箱に**自校のみ**表示され、
-確認済みにできる。警報なしの休校が監視タブに浮く。他校の欠席は一切見えない。
+**完了条件**: premium 校で欠席送信 → 先生受信箱に**自校のみ**表示・確認済み化・警報なし休校を監視タブに。他校の欠席は不可視。
+→ **達成**（DB-gated: premiumゲート/警報自動タグ/テナント越境404/トークン即失効 テスト green・全87 pass・frontend/school build green）
 
 **依存**: M11, M12, 既存 `warning_checks`。
 

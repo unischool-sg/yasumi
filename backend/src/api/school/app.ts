@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Db } from "../../infrastructure/db/client.ts";
 import type { NotificationProvider } from "../../domain/notification/provider.ts";
 import { notifyUser } from "../../domain/notification/dispatch.ts";
+import * as absenceReportsRepo from "../../infrastructure/db/repositories/absence-reports.ts";
 import * as msgRepo from "../../infrastructure/db/repositories/school-messages.ts";
 import * as schoolsRepo from "../../infrastructure/db/repositories/schools.ts";
 import * as subsRepo from "../../infrastructure/db/repositories/subscriptions.ts";
@@ -40,8 +41,8 @@ export function createSchoolApp(deps: SchoolAppDeps) {
     },
   );
 
-  // --- 以降は認証必須（テナント＝トークンの schoolId 固定）---
-  app.use("*", teacherAuthMiddleware(deps.schoolJwtSecret));
+  // --- 以降は認証必須（テナント＝トークンの schoolId 固定・毎回 DB 再検証）---
+  app.use("*", teacherAuthMiddleware(deps.schoolJwtSecret, db));
 
   app.get("/me", async (c) => {
     const teacher = c.get("teacher");
@@ -102,6 +103,35 @@ export function createSchoolApp(deps: SchoolAppDeps) {
   // 送信履歴（到達状況の可視化）
   app.get("/messages", async (c) =>
     c.json(await msgRepo.listBySchool(db, c.get("teacher").schoolId)),
+  );
+
+  // --- 欠席受付の受信箱（M13・自校スコープ）---
+  app.get(
+    "/absences",
+    zValidator("query", z.object({ status: z.enum(["unread", "confirmed"]).optional() })),
+    async (c) => {
+      const { status } = c.req.valid("query");
+      const rows = await absenceReportsRepo.listBySchool(db, c.get("teacher").schoolId, {
+        ...(status ? { status } : {}),
+      });
+      return c.json(rows);
+    },
+  );
+
+  app.patch(
+    "/absences/:id",
+    zValidator("json", z.object({ status: z.enum(["unread", "confirmed"]) })),
+    async (c) => {
+      // schoolId スコープで更新（他校の欠席は 404）
+      const updated = await absenceReportsRepo.setStatusInSchool(
+        db,
+        c.get("teacher").schoolId,
+        c.req.param("id"),
+        c.req.valid("json").status,
+      );
+      if (!updated) return c.json({ error: "not found" }, 404);
+      return c.json(updated);
+    },
   );
 
   return app;

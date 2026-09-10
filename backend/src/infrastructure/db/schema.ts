@@ -90,6 +90,36 @@ export const schoolMessages = pgTable("school_messages", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// 生徒プロフィール（欠席連絡の主体。保護者/生徒が自校ぶんを登録。テナント＝schoolId）。
+// linkToken/linkedStudentUserId は Phase3+ の保護者↔生徒クロス紐付け用に予約（MVP未使用）。
+export const studentProfiles = pgTable("student_profiles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  schoolId: uuid("school_id").notNull(),
+  ownerUserId: uuid("owner_user_id").notNull(),
+  studentName: varchar("student_name", { length: 100 }).notNull(),
+  grade: varchar("grade", { length: 20 }),
+  className: varchar("class_name", { length: 20 }),
+  linkToken: varchar("link_token", { length: 64 }),
+  linkedStudentUserId: uuid("linked_student_user_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// 欠席・遅刻・早退・休校の連絡（PII: 生徒名・理由）。テナント＝schoolId で厳格スコープ。
+export const absenceReports = pgTable("absence_reports", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  schoolId: uuid("school_id").notNull(),
+  studentProfileId: uuid("student_profile_id").notNull(),
+  reportedByUserId: uuid("reported_by_user_id").notNull(),
+  date: date("date").notNull(),
+  type: varchar("type", { length: 20 }).notNull(), // '欠席' | '遅刻' | '早退' | '休校'
+  reason: text("reason"),
+  note: text("note"),
+  // その日その学校で警報が出ていたか（自動タグ。休校の正当性チェック用）。
+  warningActive: boolean("warning_active").notNull().default(false),
+  status: varchar("status", { length: 20 }).notNull().default("unread"), // 'unread' | 'confirmed'
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const areas = pgTable("areas", {
   code: varchar("code", { length: 32 }).primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),

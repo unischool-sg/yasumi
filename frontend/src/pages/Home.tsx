@@ -22,9 +22,12 @@ interface Props {
   onChanged: () => void;
   onGoSearch: () => void;
   onNotify: (message: string) => void;
+  /** 欠席受付対応校がある場合の導線（premium 校）。 */
+  showAbsence?: boolean;
+  onAbsence?: () => void;
 }
 
-export function Home({ api, subscriptions, onChanged, onGoSearch, onNotify }: Props) {
+export function Home({ api, subscriptions, onChanged, onGoSearch, onNotify, showAbsence, onAbsence }: Props) {
   const [statuses, setStatuses] = useState<SchoolStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -79,6 +82,12 @@ export function Home({ api, subscriptions, onChanged, onGoSearch, onNotify }: Pr
         <Skeleton variant="rounded" height={168} />
       ) : (
         hero && <StatusHero status={hero} />
+      )}
+
+      {showAbsence && onAbsence && (
+        <Button variant="outlined" color="success" onClick={onAbsence} fullWidth sx={{ py: 1.2 }}>
+          欠席・遅刻を学校へ連絡する
+        </Button>
       )}
 
       {rest.length > 0 && (

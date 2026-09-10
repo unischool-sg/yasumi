@@ -171,8 +171,122 @@ suite("School (teacher) API", () => {
     expect(history.some((m) => m.category === "emergency" && m.text.includes("休校"))).toBe(true);
   });
 
-  it("無効化された教員はログイン不可（disabled → 401）", async () => {
-    // 対象教員IDを取得
+  it("欠席受付: premium校のみ受付・警報自動タグ・テナントスコープ", async () => {
+    const db = drizzle(sql, { schema });
+    // LIFF ユーザー
+    const { userId } = (await (await req("/api/me", { headers: bearer("Uabsence") })).json()) as { userId: string };
+
+    // 学校A（premium）にプロフィール作成
+    const profRes = await req("/api/me/student-profiles", {
+      method: "POST",
+      headers: { ...bearer("Uabsence"), "content-type": "application/json" },
+      body: JSON.stringify({ schoolId: schoolAId, studentName: "山田太郎", grade: "2年", className: "A組" }),
+    });
+    expect(profRes.status).toBe(201);
+    const profile = (await profRes.json()) as { id: string };
+
+    // 欠席送信（警報なし → warningActive=false）
+    const abs = await req("/api/me/absence-reports", {
+      method: "POST",
+      headers: { ...bearer("Uabsence"), "content-type": "application/json" },
+      body: JSON.stringify({ schoolId: schoolAId, studentProfileId: profile.id, date: "2026-09-11", type: "欠席", reason: "発熱のため" }),
+    });
+    expect(abs.status).toBe(201);
+    expect(((await abs.json()) as { warningActive: boolean }).warningActive).toBe(false);
+
+    // school mismatch → 400（Aのプロフィールで schoolId=B）
+    const mism = await req("/api/me/absence-reports", {
+      method: "POST",
+      headers: { ...bearer("Uabsence"), "content-type": "application/json" },
+      body: JSON.stringify({ schoolId: schoolBId, studentProfileId: profile.id, date: "2026-09-11", type: "欠席" }),
+    });
+    expect(mism.status).toBe(400);
+
+    // 非premium校（B）へは 403（Bのプロフィールを作って送る）
+    const profB = (await (await req("/api/me/student-profiles", {
+      method: "POST",
+      headers: { ...bearer("Uabsence"), "content-type": "application/json" },
+      body: JSON.stringify({ schoolId: schoolBId, studentName: "鈴木花子" }),
+    })).json()) as { id: string };
+    const absB = await req("/api/me/absence-reports", {
+      method: "POST",
+      headers: { ...bearer("Uabsence"), "content-type": "application/json" },
+      body: JSON.stringify({ schoolId: schoolBId, studentProfileId: profB.id, date: "2026-09-11", type: "欠席" }),
+    });
+    expect(absB.status).toBe(403);
+
+    // 警報自動タグ: 警報ありの日に「休校」→ warningActive=true
+    await db.insert(schema.warningChecks).values({
+      schoolId: schoolAId,
+      ruleId: crypto.randomUUID(),
+      targetDate: "2026-09-12",
+      checkedAt: new Date(),
+      warningActive: true,
+      result: "FULL_OFF",
+    });
+    const absW = await req("/api/me/absence-reports", {
+      method: "POST",
+      headers: { ...bearer("Uabsence"), "content-type": "application/json" },
+      body: JSON.stringify({ schoolId: schoolAId, studentProfileId: profile.id, date: "2026-09-12", type: "休校" }),
+    });
+    expect(((await absW.json()) as { warningActive: boolean }).warningActive).toBe(true);
+
+    // 教員A: 受信箱に自校の欠席（氏名付き）が出る
+    const login = await req("/api/school/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: emailA, password: "teacherpass1" }),
+    });
+    const { token: tA } = (await login.json()) as { token: string };
+    const inbox = (await (await req("/api/school/absences", { headers: bearer(tA) })).json()) as {
+      id: string; studentName: string; status: string; type: string;
+    }[];
+    expect(inbox.some((r) => r.studentName === "山田太郎")).toBe(true);
+    const target = inbox.find((r) => r.studentName === "山田太郎")!;
+
+    // 確認済みに更新
+    const patch = await req(`/api/school/absences/${target.id}`, {
+      method: "PATCH",
+      headers: { ...bearer(tA), "content-type": "application/json" },
+      body: JSON.stringify({ status: "confirmed" }),
+    });
+    expect(patch.status).toBe(200);
+
+    // テナント越境: 学校Bの教員はAの欠席を見られない・更新できない
+    await req(`/api/admin/schools/${schoolBId}/teachers`, {
+      method: "POST",
+      headers: { ...bearer(adminToken), "content-type": "application/json" },
+      body: JSON.stringify({ email: `b_${Math.random().toString(36).slice(2, 8)}@b.example`, password: "teacherpassB", name: "先生B", role: "owner" }),
+    });
+    const listB = (await (await req(`/api/admin/schools/${schoolBId}/teachers`, { headers: bearer(adminToken) })).json()) as { email: string }[];
+    const emailB = listB[0]!.email;
+    const loginB = await req("/api/school/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: emailB, password: "teacherpassB" }),
+    });
+    const { token: tB } = (await loginB.json()) as { token: string };
+    const inboxB = (await (await req("/api/school/absences", { headers: bearer(tB) })).json()) as { id: string }[];
+    expect(inboxB.some((r) => r.id === target.id)).toBe(false);
+    const crossPatch = await req(`/api/school/absences/${target.id}`, {
+      method: "PATCH",
+      headers: { ...bearer(tB), "content-type": "application/json" },
+      body: JSON.stringify({ status: "confirmed" }),
+    });
+    expect(crossPatch.status).toBe(404);
+  });
+
+  it("無効化された教員はログイン不可＋既存トークンも即失効（disabled → 401）", async () => {
+    // 無効化する前に一度ログインしてトークンを取得
+    const pre = await req("/api/school/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: emailA, password: "teacherpass1" }),
+    });
+    const { token: oldToken } = (await pre.json()) as { token: string };
+    expect((await req("/api/school/me", { headers: bearer(oldToken) })).status).toBe(200);
+
+    // 対象教員IDを取得して無効化
     const list = (await (
       await req(`/api/admin/schools/${schoolAId}/teachers`, { headers: bearer(adminToken) })
     ).json()) as { id: string; email: string }[];
@@ -184,11 +298,14 @@ suite("School (teacher) API", () => {
     });
     expect(patch.status).toBe(200);
 
+    // 新規ログインは不可
     const login = await req("/api/school/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ email: emailA, password: "teacherpass1" }),
     });
     expect(login.status).toBe(401);
+    // 発行済みトークンも即失効（毎リクエスト DB 再検証）
+    expect((await req("/api/school/me", { headers: bearer(oldToken) })).status).toBe(401);
   });
 });

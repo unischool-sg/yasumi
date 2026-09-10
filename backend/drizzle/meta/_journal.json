@@ -43,6 +43,13 @@
       "when": 1789052880672,
       "tag": "0005_school_messages",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789053242288,
+      "tag": "0006_absence_reception",
+      "breakpoints": true
     }
   ]
 }

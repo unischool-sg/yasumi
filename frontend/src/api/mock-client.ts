@@ -1,6 +1,6 @@
 import type { CheckResult, SchoolRule } from "@yasumi/shared";
 import type { ApiClient, NewSchoolInput, SchoolPatch } from "./client.ts";
-import type { Area, SchoolDetail, SchoolStatus, SchoolSummary, Subscription } from "./types.ts";
+import type { AbsenceReport, Area, SchoolDetail, SchoolStatus, SchoolSummary, StudentProfile, Subscription } from "./types.ts";
 
 // デザイン確認用のモッククライアント（VITE_MOCK=1 のとき useLiff が使用）。
 // バックエンド/LIFF なしで実画面をサンプルデータで表示するための開発専用。
@@ -27,6 +27,8 @@ const areas: Area[] = [
 ];
 
 let subscriptions: Subscription[] = [{ userId: "me", schoolId: "s1", notificationEnabled: true }];
+
+const studentProfiles: StudentProfile[] = [];
 
 // モックでは自分が作成した学校として s1 を扱う（編集タブ表示確認用）。
 const mySchoolIds = new Set<string>(["s1"]);
@@ -115,6 +117,32 @@ export function createMockClient(): ApiClient {
       }
       return delay(undefined as void);
     },
+    // 欠席受付（モック: s1 を premium 対応校として扱う）
+    listAbsenceSchools: () => delay(schools.filter((s) => s.id === "s1").map((s) => ({ id: s.id, name: s.name }))),
+    listStudentProfiles: () => delay([...studentProfiles]),
+    createStudentProfile: (input) => {
+      const p: StudentProfile = {
+        id: `p${studentProfiles.length + 1}`,
+        schoolId: input.schoolId,
+        studentName: input.studentName,
+        grade: input.grade ?? null,
+        className: input.className ?? null,
+      };
+      studentProfiles.push(p);
+      return delay(p);
+    },
+    createAbsenceReport: (input) =>
+      delay({
+        id: `ar${Date.now()}`,
+        schoolId: input.schoolId,
+        studentProfileId: input.studentProfileId,
+        date: input.date,
+        type: input.type,
+        reason: input.reason ?? null,
+        note: input.note ?? null,
+        status: "unread",
+        createdAt: new Date().toISOString(),
+      } satisfies AbsenceReport),
     registerDeviceToken: (_input: { token: string; platform: "ios" | "android" | "web" }) =>
       delay(undefined as void),
     deleteDeviceToken: (_token: string) => delay(undefined as void),
