@@ -6,12 +6,18 @@ import { SCHOOL_CONTACT_EMAIL } from "../consts";
 
 const mailto = `mailto:${SCHOOL_CONTACT_EMAIL}?subject=${encodeURIComponent("やすみ？ 学校向けプランについて")}`;
 
-// 学校が抱える連絡の課題
+// 学校が抱える連絡の課題（アイコンは Google 4色でアクセント。fix は「やすみ？なら」の解決）
+const icons: Record<string, string> = {
+  phone: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`,
+  mail: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg>`,
+  app: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>`,
+  clock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`,
+};
 const problems = [
-  { title: "電話連絡網が遅い", body: "台風の朝、担任から順番に電話。全員に伝わる頃には登校時刻。回す先生の負担も大きい。" },
-  { title: "一斉メールが開かれない", body: "迷惑メール扱い・アドレス変更で不達。開封されたか分からず、届いた確証がない。" },
-  { title: "専用アプリは入れてもらえない", body: "新しいアプリのインストールは保護者に嫌われ、浸透しない。更新のたびに問い合わせも増える。" },
-  { title: "朝の欠席電話がパンクする", body: "始業前に電話が集中し、事務室・職員室が対応に追われる。折り返しや聞き漏らしも起きる。" },
+  { color: "#4285f4", icon: "phone", title: "電話連絡網が遅い", body: "担任から順番に電話。全員に伝わる頃には登校時刻を過ぎている。", fix: "1通で全保護者へ同時に届く" },
+  { color: "#ea4335", icon: "mail", title: "一斉メールは開かれない", body: "迷惑メール扱いやアドレス変更で不達。届いた確証も持てない。", fix: "既読・到達がその場で見える" },
+  { color: "#f9ab00", icon: "app", title: "専用アプリは入らない", body: "新しいアプリのインストールは保護者に敬遠され、浸透しない。", fix: "普段使いのLINEでそのまま" },
+  { color: "#34a853", icon: "clock", title: "朝の欠席電話がパンク", body: "始業前に電話が集中。折り返しや聞き漏らしも起きてしまう。", fix: "アプリで受付、記録も自動" },
 ];
 
 // できること
@@ -114,13 +120,15 @@ const faqJsonLd = {
   <section class="s-problem">
     <div class="container section-head reveal">
       <p class="eyebrow">よくある課題</p>
-      <h2>その連絡手段、本当に届いていますか？</h2>
+      <h2>電話・メール・専用アプリ。<br />どれも、確実じゃない。</h2>
     </div>
     <div class="container problem-grid">
       {problems.map((p, i) => (
-        <div class="problem-card reveal" style={`--delay:${i * 0.08}s`}>
+        <div class="problem-card reveal" style={`--c:${p.color};--delay:${i * 0.08}s`}>
+          <span class="p-icon" set:html={icons[p.icon]} />
           <h3>{p.title}</h3>
           <p>{p.body}</p>
+          <div class="p-fix"><span class="p-fix-mark">やすみ？なら</span>{p.fix}</div>
         </div>
       ))}
     </div>
@@ -402,32 +410,76 @@ const faqJsonLd = {
     margin-top: 8px;
   }
 
-  /* Problem */
+  /* Problem — Google Workspace 風: アイコンタイル(4色)・控えめな影・余白広め */
   .s-problem {
-    background: var(--surface);
+    background: #fff;
   }
   .problem-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 20px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
   }
   .problem-card {
     background: #fff;
     border: 1px solid var(--line);
-    border-left: 4px solid var(--orange);
-    border-radius: 16px;
-    padding: 26px 28px;
+    border-radius: 20px;
+    padding: 32px 28px;
+    display: flex;
+    flex-direction: column;
+    transition:
+      transform 0.25s ease,
+      box-shadow 0.25s ease;
+  }
+  .problem-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 30px rgba(60, 64, 67, 0.1);
+  }
+  .p-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    margin-bottom: 20px;
+    color: var(--c);
+    background: color-mix(in srgb, var(--c) 12%, #fff);
+  }
+  .p-icon :global(svg) {
+    width: 26px;
+    height: 26px;
   }
   .problem-card h3 {
     font-size: 18px;
+    font-weight: 700;
     margin-bottom: 8px;
   }
   .problem-card p {
     color: var(--muted);
-    margin: 0;
-    font-size: 15px;
+    margin: 0 0 20px;
+    font-size: 14.5px;
+    flex: 1;
   }
-  @media (max-width: 700px) {
+  .p-fix {
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .p-fix-mark {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--c);
+    margin-bottom: 4px;
+  }
+  @media (max-width: 900px) {
+    .problem-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media (max-width: 520px) {
     .problem-grid {
       grid-template-columns: 1fr;
     }
