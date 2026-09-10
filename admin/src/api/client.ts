@@ -68,6 +68,19 @@ export interface UserRow {
   lineUserId: string | null;
   createdAt: string;
 }
+export interface UserSubscription {
+  schoolId: string;
+  schoolName: string;
+  notificationEnabled: boolean;
+  createdAt: string;
+}
+export interface UserDetail {
+  id: string;
+  lineUserId: string | null;
+  deviceTokenCount: number;
+  subscriptions: UserSubscription[];
+  profile: { displayName: string; pictureUrl?: string; statusMessage?: string } | null;
+}
 export interface WarningCheck {
   id: string;
   schoolId: string;
@@ -112,8 +125,18 @@ export const api = {
   listAreas: (prefecture?: string) => request<Area[]>(`/areas${prefecture ? `?prefecture=${encodeURIComponent(prefecture)}` : ""}`),
   createArea: (b: Area) => request<Area>("/areas", { method: "POST", body: JSON.stringify(b) }),
   deleteArea: (code: string) => request<void>(`/areas/${code}`, { method: "DELETE" }),
-  // read
+  // users
   listUsers: () => request<UserRow[]>("/users"),
+  getUser: (id: string) => request<UserDetail>(`/users/${id}`),
+  sendUserMessage: (id: string, text: string) =>
+    request<{ ok: boolean }>(`/users/${id}/message`, { method: "POST", body: JSON.stringify({ text }) }),
+  addUserSubscription: (id: string, schoolId: string) =>
+    request(`/users/${id}/subscriptions`, { method: "POST", body: JSON.stringify({ schoolId }) }),
+  setUserSubscription: (id: string, schoolId: string, notificationEnabled: boolean) =>
+    request(`/users/${id}/subscriptions/${schoolId}`, { method: "PATCH", body: JSON.stringify({ notificationEnabled }) }),
+  removeUserSubscription: (id: string, schoolId: string) =>
+    request<void>(`/users/${id}/subscriptions/${schoolId}`, { method: "DELETE" }),
+  // read
   listWarningChecks: (date?: string) => request<WarningCheck[]>(`/warning-checks${date ? `?date=${date}` : ""}`),
   listNotifications: (date?: string) => request<NotificationRow[]>(`/notifications${date ? `?date=${date}` : ""}`),
 };

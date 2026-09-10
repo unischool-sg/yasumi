@@ -41,6 +41,8 @@ export interface AppDeps extends AuthDeps {
   /** ネイティブ LINE ログインのトークン交換用（LIFF と同じ LINE Login チャネル）。 */
   lineLoginChannelId?: string;
   lineLoginChannelSecret?: string;
+  /** LINE Messaging API アクセストークン（管理画面のプロフィール取得用）。 */
+  lineChannelAccessToken?: string;
 }
 
 const checkResultSchema = z.enum(["NORMAL", "WAIT", "AM_OFF", "PM_START", "FULL_OFF", "UNKNOWN"]);
@@ -392,7 +394,14 @@ export function createApp(deps: AppDeps) {
   if (deps.adminJwtSecret) {
     app.route(
       "/api/admin",
-      createAdminApp({ db: deps.db, adminJwtSecret: deps.adminJwtSecret, ...(deps.now ? { now: deps.now } : {}) }),
+      createAdminApp({
+        db: deps.db,
+        adminJwtSecret: deps.adminJwtSecret,
+        ...(deps.now ? { now: deps.now } : {}),
+        ...(deps.lineChannelAccessToken ? { lineAccessToken: deps.lineChannelAccessToken } : {}),
+        ...(deps.notificationProvider ? { notificationProvider: deps.notificationProvider } : {}),
+        ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
+      }),
     );
   }
 
