@@ -303,19 +303,21 @@ M14 [Phase 3] 通数カウンタ／請求運用の型／(後で)Stripe・生徒�
 
 ---
 
-## M11. [Phase 0] テナント基盤 — teachers ＋ 認証 ＋ plan  ← 次の着手点
+## M11. [Phase 0] テナント基盤 — teachers ＋ 認証 ＋ plan  ✅ 実装済み（develop）
+
+> 📄 [docs/plans/2026-09-11-m11-tenant-foundation.md](./docs/plans/2026-09-11-m11-tenant-foundation.md)
 
 **目的**: 学校を「テナント」として扱い、教員アカウントが**自校だけ**を触れる土台。社内adminが手で開通できる。
 
-- [ ] `teachers` テーブル（`{ id, schoolId, email, passwordHash, role(owner|teacher), name, disabled, createdAt }`）＋マイグレーション
-- [ ] 教員認証（admin JWT に倣った HS256・`teachers` 系統）＋パスワード発行/初期化フロー（MVPは社内adminが発行）
-- [ ] **テナントミドルウェア**: ログイン中アカウントの `schoolId` を固定し、全教員向けAPIで「自校データのみ」を強制。
-      リポジトリ層も `schoolId` 必須の関数のみ公開（横断参照を型で防ぐ）
-- [ ] `schools` に `plan`（basic|standard|premium|null）・`planExpiresAt` を追加
-- [ ] 社内 admin に「教員アカウント発行・プラン設定・有効期限」パネルを追加（手動プロビジョニング）
+- [x] `teachers` テーブル（`{ id, schoolId, email, passwordHash, role(owner|teacher), name, disabled, createdAt }`）＋マイグレーション `0004`
+- [x] 教員認証（`api/school/auth.ts`・HS256・`teachers` 系統）＋社内adminが初期PW発行
+- [x] **テナントミドルウェア**（`teacherAuthMiddleware`）: トークンの `schoolId` を固定し自校のみ。teachers repo は `schoolId` 必須の関数（`findTeacherInSchool`/`deleteTeacherInSchool`）で越境防止
+- [x] `schools` に `plan`（basic|standard|premium|null）・`planExpiresAt` を追加
+- [x] `api/school/app.ts`（`/api/school` = login・/me）＋ `SCHOOL_JWT_SECRET` で有効化
+- [x] 社内 admin に「教員アカウント発行/無効化/削除・プラン設定・有効期限」（admin API＋SchoolDetail UI）
 
 **完了条件**: 社内adminが学校Aに教員アカウントとpremiumプランを付与でき、そのアカウントで
-ログインすると学校Aのデータだけが見える（他校APIは 403/404）。結合テストでテナント越境が塞がっている。
+ログインすると学校Aのデータだけが見える。→ **達成**（DB-gated 結合テスト 5件 green・全体 85 pass）
 
 **依存**: 既存 `schools` / admin 認証基盤。
 

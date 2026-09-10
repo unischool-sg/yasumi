@@ -10,6 +10,8 @@ export type NewSchool = {
   websiteUrl?: string | null;
   rulesUrl?: string | null;
   studentCount?: number | null;
+  plan?: string | null;
+  planExpiresAt?: Date | null;
   createdBy?: string | null;
 };
 

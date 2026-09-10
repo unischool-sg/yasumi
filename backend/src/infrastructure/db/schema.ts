@@ -56,9 +56,25 @@ export const schools = pgTable("schools", {
   rulesUrl: text("rules_url"),
   // 全校生徒数（浸透率＝購読者数/生徒数 の分母。任意入力・営業指標用）。
   studentCount: integer("student_count"),
+  // 有料プラン（学校向けSaaS）。null=無料/未契約。手動プロビジョニング（社内admin）で設定。
+  plan: varchar("plan", { length: 20 }), // 'basic' | 'standard' | 'premium'
+  planExpiresAt: timestamp("plan_expires_at", { withTimezone: true }),
   createdBy: uuid("created_by"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// 学校の職員アカウント（先生ダッシュボード認証。テナント＝schoolId 境界）。
+// 社内 admin / LINE エンドユーザーとは別系統。1教員=1レコード、role で権限。
+export const teachers = pgTable("teachers", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  schoolId: uuid("school_id").notNull(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  role: varchar("role", { length: 20 }).notNull().default("teacher"), // 'owner' | 'teacher'
+  name: varchar("name", { length: 100 }).notNull(),
+  disabled: boolean("disabled").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const areas = pgTable("areas", {

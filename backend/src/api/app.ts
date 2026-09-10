@@ -4,6 +4,7 @@ import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import { z } from "zod";
 import { createAdminApp } from "./admin/app.ts";
+import { createSchoolApp } from "./school/app.ts";
 import { type AuthDeps, type AuthEnv, authMiddleware } from "./auth.ts";
 import { checkSchoolEditable } from "./authz.ts";
 import { notifyUser } from "../domain/notification/dispatch.ts";
@@ -38,6 +39,8 @@ export interface AppDeps extends AuthDeps {
   now?: () => Date;
   /** 管理画面の JWT 署名鍵（設定時のみ /api/admin を有効化）。 */
   adminJwtSecret?: string;
+  /** 先生ダッシュボードの JWT 署名鍵（設定時のみ /api/school を有効化）。 */
+  schoolJwtSecret?: string;
   /** ネイティブ LINE ログインのトークン交換用（LIFF と同じ LINE Login チャネル）。 */
   lineLoginChannelId?: string;
   lineLoginChannelSecret?: string;
@@ -401,6 +404,18 @@ export function createApp(deps: AppDeps) {
         ...(deps.lineChannelAccessToken ? { lineAccessToken: deps.lineChannelAccessToken } : {}),
         ...(deps.notificationProvider ? { notificationProvider: deps.notificationProvider } : {}),
         ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
+      }),
+    );
+  }
+
+  // 先生ダッシュボード API（教員アカウント認証・自校スコープ）。/api より先に登録する。
+  if (deps.schoolJwtSecret) {
+    app.route(
+      "/api/school",
+      createSchoolApp({
+        db: deps.db,
+        schoolJwtSecret: deps.schoolJwtSecret,
+        ...(deps.now ? { now: deps.now } : {}),
       }),
     );
   }
