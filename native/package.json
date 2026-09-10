@@ -7,7 +7,8 @@
   "comment": "root workspaces には含めない独立プロジェクト。web/docker ビルドに Capacitor の重い依存を持ち込まないため、ここで個別に `bun install` する。",
   "scripts": {
     "build:web": "cd ../frontend && VITE_PLATFORM=native bun run build && rm -rf ../native/www && cp -r dist ../native/www",
-    "sync": "bun run build:web && cap sync",
+    "build:inject": "bunx esbuild src/inject.ts --bundle --format=esm --outfile=www/inject.js --define:LINE_LOGIN_CHANNEL_ID='\"'$VITE_LIFF_ID'\"' --define:API_BASE='\"'$VITE_API_BASE_URL'\"'",
+    "sync": "bun run build:web && bun run build:inject && cap sync",
     "add:ios": "cap add ios",
     "add:android": "cap add android",
     "open:ios": "cap open ios",
@@ -15,11 +16,15 @@
   },
   "dependencies": {
     "@capacitor/core": "^6.2.0",
+    "@capacitor/app": "^6.0.2",
+    "@capacitor/browser": "^6.0.5",
     "@capacitor/ios": "^6.2.0",
     "@capacitor/android": "^6.2.0",
-    "@capacitor-firebase/messaging": "^6.3.1"
+    "@capacitor-firebase/messaging": "^6.3.1",
+    "firebase": "^10.14.1"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.2.0"
+    "@capacitor/cli": "^6.2.0",
+    "esbuild": "^0.24.0"
   }
 }
