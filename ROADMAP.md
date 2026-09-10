@@ -323,17 +323,20 @@ M14 [Phase 3] 通数カウンタ／請求運用の型／(後で)Stripe・生徒�
 
 ---
 
-## M12. [Phase 1] 先生ダッシュボード（別アプリ）
+## M12. [Phase 1] 先生ダッシュボード（別アプリ）  ✅ 実装済み（develop）
+
+> 📄 [docs/plans/2026-09-11-m12-teacher-dashboard.md](./docs/plans/2026-09-11-m12-teacher-dashboard.md)
 
 **目的**: 先生が自校の公式連絡を送り、届いたかを見て、購読者を把握できる。
 
-- [ ] 新フロント `school/`（monorepo ワークスペース追加・別ドメイン `school.yasumi.unischool.jp`・deploy.yml 追記）
-- [ ] 教員ログイン（M11 の認証）
-- [ ] **公式メッセージ送信**（既存 `notifyUser` 経路を教員認証＋テナントスコープで。送信時に「緊急/休校（無制限）」か「お知らせ（計上）」を選択）
-- [ ] **到達状況**（送信成功/失敗の可視化。※開封は取得不可）
-- [ ] **購読者一覧**（`listSubscribersBySchool` を自校スコープで）
+- [x] 新フロント `school/`（workspace 追加・Vite+React19+MUI・緑テーマ・`dev:school`）。※別ドメイン `school.yasumi.unischool.jp` / deploy.yml は本番反映時に
+- [x] 教員ログイン（M11 の認証・email+password）
+- [x] **公式メッセージ送信** `POST /api/school/broadcast`（`notifyUser` 経路・自校スコープ・category 緊急/お知らせ）
+- [x] **到達状況** `school_messages` に記録（total/sent/failed）＋ `GET /messages` 履歴。※開封は取得不可
+- [x] **購読者一覧** `GET /api/school/subscribers`（自校スコープ）
 
-**完了条件**: 教員が別アプリからログイン → 自校購読者へ公式メッセージを送信 → 到達件数が見える。
+**完了条件**: 教員が別アプリからログイン → 自校購読者へ公式メッセージを送信 → 到達件数が履歴に出る。
+→ **達成**（migration `0005`・DB-gated 送信/記録/購読者/テナントスコープ テスト green・全86 pass・school build green）
 
 **依存**: M11。
 

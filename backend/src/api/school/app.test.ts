@@ -117,6 +117,60 @@ suite("School (teacher) API", () => {
     expect(me.school?.plan).toBe("premium");
   });
 
+  it("公式送信: 自校購読者へ送り、履歴(到達状況)に記録される", async () => {
+    // 送信プロバイダを捕捉する別アプリ（同一DB・同一SCHOOL_SECRET）
+    const sent: { lineUserId?: string; text: string }[] = [];
+    const msgApp = createApp({
+      db: drizzle(sql, { schema }),
+      verifyIdToken: async (t) => ({ lineUserId: t }),
+      adminJwtSecret: ADMIN_SECRET,
+      schoolJwtSecret: SCHOOL_SECRET,
+      notificationProvider: {
+        async send(target, message) {
+          sent.push({ ...(target.lineUserId ? { lineUserId: target.lineUserId } : {}), text: message.text });
+        },
+      },
+    });
+    const mreq = (path: string, init?: RequestInit) => msgApp.fetch(new Request(`http://x${path}`, init));
+
+    // LINEユーザーを作成し、admin 経由で学校Aを購読させる
+    const { userId } = (await (await mreq("/api/me", { headers: bearer("Uschoolbcast") })).json()) as { userId: string };
+    await mreq(`/api/admin/users/${userId}/subscriptions`, {
+      method: "POST",
+      headers: { ...bearer(adminToken), "content-type": "application/json" },
+      body: JSON.stringify({ schoolId: schoolAId }),
+    });
+
+    // 教員ログイン → 送信
+    const login = await mreq("/api/school/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: emailA, password: "teacherpass1" }),
+    });
+    const { token } = (await login.json()) as { token: string };
+
+    const bc = await mreq("/api/school/broadcast", {
+      method: "POST",
+      headers: { ...bearer(token), "content-type": "application/json" },
+      body: JSON.stringify({ text: "本日は暴風警報のため休校です", category: "emergency" }),
+    });
+    expect(bc.status).toBe(200);
+    const result = (await bc.json()) as { total: number; sent: number; failed: number };
+    expect(result.total).toBeGreaterThanOrEqual(1);
+    expect(result.sent).toBeGreaterThanOrEqual(1);
+    expect(sent.some((s) => s.lineUserId === "Uschoolbcast")).toBe(true);
+
+    // 購読者一覧に出る
+    const subs = (await (await mreq("/api/school/subscribers", { headers: bearer(token) })).json()) as { userId: string }[];
+    expect(subs.some((s) => s.userId === userId)).toBe(true);
+
+    // 履歴に記録される
+    const history = (await (await mreq("/api/school/messages", { headers: bearer(token) })).json()) as {
+      category: string; text: string; total: number; sent: number;
+    }[];
+    expect(history.some((m) => m.category === "emergency" && m.text.includes("休校"))).toBe(true);
+  });
+
   it("無効化された教員はログイン不可（disabled → 401）", async () => {
     // 対象教員IDを取得
     const list = (await (

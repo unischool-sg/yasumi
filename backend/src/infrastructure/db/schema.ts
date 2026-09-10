@@ -77,6 +77,19 @@ export const teachers = pgTable("teachers", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// 先生ダッシュボードからの公式一斉送信ログ（到達状況の可視化＋任意送信の通数集計元）。
+export const schoolMessages = pgTable("school_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  schoolId: uuid("school_id").notNull(),
+  teacherId: uuid("teacher_id").notNull(),
+  category: varchar("category", { length: 20 }).notNull(), // 'emergency'(無制限) | 'announcement'(計上)
+  text: text("text").notNull(),
+  total: integer("total").notNull(),
+  sent: integer("sent").notNull(),
+  failed: integer("failed").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const areas = pgTable("areas", {
   code: varchar("code", { length: 32 }).primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),

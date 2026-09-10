@@ -2,7 +2,11 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Db } from "../../infrastructure/db/client.ts";
+import type { NotificationProvider } from "../../domain/notification/provider.ts";
+import { notifyUser } from "../../domain/notification/dispatch.ts";
+import * as msgRepo from "../../infrastructure/db/repositories/school-messages.ts";
 import * as schoolsRepo from "../../infrastructure/db/repositories/schools.ts";
+import * as subsRepo from "../../infrastructure/db/repositories/subscriptions.ts";
 import { rateLimit } from "../middleware/rate-limit.ts";
 import { type SchoolEnv, teacherAuthMiddleware, teacherLogin } from "./auth.ts";
 
@@ -10,6 +14,9 @@ export interface SchoolAppDeps {
   db: Db;
   schoolJwtSecret: string;
   now?: () => Date;
+  /** 公式メッセージ送信用（LINE / FCM 送り分け）。 */
+  notificationProvider?: NotificationProvider;
+  pushProvider?: NotificationProvider;
 }
 
 /**
@@ -52,6 +59,50 @@ export function createSchoolApp(deps: SchoolAppDeps) {
         : null,
     });
   });
+
+  // 自校の購読者一覧（テナントスコープ）
+  app.get("/subscribers", async (c) =>
+    c.json(await subsRepo.listSubscribersBySchool(db, c.get("teacher").schoolId)),
+  );
+
+  // 公式メッセージの一斉送信（自校購読者へ）。category: emergency(無制限) / announcement(将来計上)
+  app.post(
+    "/broadcast",
+    zValidator("json", z.object({
+      text: z.string().min(1).max(1000),
+      category: z.enum(["emergency", "announcement"]),
+    })),
+    async (c) => {
+      const { schoolId, id: teacherId } = c.get("teacher");
+      const { text, category } = c.req.valid("json");
+      const subs = await subsRepo.listSubscribersBySchool(db, schoolId);
+      const notifyDeps = {
+        db,
+        ...(deps.notificationProvider ? { notificationProvider: deps.notificationProvider } : {}),
+        ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
+      };
+      let sent = 0;
+      for (const s of subs) {
+        if (await notifyUser(notifyDeps, s.userId, text)) sent++;
+      }
+      const total = subs.length;
+      const row = await msgRepo.createMessage(db, {
+        schoolId,
+        teacherId,
+        category,
+        text,
+        total,
+        sent,
+        failed: total - sent,
+      });
+      return c.json({ id: row.id, total, sent, failed: total - sent });
+    },
+  );
+
+  // 送信履歴（到達状況の可視化）
+  app.get("/messages", async (c) =>
+    c.json(await msgRepo.listBySchool(db, c.get("teacher").schoolId)),
+  );
 
   return app;
 }

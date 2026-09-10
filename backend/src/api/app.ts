@@ -416,6 +416,8 @@ export function createApp(deps: AppDeps) {
         db: deps.db,
         schoolJwtSecret: deps.schoolJwtSecret,
         ...(deps.now ? { now: deps.now } : {}),
+        ...(deps.notificationProvider ? { notificationProvider: deps.notificationProvider } : {}),
+        ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
       }),
     );
   }
