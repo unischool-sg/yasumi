@@ -6,6 +6,8 @@ import { z } from "zod";
 import { createAdminApp } from "./admin/app.ts";
 import { type AuthDeps, type AuthEnv, authMiddleware } from "./auth.ts";
 import { checkSchoolEditable } from "./authz.ts";
+import { notifyUser } from "../domain/notification/dispatch.ts";
+import { exchangeLineCode } from "./line-login.ts";
 import { rateLimit } from "./middleware/rate-limit.ts";
 import type { NotificationProvider } from "../domain/notification/provider.ts";
 import type { WarningProvider } from "../domain/warning/provider.ts";
@@ -36,6 +38,9 @@ export interface AppDeps extends AuthDeps {
   now?: () => Date;
   /** 管理画面の JWT 署名鍵（設定時のみ /api/admin を有効化）。 */
   adminJwtSecret?: string;
+  /** ネイティブ LINE ログインのトークン交換用（LIFF と同じ LINE Login チャネル）。 */
+  lineLoginChannelId?: string;
+  lineLoginChannelSecret?: string;
 }
 
 const checkResultSchema = z.enum(["NORMAL", "WAIT", "AM_OFF", "PM_START", "FULL_OFF", "UNKNOWN"]);
@@ -93,6 +98,34 @@ export function createApp(deps: AppDeps) {
   app.get("/public/schools", async (c) => {
     return c.json(await schoolsRepo.listPublicSchools(deps.db));
   });
+
+  // ネイティブアプリの LINE ログイン: 認可コード → ID トークン交換（channel secret はサーバー保持）。
+  // 認証不要（ログイン前）。返す idToken を以降 Authorization: Bearer に使う。
+  app.post(
+    "/api/auth/line/token",
+    zValidator(
+      "json",
+      z.object({ code: z.string().min(1), codeVerifier: z.string().min(1), redirectUri: z.string().min(1) }),
+    ),
+    async (c) => {
+      if (!deps.lineLoginChannelId || !deps.lineLoginChannelSecret) {
+        return c.json({ error: "line login not configured" }, 503);
+      }
+      const b = c.req.valid("json");
+      try {
+        const { idToken } = await exchangeLineCode({
+          code: b.code,
+          codeVerifier: b.codeVerifier,
+          redirectUri: b.redirectUri,
+          channelId: deps.lineLoginChannelId,
+          channelSecret: deps.lineLoginChannelSecret,
+        });
+        return c.json({ idToken });
+      } catch {
+        return c.json({ error: "exchange failed" }, 400);
+      }
+    },
+  );
 
   const api = new Hono<AuthEnv>();
   api.use("*", rateLimit());
@@ -155,6 +188,12 @@ export function createApp(deps: AppDeps) {
       });
       if (body.areaCodes) await cfg.setAreaCodes(deps.db, school.id, body.areaCodes);
       if (body.warningTypes) await cfg.setWarningTypes(deps.db, school.id, body.warningTypes);
+      // 作成者へ確認通知（デバイストークンがあれば FCM、無ければ LINE。失敗しても 201 は返す）
+      await notifyUser(
+        deps,
+        c.get("userId"),
+        `「${school.name}」を登録しました！\n同じ学校のみんなで共有されます。\n\n朝の判定時刻に自動でチェックして、休校などをお知らせします。`,
+      );
       return c.json(school, 201);
     },
   );

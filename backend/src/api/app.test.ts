@@ -155,6 +155,30 @@ suite("API integration", () => {
     expect((detail as { warningTypes: string[] }).warningTypes).toContain("暴風警報");
   });
 
+  it("学校作成時に作成者へ確認通知を送る", async () => {
+    const sent: { lineUserId?: string; text: string }[] = [];
+    const notifyApp = createApp({
+      db: drizzle(sql, { schema }),
+      verifyIdToken: async (token) => ({ lineUserId: token }),
+      notificationProvider: {
+        send: async (target, message) => {
+          sent.push({ lineUserId: target.lineUserId, text: message.text });
+        },
+      },
+    });
+    const res = await notifyApp.fetch(
+      new Request("http://x/api/schools", {
+        method: "POST",
+        headers: { ...auth("Unotify"), "content-type": "application/json" },
+        body: JSON.stringify({ name: "通知テスト校", prefecture: "兵庫県" }),
+      }),
+    );
+    expect(res.status).toBe(201);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.lineUserId).toBe("Unotify");
+    expect(sent[0]?.text).toContain("登録しました");
+  });
+
   it("GET /api/me/schools → 自分が作成した学校のみ返す", async () => {
     const created = (await (
       await req("/api/schools", {
