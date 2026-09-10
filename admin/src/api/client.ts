@@ -51,6 +51,17 @@ export interface School {
   prefecture: string;
   city: string | null;
   websiteUrl: string | null;
+  studentCount: number | null;
+  createdAt: string;
+}
+export interface SchoolStats {
+  id: string;
+  name: string;
+  prefecture: string;
+  city: string | null;
+  studentCount: number | null;
+  subscriberCount: number;
+  enabledCount: number;
   createdAt: string;
 }
 export interface SchoolDetail extends School {
@@ -118,6 +129,7 @@ export const api = {
     request<Admin>(`/admins/${id}`, { method: "PATCH", body: JSON.stringify(b) }),
   // schools
   listSchools: (q?: string) => request<School[]>(`/schools${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+  getSchoolsOverview: () => request<SchoolStats[]>("/schools/overview"),
   getSchool: (id: string) => request<SchoolDetail>(`/schools/${id}`),
   getSchoolSubscribers: (id: string) => request<SchoolSubscriber[]>(`/schools/${id}/subscribers`),
   createSchool: (b: { name: string; prefecture: string; city?: string; areaCodes?: string[]; warningTypes?: string[] }) =>

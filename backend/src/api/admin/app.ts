@@ -103,6 +103,8 @@ export function createAdminApp(deps: AdminAppDeps) {
     const { q } = c.req.valid("query");
     return c.json(q ? await schoolsRepo.searchSchools(db, q, 200) : await schoolsRepo.listSchools(db, { limit: 200 }));
   });
+  // 学校ごとの購読者数・浸透率（営業指標。校内密度の高い順）
+  app.get("/schools/overview", async (c) => c.json(await schoolsRepo.listSchoolsWithStats(db)));
   app.get("/schools/:id", async (c) => {
     const id = c.req.param("id");
     const school = await schoolsRepo.findSchoolById(db, id);
@@ -121,6 +123,7 @@ export function createAdminApp(deps: AdminAppDeps) {
       prefecture: z.string().min(1),
       city: z.string().optional(),
       websiteUrl: z.string().url().optional(),
+      studentCount: z.number().int().positive().optional(),
       areaCodes: z.array(z.string()).optional(),
       warningTypes: z.array(z.string()).optional(),
     })),
@@ -131,6 +134,7 @@ export function createAdminApp(deps: AdminAppDeps) {
         prefecture: b.prefecture,
         city: b.city ?? null,
         websiteUrl: b.websiteUrl ?? null,
+        studentCount: b.studentCount ?? null,
         createdBy: null,
       });
       if (b.areaCodes) await cfg.setAreaCodes(db, school.id, b.areaCodes);
@@ -145,6 +149,7 @@ export function createAdminApp(deps: AdminAppDeps) {
       prefecture: z.string().min(1).optional(),
       city: z.string().nullable().optional(),
       websiteUrl: z.string().url().nullable().optional(),
+      studentCount: z.number().int().positive().nullable().optional(),
       areaCodes: z.array(z.string()).optional(),
       warningTypes: z.array(z.string()).optional(),
     })),

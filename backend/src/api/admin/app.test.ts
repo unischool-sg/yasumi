@@ -153,6 +153,39 @@ suite("Admin API", () => {
     expect(del.status).toBe(204);
   });
 
+  it("学校の購読者数・生徒数・浸透率の集計（overview）", async () => {
+    const suT = await loginToken(suName);
+    // 生徒数(分母)付きで学校作成
+    const school = (await (
+      await req("/api/admin/schools", {
+        method: "POST",
+        headers: { ...bearer(suT), "content-type": "application/json" },
+        body: JSON.stringify({ name: "浸透率テスト校", prefecture: "兵庫県", studentCount: 200 }),
+      })
+    ).json()) as { id: string; studentCount: number | null };
+    expect(school.studentCount).toBe(200);
+
+    // ユーザーを購読させる
+    const { userId } = (await (await req("/api/me", { headers: bearer("Uoverview") })).json()) as { userId: string };
+    await req(`/api/admin/users/${userId}/subscriptions`, {
+      method: "POST",
+      headers: { ...bearer(suT), "content-type": "application/json" },
+      body: JSON.stringify({ schoolId: school.id }),
+    });
+
+    const overview = (await (await req("/api/admin/schools/overview", { headers: bearer(suT) })).json()) as {
+      id: string;
+      subscriberCount: number;
+      enabledCount: number;
+      studentCount: number | null;
+    }[];
+    const row = overview.find((s) => s.id === school.id);
+    expect(row).toBeDefined();
+    expect(row!.subscriberCount).toBe(1);
+    expect(row!.enabledCount).toBe(1);
+    expect(row!.studentCount).toBe(200);
+  });
+
   it("ユーザーへメッセージ送信（プロバイダ経由）", async () => {
     const sent: { lineUserId?: string; text: string }[] = [];
     const msgApp = createApp({

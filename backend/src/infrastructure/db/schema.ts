@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  integer,
   jsonb,
   pgTable,
   primaryKey,
@@ -53,6 +54,8 @@ export const schools = pgTable("schools", {
   city: varchar("city", { length: 100 }),
   websiteUrl: text("website_url"),
   rulesUrl: text("rules_url"),
+  // 全校生徒数（浸透率＝購読者数/生徒数 の分母。任意入力・営業指標用）。
+  studentCount: integer("student_count"),
   createdBy: uuid("created_by"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

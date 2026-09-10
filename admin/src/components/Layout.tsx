@@ -4,6 +4,7 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import PeopleIcon from "@mui/icons-material/People";
 import PlaceIcon from "@mui/icons-material/Place";
 import SchoolIcon from "@mui/icons-material/School";
+import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import ShieldIcon from "@mui/icons-material/AdminPanelSettings";
 import {
   AppBar,
@@ -25,6 +26,7 @@ const WIDTH = 236;
 const nav = [
   { to: "/", label: "ダッシュボード", icon: <DashboardIcon /> },
   { to: "/schools", label: "学校・ルール", icon: <SchoolIcon /> },
+  { to: "/growth", label: "浸透率（営業）", icon: <TrendingUpIcon /> },
   { to: "/areas", label: "地域マスタ", icon: <PlaceIcon /> },
   { to: "/users", label: "ユーザー", icon: <PeopleIcon /> },
   { to: "/history", label: "判定・通知履歴", icon: <HistoryIcon /> },

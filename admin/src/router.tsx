@@ -4,6 +4,7 @@ import { getAuth, isSuperadmin } from "./lib/auth.ts";
 import { Admins } from "./pages/Admins.tsx";
 import { Areas } from "./pages/Areas.tsx";
 import { Dashboard } from "./pages/Dashboard.tsx";
+import { Growth } from "./pages/Growth.tsx";
 import { History } from "./pages/History.tsx";
 import { Login } from "./pages/Login.tsx";
 import { SchoolDetail } from "./pages/SchoolDetail.tsx";
@@ -32,6 +33,7 @@ const schoolDetailRoute = createRoute({
   path: "/schools/$id",
   component: () => <SchoolDetail id={schoolDetailRoute.useParams().id} />,
 });
+const growthRoute = createRoute({ getParentRoute: () => protectedRoute, path: "/growth", component: Growth });
 const areasRoute = createRoute({ getParentRoute: () => protectedRoute, path: "/areas", component: Areas });
 const usersRoute = createRoute({ getParentRoute: () => protectedRoute, path: "/users", component: Users });
 const userDetailRoute = createRoute({
@@ -51,7 +53,7 @@ const adminsRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
-  protectedRoute.addChildren([dashboardRoute, schoolsRoute, schoolDetailRoute, areasRoute, usersRoute, userDetailRoute, historyRoute, adminsRoute]),
+  protectedRoute.addChildren([dashboardRoute, schoolsRoute, schoolDetailRoute, growthRoute, areasRoute, usersRoute, userDetailRoute, historyRoute, adminsRoute]),
 ]);
 
 export const router = createRouter({ routeTree });

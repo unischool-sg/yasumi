@@ -1,0 +1,1 @@
+ALTER TABLE "schools" ADD COLUMN "student_count" integer;
