@@ -1,0 +1,5 @@
+# パッケージ取得は公開 npm レジストリを使う。
+# （以前は npm.flatt.tech ミラー経由だったが、fresh install 時のレート制限で
+#  Docker ビルドが失敗するため、公開 npm に切替。bun.lock も URL を npmjs に統一。）
+[install]
+registry = "https://registry.npmjs.org"

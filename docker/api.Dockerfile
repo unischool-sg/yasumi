@@ -8,7 +8,7 @@ ENV NODE_ENV=production
 ENV PORT=3000
 
 # workspace の全メンバー package.json を揃えて frozen-lockfile を解決
-COPY package.json bun.lock ./
+COPY package.json bun.lock bunfig.toml ./
 COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
 COPY landing/package.json ./landing/

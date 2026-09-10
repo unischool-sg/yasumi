@@ -6,7 +6,7 @@ WORKDIR /app
 ARG VITE_ADMIN_API_BASE_URL
 ENV VITE_ADMIN_API_BASE_URL=$VITE_ADMIN_API_BASE_URL
 
-COPY package.json bun.lock ./
+COPY package.json bun.lock bunfig.toml ./
 COPY admin/package.json ./admin/
 COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/

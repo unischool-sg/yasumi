@@ -10,7 +10,7 @@ ARG VITE_API_BASE_URL
 ENV VITE_LIFF_ID=$VITE_LIFF_ID
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
-COPY package.json bun.lock ./
+COPY package.json bun.lock bunfig.toml ./
 COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
 COPY landing/package.json ./landing/

@@ -32,14 +32,15 @@ services:
     ports:
       - "${ADMIN_PORT:-8083}:80"
 
-  # NOTE: 先生ダッシュボード(school) のコンテナは一旦保留。
-  # npm ミラー(npm.flatt.tech)が fresh install で 4xx を返すため、workspace 追加で bun.lock を
-  # 変えると全イメージのキャッシュが無効化され deploy が失敗する。school を workspace に戻し、
-  # ミラー問題を解消してから compose に復帰させる（docker/school.Dockerfile は用意済み）。
-  #   school:
-  #     build: { context: .., dockerfile: docker/school.Dockerfile, args: { VITE_SCHOOL_API_BASE_URL: ${VITE_SCHOOL_API_BASE_URL} } }
-  #     restart: unless-stopped
-  #     ports: [ "${SCHOOL_PORT:-8084}:80" ]
+  school:
+    build:
+      context: ..
+      dockerfile: docker/school.Dockerfile
+      args:
+        VITE_SCHOOL_API_BASE_URL: ${VITE_SCHOOL_API_BASE_URL}
+    restart: unless-stopped
+    ports:
+      - "${SCHOOL_PORT:-8084}:80"
 
   frontend:
     build:

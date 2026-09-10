@@ -6,7 +6,7 @@ WORKDIR /app
 ARG VITE_SCHOOL_API_BASE_URL
 ENV VITE_SCHOOL_API_BASE_URL=$VITE_SCHOOL_API_BASE_URL
 
-COPY package.json bun.lock ./
+COPY package.json bun.lock bunfig.toml ./
 COPY school/package.json ./school/
 COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
