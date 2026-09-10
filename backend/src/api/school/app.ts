@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Db } from "../../infrastructure/db/client.ts";
 import type { NotificationProvider } from "../../domain/notification/provider.ts";
 import { notifyUser } from "../../domain/notification/dispatch.ts";
+import { announcementMonthlyLimit, jstMonthStart } from "../../domain/plan.ts";
 import * as absenceReportsRepo from "../../infrastructure/db/repositories/absence-reports.ts";
 import * as msgRepo from "../../infrastructure/db/repositories/school-messages.ts";
 import * as schoolsRepo from "../../infrastructure/db/repositories/schools.ts";
@@ -76,6 +77,18 @@ export function createSchoolApp(deps: SchoolAppDeps) {
     async (c) => {
       const { schoolId, id: teacherId } = c.get("teacher");
       const { text, category } = c.req.valid("json");
+      // お知らせ（任意送信）は月間通数の上限を超えたら 403。緊急/休校は無制限。
+      if (category === "announcement") {
+        const school = await schoolsRepo.findSchoolById(db, schoolId);
+        const now = deps.now?.() ?? new Date();
+        const limit = announcementMonthlyLimit(school ?? { plan: null, planExpiresAt: null }, now);
+        if (limit !== null) {
+          const used = await msgRepo.countAnnouncementsSince(db, schoolId, jstMonthStart(now));
+          if (used >= limit) {
+            return c.json({ error: "quota exceeded", used, limit }, 403);
+          }
+        }
+      }
       const subs = await subsRepo.listSubscribersBySchool(db, schoolId);
       const notifyDeps = {
         db,
@@ -104,6 +117,16 @@ export function createSchoolApp(deps: SchoolAppDeps) {
   app.get("/messages", async (c) =>
     c.json(await msgRepo.listBySchool(db, c.get("teacher").schoolId)),
   );
+
+  // 今月の任意送信（お知らせ）の残数
+  app.get("/quota", async (c) => {
+    const schoolId = c.get("teacher").schoolId;
+    const school = await schoolsRepo.findSchoolById(db, schoolId);
+    const now = deps.now?.() ?? new Date();
+    const limit = announcementMonthlyLimit(school ?? { plan: null, planExpiresAt: null }, now);
+    const used = await msgRepo.countAnnouncementsSince(db, schoolId, jstMonthStart(now));
+    return c.json({ plan: school?.plan ?? null, announcement: { used, limit } });
+  });
 
   // --- 欠席受付の受信箱（M13・自校スコープ）---
   app.get(

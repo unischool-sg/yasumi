@@ -361,17 +361,20 @@ M14 [Phase 3] 通数カウンタ／請求運用の型／(後で)Stripe・生徒�
 
 ---
 
-## M14. [Phase 3] 通数・請求運用・（後で）Stripe
+## M14. [Phase 3] 通数・請求運用（Stripe/紐付けは対象外）  ✅ 実装済み（develop）
 
-**目的**: 任意送信の従量管理と、請求の型。決済自動化と紐付けフローは需要を見てから。
+> 📄 [docs/plans/2026-09-11-m14-message-quota.md](./docs/plans/2026-09-11-m14-message-quota.md)
+> ユーザー指示により **Stripe は今回対象外**。生徒↔保護者クロス紐付け（linkToken）も Phase3+ の任意扱いで今回見送り。
 
-- [ ] 任意送信の**月間通数カウンタ**（カテゴリ列＋月次集計）と上限表示・超過時の追加枠アドオン
-- [ ] 請求書運用の型（社内adminでプラン/期限管理・年払い2ヶ月無料）
-- [ ] **Stripe**（カード自動）の継ぎ目 ※セルフサーブは需要次第
-- [ ] 生徒↔保護者**クロスアカウント紐付け**（linkToken 生成/読込フロー）
-- [ ] 教員の権限分割の高度化（owner/teacher を超える細分化）
+- [x] 任意送信の**月間通数カウンタ**: `domain/plan.ts` `announcementMonthlyLimit`（basic10/standard50/premium無制限）＋`jstMonthStart`、`countAnnouncementsSince`
+- [x] `POST /api/school/broadcast`: お知らせが上限到達で 403（緊急/休校は無制限）。`GET /api/school/quota`（used/limit）
+- [x] school ダッシュボード: お知らせ残数表示・上限到達で送信不可＋案内
+- [x] 請求書運用の型: M11 の手動 plan/`planExpiresAt`（社内admin）で対応
+- [ ] Stripe（カード自動）… **対象外（今回やらない）**
+- [ ] 生徒↔保護者 linkToken 紐付け … **対象外（Phase3+・需要次第）**
 
-**完了条件**: 通数上限が効き、請求運用が回る。Stripe/紐付けは着手可否をこの段階で判断。
+**完了条件**: basic 校でお知らせ10通→11通目が 403、緊急は無制限、`/quota` が used/limit を返す。
+→ **達成**（DB-gated テスト green・全88 pass・school build green）
 
 **依存**: M11〜M13。
 

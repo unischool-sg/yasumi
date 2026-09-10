@@ -276,6 +276,56 @@ suite("School (teacher) API", () => {
     expect(crossPatch.status).toBe(404);
   });
 
+  it("任意送信(お知らせ)の月間上限: basic=10通で11通目は403・緊急は無制限", async () => {
+    // basic プランの学校Cと教員を用意
+    const schoolCId = ((await (
+      await req("/api/admin/schools", {
+        method: "POST",
+        headers: { ...bearer(adminToken), "content-type": "application/json" },
+        body: JSON.stringify({ name: "通数テスト校", prefecture: "兵庫県" }),
+      })
+    ).json()) as { id: string }).id;
+    await req(`/api/admin/schools/${schoolCId}`, {
+      method: "PATCH",
+      headers: { ...bearer(adminToken), "content-type": "application/json" },
+      body: JSON.stringify({ plan: "basic" }),
+    });
+    const emailC = `c_${Math.random().toString(36).slice(2, 8)}@c.example`;
+    await req(`/api/admin/schools/${schoolCId}/teachers`, {
+      method: "POST",
+      headers: { ...bearer(adminToken), "content-type": "application/json" },
+      body: JSON.stringify({ email: emailC, password: "teacherpassC", name: "先生C", role: "owner" }),
+    });
+    const { token: tC } = (await (await req("/api/school/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: emailC, password: "teacherpassC" }),
+    })).json()) as { token: string };
+
+    const announce = () => req("/api/school/broadcast", {
+      method: "POST",
+      headers: { ...bearer(tC), "content-type": "application/json" },
+      body: JSON.stringify({ text: "お知らせ", category: "announcement" }),
+    });
+
+    // 10通は成功（購読者0なので total=0 でも記録される）
+    for (let i = 0; i < 10; i++) expect((await announce()).status).toBe(200);
+    // 11通目は上限で 403
+    expect((await announce()).status).toBe(403);
+    // 緊急は上限に関係なく送れる
+    const emg = await req("/api/school/broadcast", {
+      method: "POST",
+      headers: { ...bearer(tC), "content-type": "application/json" },
+      body: JSON.stringify({ text: "休校連絡", category: "emergency" }),
+    });
+    expect(emg.status).toBe(200);
+    // quota は used=10, limit=10
+    const quota = (await (await req("/api/school/quota", { headers: bearer(tC) })).json()) as {
+      announcement: { used: number; limit: number | null };
+    };
+    expect(quota.announcement).toEqual({ used: 10, limit: 10 });
+  });
+
   it("無効化された教員はログイン不可＋既存トークンも即失効（disabled → 401）", async () => {
     // 無効化する前に一度ログインしてトークンを取得
     const pre = await req("/api/school/auth/login", {

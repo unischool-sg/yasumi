@@ -16,6 +16,7 @@ export function Dashboard() {
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: api.me });
   const { data: subscribers = [] } = useQuery({ queryKey: ["subscribers"], queryFn: api.getSubscribers });
   const { data: messages = [] } = useQuery({ queryKey: ["messages"], queryFn: api.getMessages });
+  const { data: quota } = useQuery({ queryKey: ["quota"], queryFn: api.getQuota });
 
   const [text, setText] = useState("");
   const [category, setCategory] = useState<MessageCategory>("emergency");
@@ -25,10 +26,15 @@ export function Dashboard() {
     onSuccess: (r) => {
       setText("");
       qc.invalidateQueries({ queryKey: ["messages"] });
+      qc.invalidateQueries({ queryKey: ["quota"] });
       toast.success(`送信しました（到達 ${r.sent}/${r.total} 件）`);
     },
     onError: (e) => toast.error(`送信に失敗しました: ${(e as Error).message}`),
   });
+
+  const annLimit = quota?.announcement.limit ?? null;
+  const annUsed = quota?.announcement.used ?? 0;
+  const annExhausted = category === "announcement" && annLimit !== null && annUsed >= annLimit;
 
   const doSend = () => {
     if (!window.confirm(`購読者 ${subscribers.length} 名に「${CAT_LABEL[category]}」として送信します。よろしいですか？`)) return;
@@ -48,10 +54,18 @@ export function Dashboard() {
         <CardContent>
           <Typography variant="subtitle2" sx={{ mb: 1.5 }}>公式メッセージを一斉送信</Typography>
           <Stack spacing={1.5}>
-            <TextField select size="small" label="種別" value={category} onChange={(e) => setCategory(e.target.value as MessageCategory)} sx={{ width: 220 }}>
-              <MenuItem value="emergency">休校・緊急（無制限）</MenuItem>
-              <MenuItem value="announcement">お知らせ</MenuItem>
-            </TextField>
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+              <TextField select size="small" label="種別" value={category} onChange={(e) => setCategory(e.target.value as MessageCategory)} sx={{ width: 220 }}>
+                <MenuItem value="emergency">休校・緊急（無制限）</MenuItem>
+                <MenuItem value="announcement">お知らせ</MenuItem>
+              </TextField>
+              {category === "announcement" && (
+                <Typography variant="caption" color={annExhausted ? "error" : "text.secondary"}>
+                  今月のお知らせ：{annUsed}
+                  {annLimit === null ? "（無制限）" : ` / ${annLimit} 通`}
+                </Typography>
+              )}
+            </Stack>
             <TextField
               fullWidth multiline minRows={3}
               placeholder="例）本日は暴風警報発表のため休校とします。登校の必要はありません。"
@@ -59,9 +73,14 @@ export function Dashboard() {
               onChange={(e) => setText(e.target.value)}
             />
             <Box>
-              <Button variant="contained" disabled={!text.trim() || subscribers.length === 0 || send.isPending} onClick={doSend}>
+              <Button variant="contained" disabled={!text.trim() || subscribers.length === 0 || annExhausted || send.isPending} onClick={doSend}>
                 購読者へ送信
               </Button>
+              {annExhausted && (
+                <Typography variant="caption" color="error" sx={{ display: "block", mt: 0.5 }}>
+                  今月のお知らせ送信が上限に達しました。緊急連絡は引き続き無制限で送信できます。
+                </Typography>
+              )}
             </Box>
           </Stack>
         </CardContent>

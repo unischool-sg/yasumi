@@ -55,6 +55,10 @@ export interface BroadcastResult {
   sent: number;
   failed: number;
 }
+export interface Quota {
+  plan: Plan | null;
+  announcement: { used: number; limit: number | null };
+}
 export type AbsenceStatus = "unread" | "confirmed";
 export interface AbsenceReport {
   id: string;
@@ -78,6 +82,7 @@ export const api = {
   getMessages: () => request<SchoolMessage[]>("/messages"),
   broadcast: (text: string, category: MessageCategory) =>
     request<BroadcastResult>("/broadcast", { method: "POST", body: JSON.stringify({ text, category }) }),
+  getQuota: () => request<Quota>("/quota"),
   getAbsences: (status?: AbsenceStatus) =>
     request<AbsenceReport[]>(`/absences${status ? `?status=${status}` : ""}`),
   setAbsenceStatus: (id: string, status: AbsenceStatus) =>
