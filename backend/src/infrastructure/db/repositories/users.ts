@@ -42,6 +42,12 @@ export async function countUsers(db: Db): Promise<number> {
   return rows.length;
 }
 
+/** 全ユーザーの内部ID（一斉送信用）。 */
+export async function listAllUserIds(db: Db): Promise<string[]> {
+  const rows = await db.select({ id: users.id }).from(users);
+  return rows.map((r) => r.id);
+}
+
 /** 内部ユーザーの LINE ユーザーIDを取得（通知送信に使う）。 */
 export async function getLineUserId(db: Db, userId: string): Promise<string | undefined> {
   const rows = await db
