@@ -10,6 +10,20 @@
 
 > このディレクトリは root の bun workspaces に**含めない**独立プロジェクト。
 > web/docker のビルドに Capacitor の重い依存を持ち込まないため、ここで個別に `bun install` する。
+> （frontend 側はセキュリティproxy対策も兼ねて Capacitor/firebase 非依存にしてある。）
+
+## ネイティブ連携の仕組み（重要）
+frontend 本体は Capacitor/firebase に依存しない。代わりに `frontend/src/native/bridge.ts` が
+`window.yasumiNative`（`registerPush` / `lineLogin`）を参照するだけにしてある。
+実体は本ワークスペースの **`src/inject.ts`** が Capacitor プラグインで実装し、`window.yasumiNative` に注入する。
+
+`bun run sync` で:
+1. `build:web` … frontend を native モードでビルド → `www/`
+2. `build:inject` … `src/inject.ts` を esbuild で bundle → `www/inject.js`（`VITE_LIFF_ID` / `VITE_API_BASE_URL` を注入）
+3. `cap sync`
+
+`www/index.html` に `<script type="module" src="/inject.js"></script>` を frontend の bundle より**前**に追加すること
+（inject が `window.yasumiNative` を先に用意する）。
 
 ## 前提（各自の開発機に必要）
 - iOS: macOS + Xcode + CocoaPods、Apple Developer アカウント
