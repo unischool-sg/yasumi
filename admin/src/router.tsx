@@ -8,6 +8,7 @@ import { History } from "./pages/History.tsx";
 import { Login } from "./pages/Login.tsx";
 import { SchoolDetail } from "./pages/SchoolDetail.tsx";
 import { Schools } from "./pages/Schools.tsx";
+import { UserDetail } from "./pages/UserDetail.tsx";
 import { Users } from "./pages/Users.tsx";
 
 const rootRoute = createRootRoute({ component: () => <Outlet /> });
@@ -33,6 +34,11 @@ const schoolDetailRoute = createRoute({
 });
 const areasRoute = createRoute({ getParentRoute: () => protectedRoute, path: "/areas", component: Areas });
 const usersRoute = createRoute({ getParentRoute: () => protectedRoute, path: "/users", component: Users });
+const userDetailRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/users/$id",
+  component: () => <UserDetail id={userDetailRoute.useParams().id} />,
+});
 const historyRoute = createRoute({ getParentRoute: () => protectedRoute, path: "/history", component: History });
 const adminsRoute = createRoute({
   getParentRoute: () => protectedRoute,
@@ -45,7 +51,7 @@ const adminsRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
-  protectedRoute.addChildren([dashboardRoute, schoolsRoute, schoolDetailRoute, areasRoute, usersRoute, historyRoute, adminsRoute]),
+  protectedRoute.addChildren([dashboardRoute, schoolsRoute, schoolDetailRoute, areasRoute, usersRoute, userDetailRoute, historyRoute, adminsRoute]),
 ]);
 
 export const router = createRouter({ routeTree });

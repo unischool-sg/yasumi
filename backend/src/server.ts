@@ -48,6 +48,8 @@ const app = createApp({
     accessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN ?? "",
   }),
   ...(pushProvider ? { pushProvider } : {}),
+  // 管理画面のプロフィール取得・メッセージ送信用
+  lineChannelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN ?? "",
 });
 
 // 同一プロセス cron を起動（30分ごと・app.fetch 駆動 / backend/CRON.md）。

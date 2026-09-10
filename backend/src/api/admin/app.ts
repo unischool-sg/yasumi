@@ -2,11 +2,15 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Db } from "../../infrastructure/db/client.ts";
+import type { NotificationProvider } from "../../domain/notification/provider.ts";
+import { notifyUser } from "../../domain/notification/dispatch.ts";
+import { getLineProfile } from "../../infrastructure/line/line-api.ts";
 import { rateLimit } from "../middleware/rate-limit.ts";
 import { type AdminEnv, adminAuthMiddleware, login, requireSuperadmin } from "./auth.ts";
 import * as adminsRepo from "../../infrastructure/db/repositories/admins.ts";
 import * as areasRepo from "../../infrastructure/db/repositories/areas.ts";
 import * as cfg from "../../infrastructure/db/repositories/school-config.ts";
+import * as deviceTokensRepo from "../../infrastructure/db/repositories/device-tokens.ts";
 import * as notificationsRepo from "../../infrastructure/db/repositories/notifications.ts";
 import * as rulesRepo from "../../infrastructure/db/repositories/rules.ts";
 import * as schoolsRepo from "../../infrastructure/db/repositories/schools.ts";
@@ -19,6 +23,11 @@ export interface AdminAppDeps {
   db: Db;
   adminJwtSecret: string;
   now?: () => Date;
+  /** LINE Messaging API アクセストークン（プロフィール取得用）。 */
+  lineAccessToken?: string;
+  /** ユーザーへのメッセージ送信用（LINE / FCM 送り分け）。 */
+  notificationProvider?: NotificationProvider;
+  pushProvider?: NotificationProvider;
 }
 
 const roleSchema = z.enum(["superadmin", "admin"]);
@@ -205,9 +214,72 @@ export function createAdminApp(deps: AdminAppDeps) {
     return c.body(null, 204);
   });
 
-  // --- ユーザー・購読（閲覧）---
+  // --- ユーザー・購読 ---
   app.get("/users", async (c) => c.json(await usersRepo.listUsers(db, { limit: 200 })));
   app.get("/subscriptions", async (c) => c.json(await subsRepo.listAllSubscriptions(db, { limit: 200 })));
+
+  // ユーザー詳細（プロフィール / 購読 / デバイス数）
+  app.get("/users/:id", async (c) => {
+    const id = c.req.param("id");
+    const lineUserId = await usersRepo.getLineUserId(db, id);
+    const [subscriptions, deviceTokens] = await Promise.all([
+      subsRepo.listSubscriptionsWithSchoolByUser(db, id),
+      deviceTokensRepo.listTokensByUser(db, id),
+    ]);
+    const profile = lineUserId && deps.lineAccessToken
+      ? await getLineProfile(deps.lineAccessToken, lineUserId)
+      : null;
+    return c.json({
+      id,
+      lineUserId: lineUserId ?? null,
+      deviceTokenCount: deviceTokens.length,
+      subscriptions,
+      profile,
+    });
+  });
+
+  // ユーザーへ簡易メッセージ送信（デバイストークンあれば FCM / 無ければ LINE）
+  app.post(
+    "/users/:id/message",
+    zValidator("json", z.object({ text: z.string().min(1).max(1000) })),
+    async (c) => {
+      const ok = await notifyUser(
+        { db, ...(deps.notificationProvider ? { notificationProvider: deps.notificationProvider } : {}), ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}) },
+        c.req.param("id"),
+        c.req.valid("json").text,
+      );
+      if (!ok) return c.json({ error: "送信できませんでした（通知先が無い/未設定）" }, 400);
+      return c.json({ ok: true });
+    },
+  );
+
+  // 購読の追加 / 通知ON-OFF / 削除
+  app.post(
+    "/users/:id/subscriptions",
+    zValidator("json", z.object({ schoolId: z.string().uuid() })),
+    async (c) => {
+      const school = await schoolsRepo.findSchoolById(db, c.req.valid("json").schoolId);
+      if (!school) return c.json({ error: "school not found" }, 404);
+      const row = await subsRepo.upsertSubscription(db, { userId: c.req.param("id"), schoolId: school.id });
+      return c.json(row, 201);
+    },
+  );
+  app.patch(
+    "/users/:id/subscriptions/:schoolId",
+    zValidator("json", z.object({ notificationEnabled: z.boolean() })),
+    async (c) => {
+      const row = await subsRepo.upsertSubscription(db, {
+        userId: c.req.param("id"),
+        schoolId: c.req.param("schoolId"),
+        notificationEnabled: c.req.valid("json").notificationEnabled,
+      });
+      return c.json(row);
+    },
+  );
+  app.delete("/users/:id/subscriptions/:schoolId", async (c) => {
+    await subsRepo.removeSubscription(db, c.req.param("id"), c.req.param("schoolId"));
+    return c.body(null, 204);
+  });
 
   // --- 履歴（閲覧）---
   app.get("/warning-checks", zValidator("query", z.object({ schoolId: z.string().optional(), date: z.string().optional() })), async (c) => {

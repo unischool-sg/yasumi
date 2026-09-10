@@ -1,11 +1,29 @@
 import { and, desc, eq } from "drizzle-orm";
 import type { Db } from "../client.ts";
-import { subscriptions } from "../schema.ts";
+import { schools, subscriptions } from "../schema.ts";
 
 export type SubscriptionRow = typeof subscriptions.$inferSelect;
 
 export async function listSubscriptionsByUser(db: Db, userId: string): Promise<SubscriptionRow[]> {
   return db.select().from(subscriptions).where(eq(subscriptions.userId, userId));
+}
+
+/** 管理画面: ユーザーの購読を学校名付きで取得（新しい順）。 */
+export async function listSubscriptionsWithSchoolByUser(
+  db: Db,
+  userId: string,
+): Promise<{ schoolId: string; schoolName: string; notificationEnabled: boolean; createdAt: Date }[]> {
+  return db
+    .select({
+      schoolId: subscriptions.schoolId,
+      schoolName: schools.name,
+      notificationEnabled: subscriptions.notificationEnabled,
+      createdAt: subscriptions.createdAt,
+    })
+    .from(subscriptions)
+    .innerJoin(schools, eq(schools.id, subscriptions.schoolId))
+    .where(eq(subscriptions.userId, userId))
+    .orderBy(desc(subscriptions.createdAt));
 }
 
 /** 購読を作成/更新（PRD §37 POST subscriptions）。 */
