@@ -17,6 +17,8 @@ services:
       ADMIN_LINE_USER_IDS: ${ADMIN_LINE_USER_IDS}
       INTERNAL_CRON_TOKEN: ${INTERNAL_CRON_TOKEN}
       ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET}
+      # 先生ダッシュボード API。未設定なら /api/school は無効（安全にドーマント）。
+      SCHOOL_JWT_SECRET: ${SCHOOL_JWT_SECRET}
     depends_on:
       - postgres
 
@@ -29,6 +31,16 @@ services:
     restart: unless-stopped
     ports:
       - "${ADMIN_PORT:-8083}:80"
+
+  school:
+    build:
+      context: ..
+      dockerfile: docker/school.Dockerfile
+      args:
+        VITE_SCHOOL_API_BASE_URL: ${VITE_SCHOOL_API_BASE_URL}
+    restart: unless-stopped
+    ports:
+      - "${SCHOOL_PORT:-8084}:80"
 
   frontend:
     build:
