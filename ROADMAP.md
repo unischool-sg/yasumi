@@ -244,6 +244,13 @@ Web Push・Discord・Email 通知 / 通常登校通知の設定 UI。
 > MVP設計: [docs/plans/2026-09-10-school-saas-mvp.md](./docs/plans/2026-09-10-school-saas-mvp.md)。
 > 営業LP: `landing/src/pages/for-schools.astro`。
 
+## 本番反映状況（2026-09-11）
+
+**M9〜M14 すべて本番反映済み**（PR #30 / product）。api・admin・landing・frontend・**school** の5サービス稼働。
+- パッケージ取得は **公開npm**（`npm.flatt.tech` ミラーは fresh install のレート制限で使わない・`bunfig.toml` で固定）。
+- 先生ダッシュボード(school) は host `:8085` で起動。**外部公開には Cloudflare Tunnel `yasumi-school.unischool.jp → :8085` と `.env` の `SCHOOL_JWT_SECRET` / `VITE_SCHOOL_API_BASE_URL` 設定が必要**（未設定の間 `/api/school` は無効）。
+- 残TODO: 上記トンネル/secret、for-schools LP の「開封→到達」表現修正、学生グロース施策。
+
 ## 収益化の芯（前提）
 
 - **2サイドモデル**: 利用者＝学生/保護者（**無料・死守**）、課金者＝学校（特に**私立**）。学生機能は一切ペイウォールしない。
@@ -329,7 +336,7 @@ M14 [Phase 3] 通数カウンタ／請求運用の型／(後で)Stripe・生徒�
 
 **目的**: 先生が自校の公式連絡を送り、届いたかを見て、購読者を把握できる。
 
-- [x] 新フロント `school/`（workspace 追加・Vite+React19+MUI・緑テーマ・`dev:school`）。※別ドメイン `yasumi-school.unischool.jp`（Cloudflare の Universal SSL は `*.unischool.jp` 1段のみ→2段の `school.yasumi.*` 不可。`yasumi-` プレフィックスで統一）/ deploy.yml は本番反映時に
+- [x] 新フロント `school/`（workspace・Vite+React19+MUI・緑テーマ）。compose に追加・host `:8085`・**本番反映済み**。別ドメイン `yasumi-school.unischool.jp`（Cloudflare Universal SSL は1段のみ→`yasumi-` 単段）／トンネル・secret は要設定
 - [x] 教員ログイン（M11 の認証・email+password）
 - [x] **公式メッセージ送信** `POST /api/school/broadcast`（`notifyUser` 経路・自校スコープ・category 緊急/お知らせ）
 - [x] **到達状況** `school_messages` に記録（total/sent/failed）＋ `GET /messages` 履歴。※開封は取得不可
