@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createAdminApp } from "./admin/app.ts";
 import { type AuthDeps, type AuthEnv, authMiddleware } from "./auth.ts";
 import { checkSchoolEditable } from "./authz.ts";
+import { notifyUser } from "../domain/notification/dispatch.ts";
 import { exchangeLineCode } from "./line-login.ts";
 import { rateLimit } from "./middleware/rate-limit.ts";
 import type { NotificationProvider } from "../domain/notification/provider.ts";
@@ -187,6 +188,12 @@ export function createApp(deps: AppDeps) {
       });
       if (body.areaCodes) await cfg.setAreaCodes(deps.db, school.id, body.areaCodes);
       if (body.warningTypes) await cfg.setWarningTypes(deps.db, school.id, body.warningTypes);
+      // 作成者へ確認通知（デバイストークンがあれば FCM、無ければ LINE。失敗しても 201 は返す）
+      await notifyUser(
+        deps,
+        c.get("userId"),
+        `「${school.name}」を登録しました！\n同じ学校のみんなで共有されます。\n\n朝の判定時刻に自動でチェックして、休校などをお知らせします。`,
+      );
       return c.json(school, 201);
     },
   );
