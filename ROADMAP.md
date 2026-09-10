@@ -329,7 +329,7 @@ M14 [Phase 3] 通数カウンタ／請求運用の型／(後で)Stripe・生徒�
 
 **目的**: 先生が自校の公式連絡を送り、届いたかを見て、購読者を把握できる。
 
-- [x] 新フロント `school/`（workspace 追加・Vite+React19+MUI・緑テーマ・`dev:school`）。※別ドメイン `school.yasumi.unischool.jp` / deploy.yml は本番反映時に
+- [x] 新フロント `school/`（workspace 追加・Vite+React19+MUI・緑テーマ・`dev:school`）。※別ドメイン `yasumi-school.unischool.jp`（Cloudflare の Universal SSL は `*.unischool.jp` 1段のみ→2段の `school.yasumi.*` 不可。`yasumi-` プレフィックスで統一）/ deploy.yml は本番反映時に
 - [x] 教員ログイン（M11 の認証・email+password）
 - [x] **公式メッセージ送信** `POST /api/school/broadcast`（`notifyUser` 経路・自校スコープ・category 緊急/お知らせ）
 - [x] **到達状況** `school_messages` に記録（total/sent/failed）＋ `GET /messages` 履歴。※開封は取得不可
