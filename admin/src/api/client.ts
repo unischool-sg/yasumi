@@ -137,6 +137,11 @@ export const api = {
   getUser: (id: string) => request<UserDetail>(`/users/${id}`),
   sendUserMessage: (id: string, text: string) =>
     request<{ ok: boolean }>(`/users/${id}/message`, { method: "POST", body: JSON.stringify({ text }) }),
+  broadcast: (text: string, target: { type: "all" } | { type: "school"; schoolId: string }) =>
+    request<{ total: number; sent: number; failed: number }>("/broadcast", {
+      method: "POST",
+      body: JSON.stringify({ text, target }),
+    }),
   addUserSubscription: (id: string, schoolId: string) =>
     request(`/users/${id}/subscriptions`, { method: "POST", body: JSON.stringify({ schoolId }) }),
   setUserSubscription: (id: string, schoolId: string, notificationEnabled: boolean) =>

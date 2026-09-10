@@ -36,6 +36,7 @@ export function SchoolDetail({ id }: { id: string }) {
   const [areaCodes, setAreaCodes] = useState<Set<string>>(new Set());
   const [warnings, setWarnings] = useState<Set<string>>(new Set());
   const [rule, setRule] = useState({ checkTime: "08:00", result: "AM_OFF" });
+  const [bcast, setBcast] = useState("");
 
   useEffect(() => {
     if (!data) return;
@@ -70,6 +71,15 @@ export function SchoolDetail({ id }: { id: string }) {
     onSuccess: () => { invalidate(); toast.success("ルールを削除しました"); },
     onError,
   });
+  const broadcastSubs = useMutation({
+    mutationFn: () => api.broadcast(bcast, { type: "school", schoolId: id }),
+    onSuccess: (r) => { setBcast(""); toast.success(`購読者へ送信しました（${r.sent}/${r.total} 件）`); },
+    onError,
+  });
+  const sendBroadcast = () => {
+    if (!window.confirm(`この学校の購読者（${subscribers.length}名）にメッセージを送信します。よろしいですか？`)) return;
+    broadcastSubs.mutate();
+  };
 
   function toggle(set: Set<string>, key: string, setter: (s: Set<string>) => void) {
     const n = new Set(set);
@@ -169,6 +179,20 @@ export function SchoolDetail({ id }: { id: string }) {
       <Card variant="outlined" sx={{ mt: 2 }}>
         <CardContent>
           <Typography variant="subtitle2" sx={{ mb: 1.5 }}>購読中のユーザー（{subscribers.length}）</Typography>
+          <Stack direction="row" spacing={2} sx={{ alignItems: "flex-start", mb: 2 }}>
+            <TextField
+              size="small"
+              fullWidth
+              multiline
+              minRows={2}
+              placeholder="購読者へ一斉送信するメッセージ（例: 「明日は創立記念日で休校です」）"
+              value={bcast}
+              onChange={(e) => setBcast(e.target.value)}
+            />
+            <Button variant="contained" color="warning" disabled={!bcast.trim() || subscribers.length === 0 || broadcastSubs.isPending} onClick={sendBroadcast} sx={{ flexShrink: 0, mt: 0.5 }}>
+              一斉送信
+            </Button>
+          </Stack>
           <Stack spacing={1}>
             {subscribers.map((s) => (
               <Stack key={s.userId} direction="row" spacing={1} sx={{ alignItems: "center" }}>

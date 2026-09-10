@@ -184,4 +184,58 @@ suite("Admin API", () => {
     expect(sent[0]?.lineUserId).toBe("Umsg");
     expect(sent[0]?.text).toBe("テスト連絡です");
   });
+
+  it("一斉送信: 学校購読者 / 全ユーザー", async () => {
+    const sent: string[] = [];
+    const bApp = createApp({
+      db: drizzle(sql, { schema }),
+      verifyIdToken: async (t) => ({ lineUserId: t }),
+      adminJwtSecret: SECRET,
+      notificationProvider: { send: async (target) => { sent.push(target.lineUserId ?? ""); } },
+    });
+    const breq = (path: string, init?: RequestInit) => bApp.fetch(new Request(`http://x${path}`, init));
+    const lr = await breq("/api/admin/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ username: suName, password: "password123" }),
+    });
+    const t = ((await lr.json()) as { token: string }).token;
+    const u1 = ((await (await breq("/api/me", { headers: bearer("Ubc1") })).json()) as { userId: string }).userId;
+    const u2 = ((await (await breq("/api/me", { headers: bearer("Ubc2") })).json()) as { userId: string }).userId;
+    const school = (await (
+      await breq("/api/admin/schools", {
+        method: "POST",
+        headers: { ...bearer(t), "content-type": "application/json" },
+        body: JSON.stringify({ name: "一斉校", prefecture: "兵庫県" }),
+      })
+    ).json()) as { id: string };
+    for (const u of [u1, u2]) {
+      await breq(`/api/admin/users/${u}/subscriptions`, {
+        method: "POST",
+        headers: { ...bearer(t), "content-type": "application/json" },
+        body: JSON.stringify({ schoolId: school.id }),
+      });
+    }
+
+    // 学校の購読者へ
+    sent.length = 0;
+    const r1 = await breq("/api/admin/broadcast", {
+      method: "POST",
+      headers: { ...bearer(t), "content-type": "application/json" },
+      body: JSON.stringify({ text: "学校連絡", target: { type: "school", schoolId: school.id } }),
+    });
+    expect(r1.status).toBe(200);
+    expect(((await r1.json()) as { sent: number }).sent).toBe(2);
+    expect(sent).toContain("Ubc1");
+    expect(sent).toContain("Ubc2");
+
+    // 全ユーザーへ（少なくとも上記2名）
+    sent.length = 0;
+    const r2 = await breq("/api/admin/broadcast", {
+      method: "POST",
+      headers: { ...bearer(t), "content-type": "application/json" },
+      body: JSON.stringify({ text: "全体連絡", target: { type: "all" } }),
+    });
+    expect(((await r2.json()) as { sent: number }).sent).toBeGreaterThanOrEqual(2);
+  });
 });

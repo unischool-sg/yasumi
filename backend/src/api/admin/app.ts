@@ -219,6 +219,38 @@ export function createAdminApp(deps: AdminAppDeps) {
     c.json(await subsRepo.listSubscribersBySchool(db, c.req.param("id"))),
   );
 
+  // 一斉メッセージ送信（全ユーザー / 特定学校の購読者）。デバイストークンあれば FCM / 無ければ LINE。
+  app.post(
+    "/broadcast",
+    zValidator(
+      "json",
+      z.object({
+        text: z.string().min(1).max(1000),
+        target: z.discriminatedUnion("type", [
+          z.object({ type: z.literal("all") }),
+          z.object({ type: z.literal("school"), schoolId: z.string().uuid() }),
+        ]),
+      }),
+    ),
+    async (c) => {
+      const { text, target } = c.req.valid("json");
+      const userIds =
+        target.type === "all"
+          ? await usersRepo.listAllUserIds(db)
+          : (await subsRepo.listSubscribersBySchool(db, target.schoolId)).map((s) => s.userId);
+      const notifyDeps = {
+        db,
+        ...(deps.notificationProvider ? { notificationProvider: deps.notificationProvider } : {}),
+        ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
+      };
+      let sent = 0;
+      for (const uid of userIds) {
+        if (await notifyUser(notifyDeps, uid, text)) sent++;
+      }
+      return c.json({ total: userIds.length, sent, failed: userIds.length - sent });
+    },
+  );
+
   // --- ユーザー・購読 ---
   app.get("/users", async (c) => c.json(await usersRepo.listUsers(db, { limit: 200 })));
   app.get("/subscriptions", async (c) => c.json(await subsRepo.listAllSubscriptions(db, { limit: 200 })));
