@@ -5,7 +5,7 @@
 FROM oven/bun:1 AS build
 WORKDIR /app
 # workspace の全メンバー package.json を揃えて frozen-lockfile を解決
-COPY package.json bun.lock ./
+COPY package.json bun.lock bunfig.toml ./
 COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
 COPY landing/package.json ./landing/

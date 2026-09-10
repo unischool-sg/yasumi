@@ -8,6 +8,7 @@
     "backend",
     "frontend",
     "landing",
+    "school",
     "packages/*"
   ],
   "scripts": {
@@ -15,6 +16,7 @@
     "dev:frontend": "bun run --cwd frontend dev",
     "dev:landing": "bun run --cwd landing dev",
     "dev:admin": "bun run --cwd admin dev",
+    "dev:school": "bun run --cwd school dev",
     "test": "bun test",
     "typecheck": "bun run --cwd packages/shared typecheck && bun run --cwd backend typecheck && bun run --cwd frontend typecheck"
   },
