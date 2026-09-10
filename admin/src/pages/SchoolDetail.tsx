@@ -22,6 +22,7 @@ export function SchoolDetail({ id }: { id: string }) {
   const navigate = useNavigate();
   const toast = useToast();
   const { data } = useQuery({ queryKey: ["school", id], queryFn: () => api.getSchool(id) });
+  const { data: subscribers = [] } = useQuery({ queryKey: ["school-subscribers", id], queryFn: () => api.getSchoolSubscribers(id) });
   // 学校の都道府県の地域のみ取得（全国 1806 件を出さない）
   const { data: allAreas = [] } = useQuery({
     queryKey: ["areas", data?.prefecture],
@@ -161,6 +162,26 @@ export function SchoolDetail({ id }: { id: string }) {
               {RESULTS.map(([v, l]) => <MenuItem key={v} value={v}>{l}</MenuItem>)}
             </TextField>
             <Button variant="outlined" onClick={() => addRule.mutate()}>ルール追加</Button>
+          </Stack>
+        </CardContent>
+      </Card>
+
+      <Card variant="outlined" sx={{ mt: 2 }}>
+        <CardContent>
+          <Typography variant="subtitle2" sx={{ mb: 1.5 }}>購読中のユーザー（{subscribers.length}）</Typography>
+          <Stack spacing={1}>
+            {subscribers.map((s) => (
+              <Stack key={s.userId} direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                <code style={{ fontSize: 12, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {s.lineUserId ?? s.userId}
+                </code>
+                <Typography variant="caption" color={s.notificationEnabled ? "success.main" : "text.secondary"} sx={{ width: 64 }}>
+                  {s.notificationEnabled ? "通知ON" : "通知OFF"}
+                </Typography>
+                <Button size="small" onClick={() => navigate({ to: "/users/$id", params: { id: s.userId } })}>詳細</Button>
+              </Stack>
+            ))}
+            {subscribers.length === 0 && <Typography variant="body2" color="text.secondary">購読者がいません</Typography>}
           </Stack>
         </CardContent>
       </Card>

@@ -1,6 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import type { Db } from "../client.ts";
-import { schools, subscriptions } from "../schema.ts";
+import { lineAccounts, schools, subscriptions } from "../schema.ts";
 
 export type SubscriptionRow = typeof subscriptions.$inferSelect;
 
@@ -70,6 +70,24 @@ export async function listAllSubscriptions(
 export async function countSubscriptions(db: Db): Promise<number> {
   const rows = await db.select({ schoolId: subscriptions.schoolId }).from(subscriptions);
   return rows.length;
+}
+
+/** 管理画面: 学校を購読しているユーザー一覧（新しい順・lineUserId 付き）。 */
+export async function listSubscribersBySchool(
+  db: Db,
+  schoolId: string,
+): Promise<{ userId: string; lineUserId: string | null; notificationEnabled: boolean; createdAt: Date }[]> {
+  return db
+    .select({
+      userId: subscriptions.userId,
+      lineUserId: lineAccounts.lineUserId,
+      notificationEnabled: subscriptions.notificationEnabled,
+      createdAt: subscriptions.createdAt,
+    })
+    .from(subscriptions)
+    .leftJoin(lineAccounts, eq(lineAccounts.userId, subscriptions.userId))
+    .where(eq(subscriptions.schoolId, schoolId))
+    .orderBy(desc(subscriptions.createdAt));
 }
 
 /** 通知有効な購読ユーザーを学校単位で取得（M7 通知配信）。 */

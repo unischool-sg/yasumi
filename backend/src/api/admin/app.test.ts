@@ -133,6 +133,12 @@ suite("Admin API", () => {
     expect(detail.deviceTokenCount).toBe(0);
     expect(detail.subscriptions.some((s) => s.schoolId === school.id && s.schoolName === "購読編集校" && s.notificationEnabled)).toBe(true);
 
+    // 学校の購読者一覧に出る
+    const subs = (await (
+      await req(`/api/admin/schools/${school.id}/subscribers`, { headers: bearer(suT) })
+    ).json()) as { userId: string; lineUserId: string; notificationEnabled: boolean }[];
+    expect(subs.some((s) => s.userId === userId && s.lineUserId === "Uadminmgmt")).toBe(true);
+
     // 通知OFF
     const patch = await req(`/api/admin/users/${userId}/subscriptions/${school.id}`, {
       method: "PATCH",

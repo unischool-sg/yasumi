@@ -214,6 +214,11 @@ export function createAdminApp(deps: AdminAppDeps) {
     return c.body(null, 204);
   });
 
+  // 学校を購読しているユーザー一覧
+  app.get("/schools/:id/subscribers", async (c) =>
+    c.json(await subsRepo.listSubscribersBySchool(db, c.req.param("id"))),
+  );
+
   // --- ユーザー・購読 ---
   app.get("/users", async (c) => c.json(await usersRepo.listUsers(db, { limit: 200 })));
   app.get("/subscriptions", async (c) => c.json(await subsRepo.listAllSubscriptions(db, { limit: 200 })));
