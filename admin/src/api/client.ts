@@ -68,6 +68,12 @@ export interface UserRow {
   lineUserId: string | null;
   createdAt: string;
 }
+export interface SchoolSubscriber {
+  userId: string;
+  lineUserId: string | null;
+  notificationEnabled: boolean;
+  createdAt: string;
+}
 export interface UserSubscription {
   schoolId: string;
   schoolName: string;
@@ -113,6 +119,7 @@ export const api = {
   // schools
   listSchools: (q?: string) => request<School[]>(`/schools${q ? `?q=${encodeURIComponent(q)}` : ""}`),
   getSchool: (id: string) => request<SchoolDetail>(`/schools/${id}`),
+  getSchoolSubscribers: (id: string) => request<SchoolSubscriber[]>(`/schools/${id}/subscribers`),
   createSchool: (b: { name: string; prefecture: string; city?: string; areaCodes?: string[]; warningTypes?: string[] }) =>
     request<School>("/schools", { method: "POST", body: JSON.stringify(b) }),
   updateSchool: (id: string, b: Record<string, unknown>) =>
