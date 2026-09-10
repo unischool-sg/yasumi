@@ -40,7 +40,7 @@ services:
         VITE_SCHOOL_API_BASE_URL: ${VITE_SCHOOL_API_BASE_URL}
     restart: unless-stopped
     ports:
-      - "${SCHOOL_PORT:-8084}:80"
+      - "${SCHOOL_PORT:-8085}:80"
 
   frontend:
     build:
