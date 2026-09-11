@@ -47,6 +47,23 @@ export interface SchoolMessage {
   total: number;
   sent: number;
   failed: number;
+  requireConfirmation: boolean;
+  confirmedCount: number;
+  createdAt: string;
+}
+export interface MessageTemplate {
+  id: string;
+  title: string;
+  category: MessageCategory;
+  body: string;
+  createdAt: string;
+}
+export interface ClosureDraft {
+  id: string;
+  targetDate: string;
+  result: string;
+  text: string;
+  status: string;
   createdAt: string;
 }
 export interface BroadcastResult {
@@ -80,8 +97,16 @@ export const api = {
   me: () => request<Me>("/me"),
   getSubscribers: () => request<Subscriber[]>("/subscribers"),
   getMessages: () => request<SchoolMessage[]>("/messages"),
-  broadcast: (text: string, category: MessageCategory) =>
-    request<BroadcastResult>("/broadcast", { method: "POST", body: JSON.stringify({ text, category }) }),
+  broadcast: (text: string, category: MessageCategory, requireConfirmation?: boolean) =>
+    request<BroadcastResult>("/broadcast", { method: "POST", body: JSON.stringify({ text, category, requireConfirmation }) }),
+  getTemplates: () => request<MessageTemplate[]>("/templates"),
+  createTemplate: (b: { title: string; category: MessageCategory; body: string }) =>
+    request<MessageTemplate>("/templates", { method: "POST", body: JSON.stringify(b) }),
+  deleteTemplate: (id: string) => request<void>(`/templates/${id}`, { method: "DELETE" }),
+  getDrafts: () => request<ClosureDraft[]>("/drafts"),
+  sendDraft: (id: string, text?: string) =>
+    request<BroadcastResult>(`/drafts/${id}/send`, { method: "POST", body: JSON.stringify(text ? { text } : {}) }),
+  dismissDraft: (id: string) => request<ClosureDraft>(`/drafts/${id}/dismiss`, { method: "POST" }),
   getQuota: () => request<Quota>("/quota"),
   getAbsences: (status?: AbsenceStatus) =>
     request<AbsenceReport[]>(`/absences${status ? `?status=${status}` : ""}`),

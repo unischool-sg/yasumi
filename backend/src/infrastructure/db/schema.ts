@@ -87,8 +87,31 @@ export const schoolMessages = pgTable("school_messages", {
   total: integer("total").notNull(),
   sent: integer("sent").notNull(),
   failed: integer("failed").notNull(),
+  // 「確認しました」リンクを付けたか（確認率計測 / M15）。
+  requireConfirmation: boolean("require_confirmation").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// 公式メッセージの定型文テンプレート（自校スコープ / M15）。
+export const messageTemplates = pgTable("message_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  schoolId: uuid("school_id").notNull(),
+  title: varchar("title", { length: 100 }).notNull(),
+  category: varchar("category", { length: 20 }).notNull(), // 'emergency' | 'announcement'
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// メッセージの「確認しました」記録（リンククリック＝確認。開封の代替 / M15）。
+export const messageConfirmations = pgTable(
+  "message_confirmations",
+  {
+    messageId: uuid("message_id").notNull(),
+    userId: uuid("user_id").notNull(),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.messageId, t.userId] })],
+);
 
 // 生徒プロフィール（欠席連絡の主体。保護者/生徒が自校ぶんを登録。テナント＝schoolId）。
 // linkToken/linkedStudentUserId は Phase3+ の保護者↔生徒クロス紐付け用に予約（MVP未使用）。
@@ -119,6 +142,21 @@ export const absenceReports = pgTable("absence_reports", {
   status: varchar("status", { length: 20 }).notNull().default("unread"), // 'unread' | 'confirmed'
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// 警報連動の休校連絡ドラフト（判定パイプラインが自動生成→先生がワンタップ送信 / M16）。
+export const closureDrafts = pgTable(
+  "closure_drafts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    schoolId: uuid("school_id").notNull(),
+    targetDate: date("target_date").notNull(),
+    result: varchar("result", { length: 50 }).notNull(),
+    text: text("text").notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("pending"), // 'pending' | 'sent' | 'dismissed'
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("closure_drafts_unique").on(t.schoolId, t.targetDate)],
+);
 
 export const areas = pgTable("areas", {
   code: varchar("code", { length: 32 }).primaryKey(),

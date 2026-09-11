@@ -44,6 +44,8 @@ const app = createApp({
   internalCronToken,
   ...(process.env.ADMIN_JWT_SECRET ? { adminJwtSecret: process.env.ADMIN_JWT_SECRET } : {}),
   ...(process.env.SCHOOL_JWT_SECRET ? { schoolJwtSecret: process.env.SCHOOL_JWT_SECRET } : {}),
+  // 確認リンク（/c/:token）の絶対URL生成用。既定は本番APIドメイン。
+  apiBaseUrl: process.env.API_PUBLIC_BASE_URL || "https://yasumi-api.unischool.jp",
   // ネイティブ LINE ログイン（LIFF と同じチャネル）。secret 未設定なら /api/auth/line/token は 503。
   lineLoginChannelId: channelId,
   lineLoginChannelSecret: process.env.LINE_LOGIN_CHANNEL_SECRET ?? "",

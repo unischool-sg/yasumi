@@ -387,6 +387,21 @@ M14 [Phase 3] 通数カウンタ／請求運用の型／(後で)Stripe・生徒�
 
 ---
 
+## M15. 学校向け機能拡張① テンプレート＋確認ボタン  ✅ 実装済み（develop）
+
+> 📄 [docs/plans/2026-09-11-m15-m16-school-features.md](./docs/plans/2026-09-11-m15-m16-school-features.md)
+
+- [x] **テンプレート**：`message_templates`（自校スコープ CRUD）＋組み込みプリセット。送信フォームに「テンプレから挿入」・管理UI
+- [x] **確認ボタン（確認率）**：`school_messages.require_confirmation` ＋ `message_confirmations`。送信時に受信者ごと署名トークン付き確認リンクを付与、公開 `GET /c/:token` で確認記録、履歴に確認数表示（開封→到達→**確認**で LP 課題も解決）
+- [x] DB-gated テスト（templates 自校スコープ / confirm→/c→confirmedCount 冪等）green
+
+## M16. 学校向け機能拡張② 警報連動の休校ドラフト  ✅ 実装済み（develop）
+
+- [x] `closure_drafts`（unique(school,date)）＋ `run-check` フック：プラン有効校で休校系判定時に**下書きを自動生成**（`buildClosureDraftText`）
+- [x] school API `GET /drafts`・`POST /drafts/:id/send`（→emergency 送信＋sent）・`POST /drafts/:id/dismiss`（自校スコープ）
+- [x] ダッシュボード上部に**下書きバナー**（本文編集可・ワンタップ公式送信/却下）
+- [x] DB-gated テスト（一覧/送信/却下・テナント越境404）green（全91 pass）
+
 ## 段階リリースと KPI
 
 | フェーズ | ゲート / KPI |
