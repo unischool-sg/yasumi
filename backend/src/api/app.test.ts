@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -237,5 +238,56 @@ suite("API integration", () => {
     // 作成者が削除 → 204
     const del = await req(`/api/rules/${rule.id}`, { method: "DELETE", headers: auth("Uowner2") });
     expect(del.status).toBe(204);
+  });
+
+  it("LINE受信メッセージを Discord に転送（送信主名・UID・adminリンク・内容）", async () => {
+    const LSECRET = "linesecret";
+    const posts: { url: string; content: string }[] = [];
+    const fetchFn = async (url: string, init?: RequestInit): Promise<Response> => {
+      if (url.startsWith("https://api.line.me/v2/bot/profile/")) {
+        return new Response(JSON.stringify({ displayName: "テスト太郎" }), { status: 200 });
+      }
+      const body = JSON.parse(String(init?.body)) as { content: string };
+      posts.push({ url, content: body.content });
+      return new Response("", { status: 204 });
+    };
+    const wapp = createApp({
+      db: drizzle(sql, { schema }),
+      verifyIdToken: async (t) => ({ lineUserId: t }),
+      lineChannelSecret: LSECRET,
+      lineChannelAccessToken: "tok",
+      discordWebhookUrl: "https://discord.test/webhook?thread_id=1",
+      adminBaseUrl: "https://yasumi-admin.unischool.jp",
+      fetchFn,
+    });
+    const body = JSON.stringify({
+      events: [{ type: "message", source: { userId: "Uwebhooktest" }, message: { type: "text", text: "こんにちは" } }],
+    });
+    const sig = createHmac("sha256", LSECRET).update(body).digest("base64");
+    const res = await wapp.fetch(
+      new Request("http://x/api/webhooks/line", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-line-signature": sig },
+        body,
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(posts.length).toBe(1);
+    const content = posts[0]!.content;
+    expect(content).toContain("テスト太郎");
+    expect(content).toContain("Uwebhooktest");
+    expect(content).toContain("/users/"); // admin 連絡リンク
+    expect(content).toContain("こんにちは");
+
+    // 署名が不正なら 401（転送されない）
+    const bad = await wapp.fetch(
+      new Request("http://x/api/webhooks/line", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-line-signature": "invalid" },
+        body,
+      }),
+    );
+    expect(bad.status).toBe(401);
+    expect(posts.length).toBe(1);
   });
 });

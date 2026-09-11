@@ -10,6 +10,8 @@ import { type AuthDeps, type AuthEnv, authMiddleware } from "./auth.ts";
 import { checkSchoolEditable } from "./authz.ts";
 import { notifyUser } from "../domain/notification/dispatch.ts";
 import { absenceEnabled } from "../domain/plan.ts";
+import { postDiscordMessage } from "../infrastructure/discord/notify.ts";
+import { getLineProfile } from "../infrastructure/line/line-api.ts";
 import { exchangeLineCode } from "./line-login.ts";
 import { rateLimit } from "./middleware/rate-limit.ts";
 import type { NotificationProvider } from "../domain/notification/provider.ts";
@@ -24,6 +26,7 @@ import * as cfg from "../infrastructure/db/repositories/school-config.ts";
 import * as rulesRepo from "../infrastructure/db/repositories/rules.ts";
 import * as schoolsRepo from "../infrastructure/db/repositories/schools.ts";
 import * as subsRepo from "../infrastructure/db/repositories/subscriptions.ts";
+import * as usersRepo from "../infrastructure/db/repositories/users.ts";
 import * as warningChecksRepo from "../infrastructure/db/repositories/warning-checks.ts";
 import { runCheck } from "../pipeline/run-check.ts";
 import { jstDateString } from "../shared/jst.ts";
@@ -48,6 +51,12 @@ export interface AppDeps extends AuthDeps {
   schoolJwtSecret?: string;
   /** API の公開URL（確認リンク生成用。例 https://yasumi-api.unischool.jp）。 */
   apiBaseUrl?: string;
+  /** LINE 受信メッセージの転送先 Discord Webhook URL（秘密・env 注入）。未設定なら転送しない。 */
+  discordWebhookUrl?: string;
+  /** 管理画面の公開URL（Discord 転送に載せる連絡リンク用。例 https://yasumi-admin.unischool.jp）。 */
+  adminBaseUrl?: string;
+  /** テスト用 fetch 注入（Discord/LINE プロフィール取得）。未指定なら global fetch。 */
+  fetchFn?: (url: string, init?: RequestInit) => Promise<Response>;
   /** ネイティブ LINE ログインのトークン交換用（LIFF と同じ LINE Login チャネル）。 */
   lineLoginChannelId?: string;
   lineLoginChannelSecret?: string;
@@ -58,6 +67,41 @@ export interface AppDeps extends AuthDeps {
 const checkResultSchema = z.enum(["NORMAL", "WAIT", "AM_OFF", "PM_START", "FULL_OFF", "UNKNOWN"]);
 // check_time は 30分刻み（HH:00 / HH:30）のみ許可（PRD §13 Step4 / M5）。
 const checkTimeSchema = z.string().regex(/^([01]\d|2[0-3]):(00|30)$/, "HH:00 または HH:30 のみ");
+
+/** LINE Webhook イベント（必要な部分のみ）。 */
+interface LineWebhookEvent {
+  type: string;
+  source?: { userId?: string };
+  message?: { type: string; text?: string };
+}
+
+/** 受信 LINE メッセージ1件を Discord に転送（送信主名・LINE UID・admin 連絡リンク・内容）。 */
+async function forwardLineMessageToDiscord(deps: AppDeps, ev: LineWebhookEvent): Promise<void> {
+  const lineUserId = ev.source?.userId;
+  if (!lineUserId || !deps.discordWebhookUrl) return;
+  // 内部ユーザー（無ければ作成）→ admin の連絡リンク
+  const { userId } = await usersRepo.findOrCreateByLineUserId(deps.db, lineUserId);
+  const adminBase = deps.adminBaseUrl || "https://yasumi-admin.unischool.jp";
+  const adminLink = `${adminBase}/users/${userId}`;
+  // 表示名（bot 未友だち等で取れなければ不明）
+  const profile = deps.lineChannelAccessToken
+    ? await getLineProfile(deps.lineChannelAccessToken, lineUserId, deps.fetchFn ? { fetchFn: deps.fetchFn } : {})
+    : null;
+  const name = profile?.displayName ?? "（不明）";
+  // 内容（テキスト以外は種別を表示）
+  const m = ev.message;
+  const content = m?.type === "text" ? (m.text ?? "") : m?.type ? `[${m.type}]` : "（メッセージなし）";
+  const quoted = content.split("\n").map((l) => `> ${l}`).join("\n");
+  const text = [
+    "**LINEメッセージ受信**",
+    `送信主: ${name}`,
+    `LINE UID: \`${lineUserId}\``,
+    `連絡: ${adminLink}`,
+    "内容:",
+    quoted,
+  ].join("\n");
+  await postDiscordMessage(deps.discordWebhookUrl, text, deps.fetchFn ? { fetchFn: deps.fetchFn } : {});
+}
 
 /**
  * Hono アプリの factory（backend/API.md §2）。依存注入でテスト可能にする。
@@ -79,7 +123,18 @@ export function createApp(deps: AppDeps) {
     if (!verifySignature(rawBody, signature, secret)) {
       return c.json({ error: "invalid signature" }, 401);
     }
-    // MVP: イベントは最小処理（200 応答）。友だち追加/リッチメニューは将来（§20）。
+    // 受信テキストメッセージを Discord に転送（運用通知）。設定時のみ・失敗しても 200 は返す。
+    if (deps.discordWebhookUrl) {
+      try {
+        const body = JSON.parse(rawBody) as { events?: LineWebhookEvent[] };
+        for (const ev of body.events ?? []) {
+          if (ev.type !== "message" || !ev.source?.userId) continue;
+          await forwardLineMessageToDiscord(deps, ev);
+        }
+      } catch {
+        // 転送失敗は無視（LINE への 200 を優先）
+      }
+    }
     return c.json({ ok: true });
   });
 

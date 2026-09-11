@@ -19,6 +19,8 @@ services:
       ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET}
       # 先生ダッシュボード API。未設定なら /api/school は無効（安全にドーマント）。
       SCHOOL_JWT_SECRET: ${SCHOOL_JWT_SECRET}
+      # LINE 受信メッセージの Discord 転送先（秘密・未設定なら転送しない）。
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL}
     depends_on:
       - postgres
 
