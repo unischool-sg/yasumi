@@ -244,6 +244,13 @@ Web Push・Discord・Email 通知 / 通常登校通知の設定 UI。
 > MVP設計: [docs/plans/2026-09-10-school-saas-mvp.md](./docs/plans/2026-09-10-school-saas-mvp.md)。
 > 営業LP: `landing/src/pages/for-schools.astro`。
 
+## 本番反映状況（2026-09-11）
+
+**M9〜M14 すべて本番反映済み**（PR #30 / product）。api・admin・landing・frontend・**school** の5サービス稼働。
+- パッケージ取得は **公開npm**（`npm.flatt.tech` ミラーは fresh install のレート制限で使わない・`bunfig.toml` で固定）。
+- 先生ダッシュボード(school) は host `:8085` で起動。**外部公開には Cloudflare Tunnel `yasumi-school.unischool.jp → :8085` と `.env` の `SCHOOL_JWT_SECRET` / `VITE_SCHOOL_API_BASE_URL` 設定が必要**（未設定の間 `/api/school` は無効）。
+- 残TODO: 上記トンネル/secret、for-schools LP の「開封→到達」表現修正、学生グロース施策。
+
 ## 収益化の芯（前提）
 
 - **2サイドモデル**: 利用者＝学生/保護者（**無料・死守**）、課金者＝学校（特に**私立**）。学生機能は一切ペイウォールしない。
@@ -329,7 +336,7 @@ M14 [Phase 3] 通数カウンタ／請求運用の型／(後で)Stripe・生徒�
 
 **目的**: 先生が自校の公式連絡を送り、届いたかを見て、購読者を把握できる。
 
-- [x] 新フロント `school/`（workspace 追加・Vite+React19+MUI・緑テーマ・`dev:school`）。※別ドメイン `yasumi-school.unischool.jp`（Cloudflare の Universal SSL は `*.unischool.jp` 1段のみ→2段の `school.yasumi.*` 不可。`yasumi-` プレフィックスで統一）/ deploy.yml は本番反映時に
+- [x] 新フロント `school/`（workspace・Vite+React19+MUI・緑テーマ）。compose に追加・host `:8085`・**本番反映済み**。別ドメイン `yasumi-school.unischool.jp`（Cloudflare Universal SSL は1段のみ→`yasumi-` 単段）／トンネル・secret は要設定
 - [x] 教員ログイン（M11 の認証・email+password）
 - [x] **公式メッセージ送信** `POST /api/school/broadcast`（`notifyUser` 経路・自校スコープ・category 緊急/お知らせ）
 - [x] **到達状況** `school_messages` に記録（total/sent/failed）＋ `GET /messages` 履歴。※開封は取得不可
@@ -379,6 +386,21 @@ M14 [Phase 3] 通数カウンタ／請求運用の型／(後で)Stripe・生徒�
 **依存**: M11〜M13。
 
 ---
+
+## M15. 学校向け機能拡張① テンプレート＋確認ボタン  ✅ 実装済み（develop）
+
+> 📄 [docs/plans/2026-09-11-m15-m16-school-features.md](./docs/plans/2026-09-11-m15-m16-school-features.md)
+
+- [x] **テンプレート**：`message_templates`（自校スコープ CRUD）＋組み込みプリセット。送信フォームに「テンプレから挿入」・管理UI
+- [x] **確認ボタン（確認率）**：`school_messages.require_confirmation` ＋ `message_confirmations`。送信時に受信者ごと署名トークン付き確認リンクを付与、公開 `GET /c/:token` で確認記録、履歴に確認数表示（開封→到達→**確認**で LP 課題も解決）
+- [x] DB-gated テスト（templates 自校スコープ / confirm→/c→confirmedCount 冪等）green
+
+## M16. 学校向け機能拡張② 警報連動の休校ドラフト  ✅ 実装済み（develop）
+
+- [x] `closure_drafts`（unique(school,date)）＋ `run-check` フック：プラン有効校で休校系判定時に**下書きを自動生成**（`buildClosureDraftText`）
+- [x] school API `GET /drafts`・`POST /drafts/:id/send`（→emergency 送信＋sent）・`POST /drafts/:id/dismiss`（自校スコープ）
+- [x] ダッシュボード上部に**下書きバナー**（本文編集可・ワンタップ公式送信/却下）
+- [x] DB-gated テスト（一覧/送信/却下・テナント越境404）green（全91 pass）
 
 ## 段階リリースと KPI
 

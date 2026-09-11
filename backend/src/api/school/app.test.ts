@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
@@ -324,6 +325,103 @@ suite("School (teacher) API", () => {
       announcement: { used: number; limit: number | null };
     };
     expect(quota.announcement).toEqual({ used: 10, limit: 10 });
+  });
+
+  it("テンプレート: 作成・一覧（自校スコープ）・削除", async () => {
+    const { token } = (await (await req("/api/school/auth/login", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: emailA, password: "teacherpass1" }),
+    })).json()) as { token: string };
+    const created = await req("/api/school/templates", {
+      method: "POST", headers: { ...bearer(token), "content-type": "application/json" },
+      body: JSON.stringify({ title: "暴風警報休校", category: "emergency", body: "本日は暴風警報のため休校です。" }),
+    });
+    expect(created.status).toBe(201);
+    const t = (await created.json()) as { id: string };
+    const list = (await (await req("/api/school/templates", { headers: bearer(token) })).json()) as { id: string; title: string }[];
+    expect(list.some((x) => x.id === t.id && x.title === "暴風警報休校")).toBe(true);
+    expect((await req(`/api/school/templates/${t.id}`, { method: "DELETE", headers: bearer(token) })).status).toBe(204);
+  });
+
+  it("確認ボタン: requireConfirmation 送信→/c/:token→confirmedCount 反映", async () => {
+    const captured: string[] = [];
+    const cApp = createApp({
+      db: drizzle(sql, { schema }),
+      verifyIdToken: async (t) => ({ lineUserId: t }),
+      adminJwtSecret: ADMIN_SECRET,
+      schoolJwtSecret: SCHOOL_SECRET,
+      apiBaseUrl: "http://x",
+      notificationProvider: { async send(_t, m) { captured.push(m.text); } },
+    });
+    const creq = (path: string, init?: RequestInit) => cApp.fetch(new Request(`http://x${path}`, init));
+
+    // 購読者を用意
+    const { userId } = (await (await creq("/api/me", { headers: bearer("Uconfirm") })).json()) as { userId: string };
+    await creq(`/api/admin/users/${userId}/subscriptions`, {
+      method: "POST", headers: { ...bearer(adminToken), "content-type": "application/json" },
+      body: JSON.stringify({ schoolId: schoolAId }),
+    });
+    const { token } = (await (await creq("/api/school/auth/login", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: emailA, password: "teacherpass1" }),
+    })).json()) as { token: string };
+
+    const bc = await creq("/api/school/broadcast", {
+      method: "POST", headers: { ...bearer(token), "content-type": "application/json" },
+      body: JSON.stringify({ text: "本日は休校です", category: "emergency", requireConfirmation: true }),
+    });
+    const { id: msgId } = (await bc.json()) as { id: string };
+    // 送信本文に確認リンクが含まれる
+    const sentText = captured.find((t) => t.includes("/c/"))!;
+    expect(sentText).toContain("http://x/c/");
+    const confirmPath = sentText.match(/\/c\/([A-Za-z0-9._-]+)/)![0];
+
+    // 確認前は 0
+    let hist = (await (await creq("/api/school/messages", { headers: bearer(token) })).json()) as { id: string; confirmedCount: number }[];
+    expect(hist.find((m) => m.id === msgId)?.confirmedCount).toBe(0);
+
+    // リンクを叩く（確認）
+    expect((await creq(confirmPath)).status).toBe(200);
+
+    // 確認後は 1（冪等: 2回叩いても1）
+    await creq(confirmPath);
+    hist = (await (await creq("/api/school/messages", { headers: bearer(token) })).json()) as { id: string; confirmedCount: number }[];
+    expect(hist.find((m) => m.id === msgId)?.confirmedCount).toBe(1);
+  });
+
+  it("休校ドラフト: 一覧・送信・却下（自校スコープ）", async () => {
+    const db = drizzle(sql, { schema });
+    const { token } = (await (await req("/api/school/auth/login", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: emailA, password: "teacherpass1" }),
+    })).json()) as { token: string };
+
+    // 判定パイプライン相当: ドラフトを直接投入
+    await db.insert(schema.closureDrafts).values({
+      schoolId: schoolAId, targetDate: "2026-09-15", result: "FULL_OFF", text: "本日は全日休校です。", status: "pending",
+    });
+    const drafts = (await (await req("/api/school/drafts", { headers: bearer(token) })).json()) as { id: string; result: string }[];
+    const d = drafts.find((x) => x.result === "FULL_OFF");
+    expect(d).toBeDefined();
+
+    // 送信 → sent 化して一覧から消える
+    const send = await req(`/api/school/drafts/${d!.id}/send`, {
+      method: "POST", headers: { ...bearer(token), "content-type": "application/json" }, body: JSON.stringify({}),
+    });
+    expect(send.status).toBe(200);
+    const after = (await (await req("/api/school/drafts", { headers: bearer(token) })).json()) as { id: string }[];
+    expect(after.some((x) => x.id === d!.id)).toBe(false);
+
+    // 別校のドラフトは送信できない（テナント越境404）
+    await db.insert(schema.closureDrafts).values({
+      schoolId: schoolBId, targetDate: "2026-09-15", result: "FULL_OFF", text: "B校休校", status: "pending",
+    });
+    const bDraft = (await db.select().from(schema.closureDrafts)
+      .where(and(eq(schema.closureDrafts.schoolId, schoolBId), eq(schema.closureDrafts.status, "pending")))).at(0)!;
+    const cross = await req(`/api/school/drafts/${bDraft.id}/dismiss`, {
+      method: "POST", headers: bearer(token),
+    });
+    expect(cross.status).toBe(404);
   });
 
   it("無効化された教員はログイン不可＋既存トークンも即失効（disabled → 401）", async () => {

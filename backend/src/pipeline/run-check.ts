@@ -1,10 +1,14 @@
 import type { CheckResult, Warning } from "@yasumi/shared";
+import { buildClosureDraftText, isClosureResult } from "../domain/closure-draft.ts";
 import { evaluateSchoolRule } from "../domain/rule/evaluate.ts";
 import { buildNotificationText } from "../domain/notification/messages.ts";
 import type { NotificationProvider } from "../domain/notification/provider.ts";
 import { shouldNotify } from "../domain/notification/provider.ts";
+import { isPlanActive } from "../domain/plan.ts";
 import type { WarningProvider } from "../domain/warning/provider.ts";
 import type { Db } from "../infrastructure/db/client.ts";
+import * as closureDraftsRepo from "../infrastructure/db/repositories/closure-drafts.ts";
+import * as schoolsRepo from "../infrastructure/db/repositories/schools.ts";
 import * as cfg from "../infrastructure/db/repositories/school-config.ts";
 import * as deviceTokensRepo from "../infrastructure/db/repositories/device-tokens.ts";
 import * as notificationsRepo from "../infrastructure/db/repositories/notifications.ts";
@@ -118,6 +122,21 @@ export async function runCheck(
 
     // 通知（NORMAL は通知しない §19）。保存済みの結果(row.result)を採用（確定性）
     const storedResult = row.result as CheckResult;
+
+    // 警報連動の休校ドラフト自動生成（プラン有効校のみ・同日1件 / M16）。
+    // 先生がダッシュボードで確認→ワンタップで公式送信できる叩き台。
+    if (isClosureResult(storedResult)) {
+      const s = await schoolsRepo.findSchoolById(deps.db, ruleRow.schoolId);
+      if (s && isPlanActive(s, now())) {
+        await closureDraftsRepo.upsertPendingDraft(deps.db, {
+          schoolId: ruleRow.schoolId,
+          targetDate,
+          result: storedResult,
+          text: buildClosureDraftText(storedResult, matchedWarnings),
+        });
+      }
+    }
+
     if (!shouldNotify(storedResult)) continue;
 
     const subscribers = await subscriptionsRepo.listEnabledSubscribersBySchool(deps.db, ruleRow.schoolId);
