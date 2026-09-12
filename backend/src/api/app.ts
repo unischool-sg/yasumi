@@ -112,6 +112,26 @@ async function forwardLineMessageToDiscord(deps: AppDeps, ev: LineWebhookEvent):
  */
 export function createApp(deps: AppDeps) {
   const app = new Hono<AuthEnv>();
+
+  // 学校ロゴ配信（認証不要・別オリジンの <img> 埋め込み用）。
+  // secureHeaders より前に登録し、CORP(same-origin) を適用させない（クロスオリジン埋め込みを許可）。
+  app.get("/public/school-logo/:id", async (c) => {
+    if (!deps.storage) return c.notFound();
+    const school = await schoolsRepo.findSchoolById(deps.db, c.req.param("id"));
+    if (!school?.logoKey) return c.notFound();
+    const bytes = await deps.storage.get(school.logoKey).catch(() => null);
+    if (!bytes) return c.notFound();
+    return new Response(bytes, {
+      status: 200,
+      headers: {
+        "content-type": mimeFromKey(school.logoKey),
+        "cache-control": "public, max-age=3600",
+        "cross-origin-resource-policy": "cross-origin",
+        "access-control-allow-origin": "*",
+      },
+    });
+  });
+
   app.use("*", secureHeaders());
   app.use("*", cors());
 
@@ -180,22 +200,6 @@ export function createApp(deps: AppDeps) {
         verified: isPlanActive(s, now), // プラン有効校＝公式連携済みバッジ用
       })),
     );
-  });
-
-  // 公開: 学校ロゴ画像を RustFS からプロキシ配信（認証不要）。
-  app.get("/public/school-logo/:id", async (c) => {
-    if (!deps.storage) return c.notFound();
-    const school = await schoolsRepo.findSchoolById(deps.db, c.req.param("id"));
-    if (!school?.logoKey) return c.notFound();
-    const bytes = await deps.storage.get(school.logoKey).catch(() => null);
-    if (!bytes) return c.notFound();
-    return new Response(bytes, {
-      status: 200,
-      headers: {
-        "content-type": mimeFromKey(school.logoKey),
-        "cache-control": "public, max-age=3600",
-      },
-    });
   });
 
   // 公式メッセージの「確認しました」リンク（認証不要・署名トークンで本人特定 / M15）。
