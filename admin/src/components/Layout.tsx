@@ -1,3 +1,4 @@
+import CampaignIcon from "@mui/icons-material/Campaign";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import HistoryIcon from "@mui/icons-material/History";
 import LogoutIcon from "@mui/icons-material/Logout";
@@ -29,6 +30,7 @@ const nav = [
   { to: "/growth", label: "浸透率（営業）", icon: <TrendingUpIcon /> },
   { to: "/areas", label: "地域マスタ", icon: <PlaceIcon /> },
   { to: "/users", label: "ユーザー", icon: <PeopleIcon /> },
+  { to: "/flows", label: "フロー", icon: <CampaignIcon /> },
   { to: "/history", label: "判定・通知履歴", icon: <HistoryIcon /> },
 ];
 
