@@ -31,6 +31,7 @@ import * as subsRepo from "../infrastructure/db/repositories/subscriptions.ts";
 import * as usersRepo from "../infrastructure/db/repositories/users.ts";
 import * as warningChecksRepo from "../infrastructure/db/repositories/warning-checks.ts";
 import { runCheck } from "../pipeline/run-check.ts";
+import { runFlows } from "../pipeline/run-flows.ts";
 import { jstDateString } from "../shared/jst.ts";
 
 export interface AppDeps extends AuthDeps {
@@ -57,6 +58,8 @@ export interface AppDeps extends AuthDeps {
   discordWebhookUrl?: string;
   /** 友だち追加・学校購読・学校登録などの活動通知先 Discord Webhook URL（秘密・env 注入）。 */
   discordEventsWebhookUrl?: string;
+  /** フロー定期実行のログ送信先 Discord Webhook URL（秘密・env 注入）。未設定なら送らない。 */
+  discordFlowWebhookUrl?: string;
   /** 管理画面の公開URL（Discord 転送に載せる連絡リンク用。例 https://yasumi-admin.unischool.jp）。 */
   adminBaseUrl?: string;
   /** ロゴ等のオブジェクトストレージ（RustFS/S3）。未設定ならロゴ機能はドーマント。 */
@@ -218,6 +221,28 @@ export function createApp(deps: AppDeps) {
         warningProvider: deps.warningProvider,
         notificationProvider: deps.notificationProvider,
         ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
+        ...(deps.now ? { now: deps.now } : {}),
+      },
+      { triggeredAt },
+    );
+    return c.json(summary);
+  });
+
+  // cron 内部エンドポイント: フロー定期実行（既存 cron の tick から呼ばれる）。
+  app.post("/api/internal/run-flows", async (c) => {
+    if (!deps.internalCronToken || c.req.header("x-internal-token") !== deps.internalCronToken) {
+      return c.json({ error: "unauthorized" }, 401);
+    }
+    const body = (await c.req.json().catch(() => ({}))) as { triggeredAt?: string };
+    const triggeredAt = body.triggeredAt ? new Date(body.triggeredAt) : (deps.now?.() ?? new Date());
+    const summary = await runFlows(
+      {
+        db: deps.db,
+        ...(deps.notificationProvider ? { notificationProvider: deps.notificationProvider } : {}),
+        ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
+        ...(deps.discordFlowWebhookUrl ? { discordFlowWebhookUrl: deps.discordFlowWebhookUrl } : {}),
+        ...(deps.adminBaseUrl ? { adminBaseUrl: deps.adminBaseUrl } : {}),
+        ...(deps.fetchFn ? { fetchFn: deps.fetchFn } : {}),
         ...(deps.now ? { now: deps.now } : {}),
       },
       { triggeredAt },

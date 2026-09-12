@@ -75,6 +75,7 @@ const app = createApp({
   // LINE 受信メッセージの Discord 転送（秘密・未設定なら転送しない）。
   ...(process.env.DISCORD_WEBHOOK_URL ? { discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL } : {}),
   ...(process.env.DISCORD_EVENTS_WEBHOOK_URL ? { discordEventsWebhookUrl: process.env.DISCORD_EVENTS_WEBHOOK_URL } : {}),
+  ...(process.env.DISCORD_FLOW_WEBHOOK_URL ? { discordFlowWebhookUrl: process.env.DISCORD_FLOW_WEBHOOK_URL } : {}),
   adminBaseUrl: process.env.ADMIN_PUBLIC_BASE_URL || "https://yasumi-admin.unischool.jp",
   // ネイティブ LINE ログイン（LIFF と同じチャネル）。secret 未設定なら /api/auth/line/token は 503。
   lineLoginChannelId: channelId,

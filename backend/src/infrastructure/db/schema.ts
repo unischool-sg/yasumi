@@ -60,6 +60,30 @@ export const userFlags = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.name] })],
 );
 
+// フロー（一括施策）テンプレート: 対象条件（query）＋ステップ（steps）を名前付きで保存。
+export const flowTemplates = pgTable("flow_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 100 }).notNull(),
+  // 全ユーザー対象なら allUsers=true（query は無視）。
+  allUsers: boolean("all_users").notNull().default(false),
+  query: jsonb("query").notNull(), // FlowAudienceQuery
+  steps: jsonb("steps").notNull(), // FlowStep[]
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// フローの定期実行スケジュール（既存 cron の 30分刻みに乗せる）。
+export const flowSchedules = pgTable("flow_schedules", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  templateId: uuid("template_id").notNull(),
+  time: varchar("time", { length: 5 }).notNull(), // JST "HH:MM"（:00/:30 に整列）
+  daysOfWeek: jsonb("days_of_week").notNull(), // number[] 0=日..6=土、空配列は毎日
+  enabled: boolean("enabled").notNull().default(true),
+  lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+  lastRunDate: varchar("last_run_date", { length: 10 }), // JST "YYYY-MM-DD"（同日二重実行防止）
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const lineAccounts = pgTable("line_accounts", {
   userId: uuid("user_id").primaryKey(),
   lineUserId: varchar("line_user_id", { length: 255 }).notNull().unique(),

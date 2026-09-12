@@ -1,18 +1,19 @@
 import {
   Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, MenuItem, Stack, TextField, Typography,
 } from "@mui/material";
+import { type FlowAudienceQuery, type FlowFieldType, type FlowFilterBlock, type FlowQueryField, type FlowSortBlock, matchesAudienceQuery } from "@yasumi/shared";
 import type { UserRow } from "../api/client.ts";
 
-// ── 型 ───────────────────────────────────────────────
-export type QueryField = "subscriptionCount" | "createdAt" | "lineUserId" | "id" | "flag" | "school";
-export type Combinator = "and" | "or";
-export interface FilterBlock { id: string; field: QueryField; op: string; value: string; label?: string }
-export interface SortBlock { id: string; field: QueryField; dir: "asc" | "desc" }
-export interface UserQuery { combinator: Combinator; filters: FilterBlock[]; sorts: SortBlock[] }
+// ── 型（意味論は @yasumi/shared に集約。UI はここでラベル/演算子だけ持つ）──
+export type QueryField = FlowQueryField;
+export type Combinator = FlowAudienceQuery["combinator"];
+export type FilterBlock = FlowFilterBlock;
+export type SortBlock = FlowSortBlock;
+export type UserQuery = FlowAudienceQuery;
 
 export const EMPTY_QUERY: UserQuery = { combinator: "and", filters: [], sorts: [] };
 
-type FieldType = "number" | "date" | "string" | "flag" | "school";
+type FieldType = FlowFieldType;
 
 const FIELDS: Record<QueryField, { label: string; type: FieldType }> = {
   subscriptionCount: { label: "購読校数", type: "number" },
@@ -57,54 +58,9 @@ const OPS: Record<FieldType, { v: string; label: string; needsValue: boolean; va
 const genId = () => (crypto.randomUUID ? crypto.randomUUID() : `b${Date.now()}${Math.random()}`);
 const defaultOp = (field: QueryField) => OPS[FIELDS[field].type][0]!.v;
 
-// ── 評価・ソート（Users から利用）──────────────────────
-function evalBlock(u: UserRow, b: FilterBlock): boolean {
-  const type = FIELDS[b.field].type;
-  if (type === "flag") {
-    const has = (u.flags ?? []).includes(b.value);
-    return b.op === "hasFlag" ? has : !has;
-  }
-  if (type === "school") {
-    const has = (u.subscribedSchools ?? []).some((s) => s.id === b.value);
-    return b.op === "subscribes" ? has : !has;
-  }
-  if (type === "number") {
-    const n = u.subscriptionCount;
-    const v = Number(b.value);
-    switch (b.op) {
-      case "gte": return n >= v;
-      case "lte": return n <= v;
-      case "gt": return n > v;
-      case "lt": return n < v;
-      case "eq": return n === v;
-      case "ne": return n !== v;
-    }
-  }
-  if (type === "date") {
-    const t = new Date(u.createdAt).getTime();
-    if (b.op === "olderThanDays" || b.op === "withinDays") {
-      const ageMs = Date.now() - t;
-      const th = (Number(b.value) || 0) * 86400000;
-      return b.op === "olderThanDays" ? ageMs >= th : ageMs <= th;
-    }
-    const d = new Date(b.value).getTime();
-    if (Number.isNaN(d)) return true;
-    return b.op === "after" ? t > d : t < d;
-  }
-  // string
-  const s = (b.field === "lineUserId" ? u.lineUserId : u.id) ?? "";
-  switch (b.op) {
-    case "contains": return s.toLowerCase().includes(b.value.toLowerCase());
-    case "equals": return s === b.value;
-    case "empty": return s === "";
-    case "notEmpty": return s !== "";
-  }
-  return true;
-}
-
+// ── 評価・ソート（Users から利用。評価本体は @yasumi/shared）──────────
 export function matchesQuery(u: UserRow, q: UserQuery): boolean {
-  if (q.filters.length === 0) return true;
-  return q.combinator === "and" ? q.filters.every((b) => evalBlock(u, b)) : q.filters.some((b) => evalBlock(u, b));
+  return matchesAudienceQuery(u, q, Date.now());
 }
 
 export function compareUsers(a: UserRow, b: UserRow, sorts: SortBlock[]): number {

@@ -19,24 +19,34 @@ export function startCron(app: FetchApp, opts: StartCronOptions): () => void {
   let running = false;
   let stopped = false;
 
-  async function tick(): Promise<void> {
-    if (running) return; // 前回実行中なら重複させない
-    running = true;
+  async function callInternal(path: string, triggeredAt: string): Promise<void> {
     try {
       const res = await app.fetch(
-        new Request("http://internal/api/internal/run-check", {
+        new Request(`http://internal${path}`, {
           method: "POST",
           headers: {
             "content-type": "application/json",
             "x-internal-token": opts.internalCronToken,
           },
-          body: JSON.stringify({ triggeredAt: new Date().toISOString() }),
+          body: JSON.stringify({ triggeredAt }),
         }),
       );
       const summary = await res.json().catch(() => ({}));
-      console.log(`[cron] run-check status=${res.status}`, summary);
+      console.log(`[cron] ${path} status=${res.status}`, summary);
     } catch (e) {
-      console.error("[cron] run-check error", e);
+      console.error(`[cron] ${path} error`, e);
+    }
+  }
+
+  async function tick(): Promise<void> {
+    if (running) return; // 前回実行中なら重複させない
+    running = true;
+    try {
+      const triggeredAt = new Date().toISOString();
+      // 警報判定パイプライン。
+      await callInternal("/api/internal/run-check", triggeredAt);
+      // フロー定期実行（既存 cron を再利用）。
+      await callInternal("/api/internal/run-flows", triggeredAt);
     } finally {
       running = false;
     }
