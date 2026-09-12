@@ -542,6 +542,54 @@ suite("School (teacher) API", () => {
     expect((await req("/api/school/teachers", { headers: bearer(teacherLogin.token) })).status).toBe(403);
   });
 
+  it("セグメント配信＋分類(kind)＋CSV（M19/M20/M21）", async () => {
+    const sent: string[] = [];
+    const app2 = createApp({
+      db: drizzle(sql, { schema }),
+      verifyIdToken: async (t) => ({ lineUserId: t }),
+      adminJwtSecret: ADMIN_SECRET,
+      schoolJwtSecret: SCHOOL_SECRET,
+      notificationProvider: { async send(t) { if (t.lineUserId) sent.push(t.lineUserId); } },
+    });
+    const r2 = (p: string, i?: RequestInit) => app2.fetch(new Request(`http://x${p}`, i));
+    // 2ユーザー: 学年1/学年2 のプロフィール＋購読（学校Aはpremium）
+    for (const [u, grade] of [["Useg1", "1年"], ["Useg2", "2年"]]) {
+      const { userId } = (await (await r2("/api/me", { headers: bearer(u) })).json()) as { userId: string };
+      await r2("/api/me/student-profiles", {
+        method: "POST", headers: { ...bearer(u), "content-type": "application/json" },
+        body: JSON.stringify({ schoolId: schoolAId, studentName: "生徒", grade, className: "A" }),
+      });
+      await r2(`/api/admin/users/${userId}/subscriptions`, {
+        method: "POST", headers: { ...bearer(adminToken), "content-type": "application/json" },
+        body: JSON.stringify({ schoolId: schoolAId }),
+      });
+    }
+    const { token } = (await (await r2("/api/school/auth/login", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: emailA, password: "teacherpass1" }),
+    })).json()) as { token: string };
+    // 1年だけに配信（kind=closure）
+    const bc = await r2("/api/school/broadcast", {
+      method: "POST", headers: { ...bearer(token), "content-type": "application/json" },
+      body: JSON.stringify({ text: "1年生へ", category: "emergency", kind: "closure", target: { grade: "1年" } }),
+    });
+    expect(bc.status).toBe(200);
+    expect(sent).toContain("Useg1");
+    expect(sent).not.toContain("Useg2");
+    // 履歴に kind
+    const hist = (await (await r2("/api/school/messages", { headers: bearer(token) })).json()) as { kind: string }[];
+    expect(hist.some((m) => m.kind === "closure")).toBe(true);
+    // CSV（A=premium）→ 200 text/csv
+    const csv = await r2("/api/school/messages.csv", { headers: bearer(token) });
+    expect(csv.status).toBe(200);
+    expect(csv.headers.get("content-type")).toContain("text/csv");
+  });
+
+  it("CSV は非premiumで 402", async () => {
+    const std = await makeSchoolWithOwner("standard");
+    expect((await req("/api/school/messages.csv", { headers: bearer(std.token) })).status).toBe(402);
+  });
+
   it("無効化された教員はログイン不可＋既存トークンも即失効（disabled → 401）", async () => {
     // 無効化する前に一度ログインしてトークンを取得
     const pre = await req("/api/school/auth/login", {

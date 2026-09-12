@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { sign } from "hono/jwt";
 import { z } from "zod";
 import type { Db } from "../../infrastructure/db/client.ts";
@@ -83,29 +83,38 @@ export function createSchoolApp(deps: SchoolAppDeps) {
     zValidator("json", z.object({
       text: z.string().min(1).max(1000),
       category: z.enum(["emergency", "announcement"]),
+      kind: z.enum(["closure", "event", "safety", "health", "general"]).optional(),
       requireConfirmation: z.boolean().optional(),
+      target: z.object({ grade: z.string().max(20).optional(), className: z.string().max(20).optional() }).optional(),
     })),
     async (c) => {
       const { schoolId, id: teacherId } = c.get("teacher");
-      const { text, category, requireConfirmation } = c.req.valid("json");
+      const { text, category, kind, requireConfirmation, target } = c.req.valid("json");
+      const now = deps.now?.() ?? new Date();
+      const school = await schoolsRepo.findSchoolById(db, schoolId);
       // お知らせ（任意送信）は月間通数の上限を超えたら 403。緊急/休校は無制限。
       if (category === "announcement") {
-        const school = await schoolsRepo.findSchoolById(db, schoolId);
-        const now = deps.now?.() ?? new Date();
         const limit = announcementMonthlyLimit(school ?? { plan: null, planExpiresAt: null }, now);
         if (limit !== null) {
           const used = await msgRepo.countAnnouncementsSince(db, schoolId, jstMonthStart(now));
-          if (used >= limit) {
-            return c.json({ error: "quota exceeded", used, limit }, 403);
-          }
+          if (used >= limit) return c.json({ error: "quota exceeded", used, limit }, 403);
         }
       }
-      const subs = await subsRepo.listSubscribersBySchool(db, schoolId);
+      // kind 指定・セグメント配信は standard+
+      const usesKind = kind && kind !== "general";
+      const usesSegment = !!(target?.grade || target?.className);
+      if ((usesKind || usesSegment) && (!school || !hasFeature(school, usesSegment ? "segment" : "messageKind", now))) {
+        return c.json({ error: "分類・セグメント配信はスタンダード以上のプランで利用できます" }, 402);
+      }
+      // 宛先解決（セグメント指定時は学年/組で絞り込み。profile 未登録者は対象外）
+      const subs = usesSegment
+        ? await subsRepo.listSubscribersBySchoolFiltered(db, schoolId, { ...(target?.grade ? { grade: target.grade } : {}), ...(target?.className ? { className: target.className } : {}) })
+        : await subsRepo.listSubscribersBySchool(db, schoolId);
       const total = subs.length;
       const withConfirm = !!requireConfirmation && !!deps.apiBaseUrl;
       // 確認リンクは受信者ごとに token を埋めるため、先に message 行を作って id を確定する。
       const row = await msgRepo.createMessage(db, {
-        schoolId, teacherId, category, text, total, sent: 0, failed: total,
+        schoolId, teacherId, category, ...(kind ? { kind } : {}), text, total, sent: 0, failed: total,
         requireConfirmation: withConfirm,
       });
       const notifyDeps = {
@@ -132,6 +141,46 @@ export function createSchoolApp(deps: SchoolAppDeps) {
     c.json(await msgRepo.listBySchool(db, c.get("teacher").schoolId)),
   );
 
+  // --- CSV エクスポート（premium / M21）---
+  const KIND_LABEL: Record<string, string> = { closure: "休校", event: "行事", safety: "防犯", health: "保健", general: "一般" };
+  const csvResponse = (c: Context<SchoolEnv>, filename: string, rows: (string | number)[][]) => {
+    const esc = (v: string | number) => {
+      const s = String(v ?? "");
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = "﻿" + rows.map((r) => r.map(esc).join(",")).join("\r\n"); // BOM で Excel 文字化け回避
+    return c.body(csv, 200, {
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": `attachment; filename="${filename}"`,
+    });
+  };
+  const requirePremium = async (schoolId: string): Promise<boolean> => {
+    const s = await schoolsRepo.findSchoolById(db, schoolId);
+    return !!s && hasFeature(s, "csvExport", deps.now?.() ?? new Date());
+  };
+
+  app.get("/messages.csv", async (c) => {
+    const schoolId = c.get("teacher").schoolId;
+    if (!(await requirePremium(schoolId))) return c.json({ error: "CSV出力はプレミアムプランで利用できます" }, 402);
+    const msgs = await msgRepo.listBySchool(db, schoolId, 1000);
+    const rows: (string | number)[][] = [["日時", "分類", "カテゴリ", "本文", "到達", "総数", "失敗", "確認"]];
+    for (const m of msgs) {
+      rows.push([new Date(m.createdAt).toISOString(), KIND_LABEL[m.kind] ?? m.kind, m.category, m.text, m.sent, m.total, m.failed, m.confirmedCount]);
+    }
+    return csvResponse(c, "messages.csv", rows);
+  });
+
+  app.get("/absences.csv", async (c) => {
+    const schoolId = c.get("teacher").schoolId;
+    if (!(await requirePremium(schoolId))) return c.json({ error: "CSV出力はプレミアムプランで利用できます" }, 402);
+    const list = await absenceReportsRepo.listBySchool(db, schoolId);
+    const rows: (string | number)[][] = [["日付", "生徒", "学年", "組", "種別", "理由", "警報", "状態"]];
+    for (const a of list) {
+      rows.push([a.date, a.studentName, a.grade ?? "", a.className ?? "", a.type, a.reason ?? "", a.warningActive ? "あり" : "なし", a.status === "confirmed" ? "確認済み" : "未読"]);
+    }
+    return csvResponse(c, "absences.csv", rows);
+  });
+
   // --- テンプレート（定型文・自校スコープ）---
   app.get("/templates", async (c) => c.json(await templatesRepo.listBySchool(db, c.get("teacher").schoolId)));
   app.post(
@@ -139,6 +188,7 @@ export function createSchoolApp(deps: SchoolAppDeps) {
     zValidator("json", z.object({
       title: z.string().min(1).max(100),
       category: z.enum(["emergency", "announcement"]),
+      kind: z.enum(["closure", "event", "safety", "health", "general"]).optional(),
       body: z.string().min(1).max(1000),
     })),
     async (c) => {

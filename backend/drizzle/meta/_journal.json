@@ -64,6 +64,13 @@
       "when": 1789171797976,
       "tag": "0008_school_logo_key",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789173242077,
+      "tag": "0009_message_kind",
+      "breakpoints": true
     }
   ]
 }

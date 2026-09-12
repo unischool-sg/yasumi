@@ -11,6 +11,7 @@ export async function createMessage(
     schoolId: string;
     teacherId: string;
     category: MessageCategory;
+    kind?: string;
     text: string;
     total: number;
     sent: number;
@@ -20,7 +21,7 @@ export async function createMessage(
 ): Promise<SchoolMessageRow> {
   const rows = await db
     .insert(schoolMessages)
-    .values({ ...input, requireConfirmation: input.requireConfirmation ?? false })
+    .values({ ...input, kind: input.kind ?? "general", requireConfirmation: input.requireConfirmation ?? false })
     .returning();
   const row = rows[0];
   if (!row) throw new Error("failed to create school message");
@@ -57,6 +58,7 @@ export async function listBySchool(db: Db, schoolId: string, limit = 100): Promi
       schoolId: schoolMessages.schoolId,
       teacherId: schoolMessages.teacherId,
       category: schoolMessages.category,
+      kind: schoolMessages.kind,
       text: schoolMessages.text,
       total: schoolMessages.total,
       sent: schoolMessages.sent,

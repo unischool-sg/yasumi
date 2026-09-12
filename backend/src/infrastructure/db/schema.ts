@@ -85,6 +85,8 @@ export const schoolMessages = pgTable("school_messages", {
   schoolId: uuid("school_id").notNull(),
   teacherId: uuid("teacher_id").notNull(),
   category: varchar("category", { length: 20 }).notNull(), // 'emergency'(無制限) | 'announcement'(計上)
+  // メッセージ分類（休校/行事/防犯/保健/一般。表示用・課金カテゴリとは独立 / M20）。
+  kind: varchar("kind", { length: 20 }).notNull().default("general"),
   text: text("text").notNull(),
   total: integer("total").notNull(),
   sent: integer("sent").notNull(),
@@ -100,6 +102,7 @@ export const messageTemplates = pgTable("message_templates", {
   schoolId: uuid("school_id").notNull(),
   title: varchar("title", { length: 100 }).notNull(),
   category: varchar("category", { length: 20 }).notNull(), // 'emergency' | 'announcement'
+  kind: varchar("kind", { length: 20 }).notNull().default("general"),
   body: text("body").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

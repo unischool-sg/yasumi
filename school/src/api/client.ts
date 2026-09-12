@@ -40,9 +40,11 @@ export interface Subscriber {
   createdAt: string;
 }
 export type MessageCategory = "emergency" | "announcement";
+export type MessageKind = "closure" | "event" | "safety" | "health" | "general";
 export interface SchoolMessage {
   id: string;
   category: MessageCategory;
+  kind: MessageKind;
   text: string;
   total: number;
   sent: number;
@@ -55,6 +57,7 @@ export interface MessageTemplate {
   id: string;
   title: string;
   category: MessageCategory;
+  kind: MessageKind;
   body: string;
   createdAt: string;
 }
@@ -106,10 +109,20 @@ export const api = {
   me: () => request<Me>("/me"),
   getSubscribers: () => request<Subscriber[]>("/subscribers"),
   getMessages: () => request<SchoolMessage[]>("/messages"),
-  broadcast: (text: string, category: MessageCategory, requireConfirmation?: boolean) =>
-    request<BroadcastResult>("/broadcast", { method: "POST", body: JSON.stringify({ text, category, requireConfirmation }) }),
+  broadcast: (
+    text: string,
+    category: MessageCategory,
+    opts?: { requireConfirmation?: boolean; kind?: MessageKind; target?: { grade?: string; className?: string } },
+  ) =>
+    request<BroadcastResult>("/broadcast", { method: "POST", body: JSON.stringify({ text, category, ...opts }) }),
+  getCsv: async (which: "messages" | "absences"): Promise<Blob> => {
+    const token = getAuth()?.token;
+    const res = await fetch(`${BASE}/api/school/${which}.csv`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) throw new ApiError(res.status);
+    return res.blob();
+  },
   getTemplates: () => request<MessageTemplate[]>("/templates"),
-  createTemplate: (b: { title: string; category: MessageCategory; body: string }) =>
+  createTemplate: (b: { title: string; category: MessageCategory; kind?: MessageKind; body: string }) =>
     request<MessageTemplate>("/templates", { method: "POST", body: JSON.stringify(b) }),
   deleteTemplate: (id: string) => request<void>(`/templates/${id}`, { method: "DELETE" }),
   getDrafts: () => request<ClosureDraft[]>("/drafts"),

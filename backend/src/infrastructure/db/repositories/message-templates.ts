@@ -6,9 +6,9 @@ export type MessageTemplateRow = typeof messageTemplates.$inferSelect;
 
 export async function createTemplate(
   db: Db,
-  input: { schoolId: string; title: string; category: "emergency" | "announcement"; body: string },
+  input: { schoolId: string; title: string; category: "emergency" | "announcement"; kind?: string; body: string },
 ): Promise<MessageTemplateRow> {
-  const rows = await db.insert(messageTemplates).values(input).returning();
+  const rows = await db.insert(messageTemplates).values({ ...input, kind: input.kind ?? "general" }).returning();
   const row = rows[0];
   if (!row) throw new Error("failed to create template");
   return row;
