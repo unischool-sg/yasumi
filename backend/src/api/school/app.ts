@@ -145,8 +145,10 @@ export function createSchoolApp(deps: SchoolAppDeps) {
   const KIND_LABEL: Record<string, string> = { closure: "休校", event: "行事", safety: "防犯", health: "保健", general: "一般" };
   const csvResponse = (c: Context<SchoolEnv>, filename: string, rows: (string | number)[][]) => {
     const esc = (v: string | number) => {
-      const s = String(v ?? "");
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      let s = String(v ?? "");
+      // 数式インジェクション対策: 先頭が = + - @ タブ CR のセルは ' で無害化。
+      if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
     const csv = "﻿" + rows.map((r) => r.map(esc).join(",")).join("\r\n"); // BOM で Excel 文字化け回避
     return c.body(csv, 200, {

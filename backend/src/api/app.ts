@@ -94,14 +94,19 @@ async function forwardLineMessageToDiscord(deps: AppDeps, ev: LineWebhookEvent):
   // 内容（テキスト以外は種別を表示）
   const m = ev.message;
   const content = m?.type === "text" ? (m.text ?? "") : m?.type ? `[${m.type}]` : "（メッセージなし）";
-  const quoted = content.split("\n").map((l) => `> ${l}`).join("\n");
+  // ユーザー入力はコードブロックで囲い、markdown/メンション(@everyone等)を無効化。
+  // ``` の混入でブロックを抜けられないようゼロ幅で分断する。
+  const safeName = name.replace(/`/g, "'");
+  const safeContent = content.replace(/```/g, "`​`​`");
   const text = [
     "**LINEメッセージ受信**",
-    `送信主: ${name}`,
+    `送信主: \`${safeName}\``,
     `LINE UID: \`${lineUserId}\``,
     `連絡: ${adminLink}`,
     "内容:",
-    quoted,
+    "```",
+    safeContent,
+    "```",
   ].join("\n");
   await postDiscordMessage(deps.discordWebhookUrl, text, deps.fetchFn ? { fetchFn: deps.fetchFn } : {});
 }
@@ -128,6 +133,9 @@ export function createApp(deps: AppDeps) {
         "cache-control": "public, max-age=3600",
         "cross-origin-resource-policy": "cross-origin",
         "access-control-allow-origin": "*",
+        // SVG ロゴを直接開いた際のスクリプト実行を封じる（<img> 表示は影響なし）。
+        "x-content-type-options": "nosniff",
+        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
       },
     });
   });
