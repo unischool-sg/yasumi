@@ -122,6 +122,7 @@ export interface UserDetail {
   lineUserId: string | null;
   deviceTokenCount: number;
   subscriptions: UserSubscription[];
+  flags: string[];
   profile: { displayName: string; pictureUrl?: string; statusMessage?: string } | null;
 }
 export interface WarningCheck {

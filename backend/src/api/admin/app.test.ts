@@ -291,6 +291,9 @@ suite("Admin API", () => {
     // 一覧に反映
     const users = (await (await req("/api/admin/users", { headers: bearer(suT) })).json()) as { id: string; flags: string[] }[];
     expect(users.find((u) => u.id === userId)?.flags).toContain("送信済み");
+    // ユーザー詳細にも反映
+    const detail = (await (await req(`/api/admin/users/${userId}`, { headers: bearer(suT) })).json()) as { flags: string[] };
+    expect(detail.flags).toContain("送信済み");
     // 解除
     await req("/api/admin/flags/unassign", {
       method: "POST", headers: { ...bearer(suT), "content-type": "application/json" },
