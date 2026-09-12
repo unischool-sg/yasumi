@@ -5,6 +5,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { type UserRow, api } from "../api/client.ts";
 import { DataTable } from "../components/DataTable.tsx";
+import { EMPTY_QUERY, type UserQuery, UserQueryEditor, compareUsers, matchesQuery, querySummary } from "../components/UserQueryEditor.tsx";
 import { useToast } from "../components/Toast.tsx";
 
 export function Users() {
@@ -18,25 +19,12 @@ export function Users() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [newTpl, setNewTpl] = useState({ title: "", body: "" });
 
-  // 絞り込み条件
-  const [fSub, setFSub] = useState<"all" | "subscribed" | "none">("all");
-  const [fAge, setFAge] = useState<"any" | "older" | "within">("any");
-  const [fDays, setFDays] = useState("7");
+  // 条件（Scratch風エディターで編集）
+  const [query, setQuery] = useState<UserQuery>(EMPTY_QUERY);
+  const [editorOpen, setEditorOpen] = useState(false);
 
-  const matches = (u: UserRow): boolean => {
-    if (fSub === "subscribed" && u.subscriptionCount <= 0) return false;
-    if (fSub === "none" && u.subscriptionCount > 0) return false;
-    if (fAge !== "any") {
-      const days = Number(fDays) || 0;
-      const ageMs = Date.now() - new Date(u.createdAt).getTime();
-      const thresholdMs = days * 86400000;
-      if (fAge === "older" && ageMs < thresholdMs) return false; // 登録からN日以上経過
-      if (fAge === "within" && ageMs > thresholdMs) return false; // 登録からN日以内
-    }
-    return true;
-  };
-  const shown = data.filter(matches);
-  const filterActive = fSub !== "all" || fAge !== "any";
+  const shown = data.filter((u) => matchesQuery(u, query)).sort((a, b) => compareUsers(a, b, query.sorts));
+  const filterActive = query.filters.length > 0 || query.sorts.length > 0;
 
   const toggle = (id: string) =>
     setSelected((prev) => {
@@ -170,38 +158,28 @@ export function Users() {
 
       <Card variant="outlined" sx={{ mb: 2 }}>
         <CardContent>
-          <Typography variant="subtitle2" sx={{ mb: 1.5 }}>条件で絞り込み・一括選択</Typography>
           <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", flexWrap: "wrap" }}>
-            <TextField select size="small" label="購読状態" value={fSub} onChange={(e) => setFSub(e.target.value as typeof fSub)} sx={{ width: 150 }}>
-              <MenuItem value="all">すべて</MenuItem>
-              <MenuItem value="subscribed">購読済み</MenuItem>
-              <MenuItem value="none">未購読</MenuItem>
-            </TextField>
-            <TextField select size="small" label="登録期間" value={fAge} onChange={(e) => setFAge(e.target.value as typeof fAge)} sx={{ width: 170 }}>
-              <MenuItem value="any">問わない</MenuItem>
-              <MenuItem value="older">登録からN日以上前</MenuItem>
-              <MenuItem value="within">登録からN日以内</MenuItem>
-            </TextField>
-            {fAge !== "any" && (
-              <TextField size="small" type="number" label="日数(N)" value={fDays} onChange={(e) => setFDays(e.target.value)} sx={{ width: 100 }} />
-            )}
+            <Typography variant="subtitle2">条件で絞り込み・並び替え・一括選択</Typography>
+            <Button variant="outlined" size="small" onClick={() => setEditorOpen(true)}>条件エディターを開く</Button>
             <Box sx={{ flex: 1 }} />
             <Typography variant="body2" color="text.secondary">一致: <b>{shown.length}</b> / {data.length} 名</Typography>
             <Button variant="contained" size="small" disabled={shown.length === 0} onClick={selectMatching}>一致{shown.length > 0 ? `（${shown.length}）` : ""}名を選択</Button>
             <Button size="small" disabled={selected.size === 0} onClick={() => setSelected(new Set())}>選択解除</Button>
           </Stack>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-            列見出しをクリックで並べ替え（購読・登録日など）。条件で絞った一覧を全選択して、上の送信に使えます。
+            現在の条件：{querySummary(query)}
           </Typography>
         </CardContent>
       </Card>
 
       {filterActive && (
         <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-          絞り込み中：{shown.length} 名を表示（全 {data.length} 名）
+          絞り込み/並び替え中：{shown.length} 名を表示（全 {data.length} 名）
         </Typography>
       )}
       <DataTable columns={columns} data={shown} empty="条件に一致するユーザーがいません" />
+
+      <UserQueryEditor open={editorOpen} onClose={() => setEditorOpen(false)} query={query} onChange={setQuery} />
     </Box>
   );
 }
