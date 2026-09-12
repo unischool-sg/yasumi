@@ -11,6 +11,7 @@ import { checkSchoolEditable } from "./authz.ts";
 import { notifyUser } from "../domain/notification/dispatch.ts";
 import { absenceEnabled, isPlanActive } from "../domain/plan.ts";
 import { postDiscordMessage } from "../infrastructure/discord/notify.ts";
+import type { AdsConversionProvider } from "../infrastructure/google-ads/conversion.ts";
 import { getLineProfile } from "../infrastructure/line/line-api.ts";
 import { type Storage, mimeFromKey } from "../infrastructure/storage/s3.ts";
 import { exchangeLineCode } from "./line-login.ts";
@@ -60,6 +61,8 @@ export interface AppDeps extends AuthDeps {
   adminBaseUrl?: string;
   /** ロゴ等のオブジェクトストレージ（RustFS/S3）。未設定ならロゴ機能はドーマント。 */
   storage?: Storage;
+  /** Google Ads コンバージョン送信（未設定なら gclid は貯まるが送らない）。 */
+  adsConversionProvider?: AdsConversionProvider;
   /** テスト用 fetch 注入（Discord/LINE プロフィール取得）。未指定なら global fetch。 */
   fetchFn?: (url: string, init?: RequestInit) => Promise<Response>;
   /** ネイティブ LINE ログインのトークン交換用（LIFF と同じ LINE Login チャネル）。 */
@@ -293,6 +296,16 @@ export function createApp(deps: AppDeps) {
   // --- User ---
   api.get("/me", (c) => c.json({ userId: c.get("userId") }));
 
+  // 広告アトリビューション（gclid）を first-touch 保存（Google Ads コンバージョン計測用）。
+  api.post(
+    "/me/attribution",
+    zValidator("json", z.object({ gclid: z.string().min(1).max(200) })),
+    async (c) => {
+      await usersRepo.setGclidIfAbsent(deps.db, c.get("userId"), c.req.valid("json").gclid, deps.now?.() ?? new Date());
+      return c.json({ ok: true });
+    },
+  );
+
   // 自分が作成した学校の一覧（LIFF「編集」タブ / PRD §23）
   api.get("/me/schools", async (c) => {
     return c.json(await schoolsRepo.listSchoolsByCreator(deps.db, c.get("userId")));
@@ -523,6 +536,15 @@ export function createApp(deps: AppDeps) {
             `友だち: ${adminBase}/users/${c.get("userId")}`,
           ].join("\n"),
         );
+        // Google Ads コンバージョン（gclid あり・未送信のみ・best-effort）
+        if (deps.adsConversionProvider) {
+          const attr = await usersRepo.getAttribution(deps.db, c.get("userId"));
+          if (attr?.gclid && !attr.gclidConvertedAt) {
+            const at = deps.now?.() ?? new Date();
+            const ok = await deps.adsConversionProvider.upload({ gclid: attr.gclid, at }).catch(() => false);
+            if (ok) await usersRepo.markGclidConverted(deps.db, c.get("userId"), at);
+          }
+        }
       }
       return c.json(row, 201);
     },

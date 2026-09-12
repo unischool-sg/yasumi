@@ -76,6 +76,9 @@ export function createApiClient(idToken: string) {
       }),
     deleteRule: (ruleId: string) =>
       request<void>(`/api/rules/${ruleId}`, { method: "DELETE" }),
+    /** 広告アトリビューション（gclid）を保存（Google Ads コンバージョン計測）。 */
+    saveAttribution: (input: { gclid: string }) =>
+      request<{ ok: boolean }>("/api/me/attribution", { method: "POST", body: JSON.stringify(input) }),
     /** 欠席受付が使える学校（premium・購読中）。 */
     listAbsenceSchools: () => request<AbsenceSchool[]>("/api/me/absence-schools"),
     /** 自分の生徒プロフィール一覧。 */

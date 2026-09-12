@@ -92,6 +92,12 @@ export interface UserRow {
   lineUserId: string | null;
   createdAt: string;
   subscriptionCount: number;
+  flags: string[];
+}
+export interface FlagDef {
+  name: string;
+  color: string | null;
+  createdAt: string;
 }
 export interface AdminMessageTemplate {
   id: string;
@@ -193,6 +199,14 @@ export const api = {
   createMessageTemplate: (b: { title: string; body: string }) =>
     request<AdminMessageTemplate>("/message-templates", { method: "POST", body: JSON.stringify(b) }),
   deleteMessageTemplate: (id: string) => request<void>(`/message-templates/${id}`, { method: "DELETE" }),
+  // フラグ
+  getFlagDefs: () => request<FlagDef[]>("/flag-defs"),
+  createFlagDef: (b: { name: string; color?: string }) => request<FlagDef>("/flag-defs", { method: "POST", body: JSON.stringify(b) }),
+  deleteFlagDef: (name: string) => request<void>(`/flag-defs/${encodeURIComponent(name)}`, { method: "DELETE" }),
+  assignFlag: (userIds: string[], name: string) =>
+    request<{ assigned: number; total: number }>("/flags/assign", { method: "POST", body: JSON.stringify({ userIds, name }) }),
+  unassignFlag: (userIds: string[], name: string) =>
+    request<{ ok: boolean; total: number }>("/flags/unassign", { method: "POST", body: JSON.stringify({ userIds, name }) }),
   addUserSubscription: (id: string, schoolId: string) =>
     request(`/users/${id}/subscriptions`, { method: "POST", body: JSON.stringify({ schoolId }) }),
   setUserSubscription: (id: string, schoolId: string, notificationEnabled: boolean) =>

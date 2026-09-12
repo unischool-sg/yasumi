@@ -1,6 +1,9 @@
 // LINE 公式アカウント友だち追加（ミニアプリの入口）。
 export const LINE_URL = "https://line.me/R/ti/p/%40270qmktw";
 
+// LIFF ID（設定時、CTA を LIFF 経由にして gclid を引き継ぐ / Google Ads 計測）。
+export const LIFF_ID = import.meta.env.PUBLIC_LIFF_ID || "";
+
 // 学校向け営業LP（/for-schools）の問い合わせ先。
 export const SCHOOL_CONTACT_EMAIL = "unischool@sandagakuen.ed.jp";
 

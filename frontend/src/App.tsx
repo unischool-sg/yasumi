@@ -65,6 +65,12 @@ function Main({ api }: { api: ApiClient }) {
     registerPushToken(api);
   }, [api]);
 
+  // 広告クリックID(gclid)を保存（Google Ads コンバージョン計測）。URL / LIFF state から取得。
+  useEffect(() => {
+    const gclid = readGclid();
+    if (gclid) api.saveAttribution({ gclid }).catch(() => {});
+  }, [api]);
+
   const subscribedIds = new Set(subscriptions.map((s) => s.schoolId));
   const isModal = view.kind !== "tabs";
   const title =
@@ -168,6 +174,24 @@ function Main({ api }: { api: ApiClient }) {
       </Snackbar>
     </Box>
   );
+}
+
+/** gclid を URL クエリまたは LIFF の liff.state（エンコードされたクエリ）から取得。 */
+function readGclid(): string | null {
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    const direct = sp.get("gclid");
+    if (direct) return direct;
+    // LIFF は元のクエリを liff.state に入れることがある（例: liff.state=%3Fgclid%3D...）。
+    const state = sp.get("liff.state");
+    if (state) {
+      const inner = new URLSearchParams(state.startsWith("?") ? state.slice(1) : state);
+      return inner.get("gclid");
+    }
+  } catch {
+    /* noop */
+  }
+  return null;
 }
 
 function Splash({ children, error }: { children: ReactNode; error?: boolean }) {

@@ -18,6 +18,9 @@ ENV PUBLIC_API_BASE_URL=$PUBLIC_API_BASE_URL
 # SEO の基準URL（canonical / og:url / sitemap）
 ARG PUBLIC_SITE_URL
 ENV PUBLIC_SITE_URL=$PUBLIC_SITE_URL
+
+ARG PUBLIC_LIFF_ID
+ENV PUBLIC_LIFF_ID=$PUBLIC_LIFF_ID
 RUN bun run --cwd landing build
 
 # --- serve ---

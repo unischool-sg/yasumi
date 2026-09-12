@@ -12,6 +12,7 @@ import { rateLimit } from "../middleware/rate-limit.ts";
 import { type AdminEnv, adminAuthMiddleware, login, requireSuperadmin } from "./auth.ts";
 import * as adminsRepo from "../../infrastructure/db/repositories/admins.ts";
 import * as adminTemplatesRepo from "../../infrastructure/db/repositories/admin-message-templates.ts";
+import * as flagsRepo from "../../infrastructure/db/repositories/flags.ts";
 import * as areasRepo from "../../infrastructure/db/repositories/areas.ts";
 import * as cfg from "../../infrastructure/db/repositories/school-config.ts";
 import * as deviceTokensRepo from "../../infrastructure/db/repositories/device-tokens.ts";
@@ -379,8 +380,42 @@ export function createAdminApp(deps: AdminAppDeps) {
     return c.body(null, 204);
   });
 
+  // --- フラグ（タグ）---
+  app.get("/flag-defs", async (c) => c.json(await flagsRepo.listDefs(db)));
+  app.post(
+    "/flag-defs",
+    zValidator("json", z.object({ name: z.string().min(1).max(50), color: z.string().max(20).optional() })),
+    async (c) => c.json(await flagsRepo.createDef(db, c.req.valid("json")), 201),
+  );
+  app.delete("/flag-defs/:name", async (c) => {
+    await flagsRepo.deleteDef(db, c.req.param("name"));
+    return c.body(null, 204);
+  });
+  app.post(
+    "/flags/assign",
+    zValidator("json", z.object({ userIds: z.array(z.string().uuid()).min(1).max(1000), name: z.string().min(1).max(50) })),
+    async (c) => {
+      const { userIds, name } = c.req.valid("json");
+      const assigned = await flagsRepo.assign(db, userIds, name);
+      return c.json({ assigned, total: userIds.length });
+    },
+  );
+  app.post(
+    "/flags/unassign",
+    zValidator("json", z.object({ userIds: z.array(z.string().uuid()).min(1).max(1000), name: z.string().min(1).max(50) })),
+    async (c) => {
+      const { userIds, name } = c.req.valid("json");
+      await flagsRepo.unassign(db, userIds, name);
+      return c.json({ ok: true, total: userIds.length });
+    },
+  );
+
   // --- ユーザー・購読 ---
-  app.get("/users", async (c) => c.json(await usersRepo.listUsers(db, { limit: 200 })));
+  app.get("/users", async (c) => {
+    const rows = await usersRepo.listUsers(db, { limit: 1000 });
+    const flags = await flagsRepo.listByUsers(db, rows.map((r) => r.id));
+    return c.json(rows.map((r) => ({ ...r, flags: flags.get(r.id) ?? [] })));
+  });
   app.get("/subscriptions", async (c) => c.json(await subsRepo.listAllSubscriptions(db, { limit: 200 })));
 
   // ユーザー詳細（プロフィール / 購読 / デバイス数）

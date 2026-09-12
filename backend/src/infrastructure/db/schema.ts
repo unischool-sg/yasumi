@@ -18,6 +18,10 @@ import {
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  // Google Ads コンバージョン計測用（first-touch の gclid）。
+  gclid: varchar("gclid", { length: 200 }),
+  gclidAt: timestamp("gclid_at", { withTimezone: true }),
+  gclidConvertedAt: timestamp("gclid_converted_at", { withTimezone: true }),
 });
 
 // 管理画面のアカウント（LINE ユーザーとは別系統・id/password 認証 / admin）。
@@ -37,6 +41,24 @@ export const adminMessageTemplates = pgTable("admin_message_templates", {
   body: text("body").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ユーザーフラグ（タグ）の定義（選択肢の元）。
+export const flagDefs = pgTable("flag_defs", {
+  name: varchar("name", { length: 50 }).primaryKey(),
+  color: varchar("color", { length: 20 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ユーザーへのフラグ付与（多対多）。
+export const userFlags = pgTable(
+  "user_flags",
+  {
+    userId: uuid("user_id").notNull(),
+    name: varchar("name", { length: 50 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.name] })],
+);
 
 export const lineAccounts = pgTable("line_accounts", {
   userId: uuid("user_id").primaryKey(),

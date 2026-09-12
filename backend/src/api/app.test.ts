@@ -291,6 +291,39 @@ suite("API integration", () => {
     expect(posts.length).toBe(1);
   });
 
+  it("gclid: first-touch保存＋購読時に1回だけコンバージョン送信", async () => {
+    const uploads: string[] = [];
+    const gapp = createApp({
+      db: drizzle(sql, { schema }),
+      verifyIdToken: async (t) => ({ lineUserId: t }),
+      adsConversionProvider: { async upload({ gclid }) { uploads.push(gclid); return true; } },
+    });
+    const greq = (p: string, i?: RequestInit) => gapp.fetch(new Request(`http://x${p}`, i));
+    const gauth = (t: string) => ({ Authorization: `Bearer ${t}` });
+    // 学校を2つ用意
+    const db = drizzle(sql, { schema });
+    const s1 = await createSchool(db, { name: "gclid校1", prefecture: "兵庫県" });
+    const s2 = await createSchool(db, { name: "gclid校2", prefecture: "兵庫県" });
+    await greq("/api/me", { headers: gauth("Ugclid") });
+
+    // first-touch 保存（2回目は上書きしない）
+    await greq("/api/me/attribution", { method: "POST", headers: { ...gauth("Ugclid"), "content-type": "application/json" }, body: JSON.stringify({ gclid: "GC_FIRST" }) });
+    await greq("/api/me/attribution", { method: "POST", headers: { ...gauth("Ugclid"), "content-type": "application/json" }, body: JSON.stringify({ gclid: "GC_SECOND" }) });
+
+    // 新規購読 → コンバージョン1回（first-touchのgclid）
+    await greq("/api/me/subscriptions", { method: "POST", headers: { ...gauth("Ugclid"), "content-type": "application/json" }, body: JSON.stringify({ schoolId: s1.id }) });
+    expect(uploads).toEqual(["GC_FIRST"]);
+
+    // 別校を購読しても再送しない（converted済み）
+    await greq("/api/me/subscriptions", { method: "POST", headers: { ...gauth("Ugclid"), "content-type": "application/json" }, body: JSON.stringify({ schoolId: s2.id }) });
+    expect(uploads).toEqual(["GC_FIRST"]);
+
+    // gclid 無しユーザーは送信されない
+    await greq("/api/me", { headers: gauth("Unogclid") });
+    await greq("/api/me/subscriptions", { method: "POST", headers: { ...gauth("Unogclid"), "content-type": "application/json" }, body: JSON.stringify({ schoolId: s1.id }) });
+    expect(uploads).toEqual(["GC_FIRST"]);
+  });
+
   it("活動通知: 友だち追加(follow)と学校購読を events Webhook に送る", async () => {
     const LSECRET = "linesecret2";
     const events: string[] = [];

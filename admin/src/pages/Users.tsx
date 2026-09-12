@@ -6,6 +6,7 @@ import { useState } from "react";
 import { type UserRow, api } from "../api/client.ts";
 import { DataTable } from "../components/DataTable.tsx";
 import { EMPTY_QUERY, type UserQuery, UserQueryEditor, compareUsers, matchesQuery, querySummary } from "../components/UserQueryEditor.tsx";
+import { UserFlowRunner } from "../components/UserFlowRunner.tsx";
 import { useToast } from "../components/Toast.tsx";
 
 export function Users() {
@@ -14,14 +15,29 @@ export function Users() {
   const qc = useQueryClient();
   const { data = [] } = useQuery({ queryKey: ["users"], queryFn: api.listUsers });
   const { data: templates = [] } = useQuery({ queryKey: ["admin-templates"], queryFn: api.getMessageTemplates });
+  const { data: flagDefs = [] } = useQuery({ queryKey: ["flag-defs"], queryFn: api.getFlagDefs });
+  const flagNames = flagDefs.map((f) => f.name);
 
   const [text, setText] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [newTpl, setNewTpl] = useState({ title: "", body: "" });
+  const [newFlag, setNewFlag] = useState("");
 
   // 条件（Scratch風エディターで編集）
   const [query, setQuery] = useState<UserQuery>(EMPTY_QUERY);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [flowOpen, setFlowOpen] = useState(false);
+
+  const addFlagDef = useMutation({
+    mutationFn: () => api.createFlagDef({ name: newFlag.trim() }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["flag-defs"] }); setNewFlag(""); toast.success("フラグを作成しました"); },
+    onError: (e) => toast.error(`失敗しました: ${(e as Error).message}`),
+  });
+  const delFlagDef = useMutation({
+    mutationFn: (name: string) => api.deleteFlagDef(name),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["flag-defs"] }); qc.invalidateQueries({ queryKey: ["users"] }); toast.success("フラグを削除しました"); },
+    onError: (e) => toast.error(`失敗しました: ${(e as Error).message}`),
+  });
 
   const shown = data.filter((u) => matchesQuery(u, query)).sort((a, b) => compareUsers(a, b, query.sorts));
   const filterActive = query.filters.length > 0 || query.sorts.length > 0;
@@ -87,6 +103,18 @@ export function Users() {
       cell: (c) => {
         const n = c.getValue() as number;
         return n > 0 ? <Chip size="small" color="primary" variant="outlined" label={`${n}校`} /> : <Typography variant="caption" color="text.secondary">なし</Typography>;
+      },
+    },
+    {
+      header: "フラグ",
+      id: "flags",
+      cell: (c) => {
+        const flags = c.row.original.flags;
+        return flags.length ? (
+          <Stack direction="row" spacing={0.5} sx={{ flexWrap: "wrap", gap: 0.5 }}>
+            {flags.map((f) => <Chip key={f} size="small" label={f} sx={{ height: 20 }} />)}
+          </Stack>
+        ) : <Typography variant="caption" color="text.secondary">—</Typography>;
       },
     },
     { header: "登録日", accessorKey: "createdAt", cell: (c) => new Date(c.getValue() as string).toLocaleString("ja-JP") },
@@ -165,6 +193,7 @@ export function Users() {
             <Typography variant="body2" color="text.secondary">一致: <b>{shown.length}</b> / {data.length} 名</Typography>
             <Button variant="contained" size="small" disabled={shown.length === 0} onClick={selectMatching}>一致{shown.length > 0 ? `（${shown.length}）` : ""}名を選択</Button>
             <Button size="small" disabled={selected.size === 0} onClick={() => setSelected(new Set())}>選択解除</Button>
+            <Button variant="outlined" color="secondary" size="small" disabled={shown.length === 0} onClick={() => setFlowOpen(true)}>フローを実行</Button>
           </Stack>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
             現在の条件：{querySummary(query)}
@@ -177,9 +206,33 @@ export function Users() {
           絞り込み/並び替え中：{shown.length} 名を表示（全 {data.length} 名）
         </Typography>
       )}
+      <Card variant="outlined" sx={{ mb: 2 }}>
+        <CardContent>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>フラグの管理</Typography>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1, mb: 1.5 }}>
+            {flagDefs.map((f) => (
+              <Chip key={f.name} label={f.name} onDelete={() => delFlagDef.mutate(f.name)} variant="outlined" />
+            ))}
+            {flagDefs.length === 0 && <Typography variant="caption" color="text.secondary">フラグがありません</Typography>}
+          </Stack>
+          <Stack direction="row" spacing={1}>
+            <TextField size="small" label="フラグ名" value={newFlag} onChange={(e) => setNewFlag(e.target.value)} sx={{ width: 200 }} />
+            <Button variant="outlined" disabled={!newFlag.trim() || addFlagDef.isPending} onClick={() => addFlagDef.mutate()}>作成</Button>
+          </Stack>
+        </CardContent>
+      </Card>
+
       <DataTable columns={columns} data={shown} empty="条件に一致するユーザーがいません" />
 
-      <UserQueryEditor open={editorOpen} onClose={() => setEditorOpen(false)} query={query} onChange={setQuery} />
+      <UserQueryEditor open={editorOpen} onClose={() => setEditorOpen(false)} query={query} onChange={setQuery} flagNames={flagNames} />
+      <UserFlowRunner
+        open={flowOpen}
+        onClose={() => setFlowOpen(false)}
+        audienceIds={shown.map((u) => u.id)}
+        templates={templates}
+        flagNames={flagNames}
+        onRan={() => qc.invalidateQueries({ queryKey: ["users"] })}
+      />
     </Box>
   );
 }
