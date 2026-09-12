@@ -1,0 +1,75 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+import { OPERATOR } from "../consts";
+
+const updated = "2026年9月12日";
+---
+
+<Layout title="プライバシーポリシー | やすみ？" description="やすみ？のプライバシーポリシー（個人情報の取扱い）です。">
+  <Header />
+  <section class="legal">
+    <div class="container">
+      <h1>プライバシーポリシー</h1>
+      <p class="lead">{OPERATOR.name}（以下「当社」）は、「やすみ？」（以下「本サービス」）における利用者の個人情報を、以下の方針に従って適切に取り扱います。</p>
+
+      <h2>1. 取得する情報</h2>
+      <ul>
+        <li>LINE のユーザー識別子、表示名・プロフィール画像（LINE の許諾範囲内）</li>
+        <li>購読している学校、通知設定、判定・通知の履歴</li>
+        <li>アプリ通知用のデバイストークン（ネイティブ/PWA 利用時）</li>
+        <li>学校向け機能の利用に伴い登録される生徒プロフィール（氏名・学年・組）および欠席連絡（種別・理由等。健康に関する情報などの要配慮個人情報を含む場合があります）</li>
+        <li>アクセス解析により収集される利用状況（Cookie 等を含む）</li>
+      </ul>
+
+      <h2>2. 利用目的</h2>
+      <ul>
+        <li>本サービスの提供・運営（登校可否の判定・通知、学校からの連絡・欠席受付）</li>
+        <li>本サービスの改善、不具合対応、不正利用の防止</li>
+        <li>お問い合わせ対応</li>
+      </ul>
+
+      <h2>3. 第三者提供</h2>
+      <p>当社は、法令に基づく場合を除き、あらかじめ同意を得ずに個人情報を第三者へ提供しません。ただし、学校向け機能においては、当該学校の運用に必要な範囲で、購読者情報・欠席連絡等を当該学校（教員アカウント）に提供します。</p>
+
+      <h2>4. 外部サービスの利用（業務委託・情報処理の委託）</h2>
+      <p>本サービスの提供のため、以下の外部サービスを利用します。各社の定めに従い情報が処理されます。</p>
+      <ul>
+        <li>LINE（メッセージ送受信・ログイン）</li>
+        <li>Google（プッシュ通知 FCM、アクセス解析 Google Analytics）</li>
+        <li>当社が管理するオブジェクトストレージ（学校ロゴ等の保存）</li>
+      </ul>
+
+      <h2>5. Cookie・アクセス解析</h2>
+      <p>本サービスは利用状況の把握・改善のため Google Analytics を利用します。ブラウザ設定で Cookie を無効化できますが、一部機能が利用できない場合があります。</p>
+
+      <h2>6. 安全管理・保管期間</h2>
+      <p>取得した情報は、漏えい・滅失・毀損の防止のため適切に管理し、利用目的の達成に必要な期間または法令で定める期間保管し、不要となった情報は適切に削除します。</p>
+
+      <h2>7. 開示・訂正・削除等の請求</h2>
+      <p>利用者は、自己の個人情報の開示・訂正・利用停止・削除等を請求できます。下記のお問い合わせ先までご連絡ください。ご本人確認のうえ、法令に従い対応します。</p>
+
+      <h2>8. 改定</h2>
+      <p>当社は、必要に応じて本ポリシーを改定します。改定後の内容は本ページに掲示した時点から適用されます。</p>
+
+      <h2>9. お問い合わせ</h2>
+      <p>個人情報の取扱いに関するお問い合わせは <a href={`mailto:${OPERATOR.email}`}>{OPERATOR.email}</a>（運営：{OPERATOR.name} / 個人情報保護管理責任者：{OPERATOR.manager}）までご連絡ください。</p>
+
+      <p class="updated">制定日：{updated}<br />運営：{OPERATOR.name}</p>
+    </div>
+  </section>
+  <Footer />
+</Layout>
+
+<style>
+  .legal { padding: 56px 0 72px; }
+  .legal h1 { font-size: clamp(26px, 4vw, 34px); font-weight: 700; margin-bottom: 16px; }
+  .legal .lead { color: var(--muted); margin-bottom: 32px; max-width: 46em; }
+  .legal h2 { font-size: 18px; font-weight: 700; margin: 28px 0 8px; }
+  .legal p, .legal li { color: #3c4043; line-height: 1.9; max-width: 46em; }
+  .legal ul { padding-left: 1.2em; margin: 8px 0; }
+  .legal a { color: var(--blue); }
+  .legal a:hover { text-decoration: underline; }
+  .legal .updated { margin-top: 40px; font-size: 13px; color: #80868b; }
+</style>

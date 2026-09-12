@@ -1,9 +1,29 @@
 ---
+import { LINE_URL, SCHOOL_APP_URL } from "../consts";
 ---
 
 <footer class="site-footer">
   <div class="container footer-inner">
     <div class="footer-brand">やすみ？</div>
+
+    <nav class="footer-nav">
+      <div class="footer-col">
+        <span class="footer-h">サービス</span>
+        <a href="/">トップ</a>
+        <a href="/schools">学校一覧</a>
+        <a href="/for-schools">学校の方へ</a>
+        <a href={LINE_URL} target="_blank" rel="noopener">LINEで始める</a>
+        <a href={SCHOOL_APP_URL} target="_blank" rel="noopener">先生ログイン</a>
+      </div>
+      <div class="footer-col">
+        <span class="footer-h">運営・規約</span>
+        <a href="/terms">利用規約</a>
+        <a href="/privacy">プライバシーポリシー</a>
+        <a href="/tokushoho">特定商取引法に基づく表記</a>
+        <a href="https://unischool.jp" target="_blank" rel="noopener">運営元 UniSchool</a>
+      </div>
+    </nav>
+
     <p class="footer-disclaimer">
       本サービスは学校公式サービスではありません。気象庁の情報とユーザーが登録した学校規則をもとに自動判定しています。
       最終的な登校判断については、学校からの公式連絡をご確認ください。
@@ -30,10 +50,35 @@
     font-weight: 700;
     color: var(--ink);
     font-size: 18px;
-    margin-bottom: 12px;
+    margin-bottom: 16px;
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+  .footer-nav {
+    display: flex;
+    gap: 56px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .footer-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .footer-h {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+  .footer-col a {
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .footer-col a:hover {
+    color: var(--blue);
   }
   .footer-disclaimer {
     max-width: 720px;

@@ -1,0 +1,105 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+import { OPERATOR } from "../consts";
+
+const updated = "2026年9月12日";
+---
+
+<Layout title="利用規約 | やすみ？" description="やすみ？の利用規約です。">
+  <Header />
+  <section class="legal">
+    <div class="container">
+      <h1>利用規約</h1>
+      <p class="lead">本利用規約（以下「本規約」）は、{OPERATOR.name}（以下「当社」）が提供する「やすみ？」（以下「本サービス」）の利用条件を定めるものです。利用者は本規約に同意のうえ本サービスを利用するものとします。</p>
+
+      <h2>第1条（サービス内容）</h2>
+      <p>本サービスは、気象庁が公表する気象警報等の情報と、利用者が登録した学校ごとのルールにもとづき、休校・遅延等の登校可否を自動で判定し、LINE等で通知するサービスです。学校向けの有料プランでは、学校が公式の発信元として保護者・生徒へ連絡・欠席受付等を行う機能を提供します。</p>
+
+      <h2>第2条（本サービスの位置づけ・免責）</h2>
+      <ul>
+        <li>本サービス（無料機能）は学校公式のサービスではありません。判定は気象情報と利用者登録のルールに基づく推定であり、正確性・完全性・適時性を保証しません。</li>
+        <li>最終的な登校の判断は、学校からの公式連絡および利用者ご自身の責任において行ってください。</li>
+        <li>通信環境・外部サービスの障害等により、通知の遅延・不達が生じる場合があります。これらに起因する損害について、当社は法令上許容される範囲で責任を負いません。</li>
+      </ul>
+
+      <h2>第3条（利用登録・アカウント）</h2>
+      <p>利用者は、LINEアカウント等を通じて本サービスを利用します。学校向けプランの教員アカウントは、当社または学校の管理者が発行します。アカウントの管理は利用者の責任で行い、第三者に利用させてはなりません。</p>
+
+      <h2>第4条（禁止事項）</h2>
+      <ul>
+        <li>法令または公序良俗に反する行為</li>
+        <li>虚偽の情報の登録・送信、他者へのなりすまし</li>
+        <li>本サービスの運営を妨害する行為、不正アクセス、リバースエンジニアリング</li>
+        <li>他の利用者・第三者の権利を侵害する行為</li>
+      </ul>
+
+      <h2>第5条（有料プラン）</h2>
+      <p>学校向け有料プランの料金・支払方法・提供時期・解約条件等は、<a href="/tokushoho">特定商取引法に基づく表記</a>および個別の契約・見積に定めるところによります。</p>
+
+      <h2>第6条（サービスの変更・中断・終了）</h2>
+      <p>当社は、利用者への事前告知に努めたうえで、本サービスの内容の変更・追加・中断・終了を行うことがあります。</p>
+
+      <h2>第7条（知的財産権）</h2>
+      <p>本サービスに関する著作権・商標その他の知的財産権は当社または正当な権利者に帰属します。</p>
+
+      <h2>第8条（個人情報の取扱い）</h2>
+      <p>個人情報の取扱いは<a href="/privacy">プライバシーポリシー</a>に定めるとおりとします。</p>
+
+      <h2>第9条（規約の変更）</h2>
+      <p>当社は、必要に応じて本規約を変更できます。変更後の規約は本ページに掲示した時点から効力を生じます。</p>
+
+      <h2>第10条（準拠法・裁判管轄）</h2>
+      <p>本規約は日本法に準拠し、本サービスに関して紛争が生じた場合は、当社所在地を管轄する裁判所を第一審の専属的合意管轄裁判所とします。</p>
+
+      <h2>第11条（お問い合わせ）</h2>
+      <p>本規約に関するお問い合わせは <a href={`mailto:${OPERATOR.email}`}>{OPERATOR.email}</a> までご連絡ください。</p>
+
+      <p class="updated">制定日：{updated}<br />運営：{OPERATOR.name}</p>
+    </div>
+  </section>
+  <Footer />
+</Layout>
+
+<style>
+  .legal {
+    padding: 56px 0 72px;
+  }
+  .legal h1 {
+    font-size: clamp(26px, 4vw, 34px);
+    font-weight: 700;
+    margin-bottom: 16px;
+  }
+  .legal .lead {
+    color: var(--muted);
+    margin-bottom: 32px;
+    max-width: 46em;
+  }
+  .legal h2 {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 28px 0 8px;
+  }
+  .legal p,
+  .legal li {
+    color: #3c4043;
+    line-height: 1.9;
+    max-width: 46em;
+  }
+  .legal ul {
+    padding-left: 1.2em;
+    margin: 8px 0;
+  }
+  .legal a {
+    color: var(--blue);
+  }
+  .legal a:hover {
+    text-decoration: underline;
+  }
+  .legal .updated {
+    margin-top: 40px;
+    font-size: 13px;
+    color: #80868b;
+  }
+</style>
