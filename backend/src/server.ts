@@ -5,6 +5,7 @@ import { getDb } from "./infrastructure/db/client.ts";
 import { FcmNotificationProvider } from "./infrastructure/fcm/fcm-notification-provider.ts";
 import { JmaWarningProvider } from "./infrastructure/jma/jma-warning-provider.ts";
 import { LineNotificationProvider } from "./infrastructure/line/line-notification-provider.ts";
+import { createS3Storage } from "./infrastructure/storage/s3.ts";
 
 const port = Number(process.env.PORT ?? 3000);
 const channelId = process.env.LIFF_CHANNEL_ID ?? "";
@@ -36,8 +37,19 @@ if (!pushProvider) {
   console.warn("[yasumi] FCM_* 未設定のため FCM プッシュは無効（LINE プッシュのみ）");
 }
 
+// オブジェクトストレージ（RustFS/S3互換）。資格情報が揃っている時だけ有効化。
+const storage = createS3Storage({
+  endpoint: process.env.S3_ENDPOINT ?? "",
+  accessKeyId: process.env.S3_ACCESS_KEY_ID ?? "",
+  secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? "",
+  bucket: process.env.S3_BUCKET ?? "",
+  region: process.env.S3_REGION ?? "us-east-1",
+});
+if (!storage) console.warn("[yasumi] S3_* 未設定のためロゴ機能は無効");
+
 const app = createApp({
   db: getDb(),
+  ...(storage ? { storage } : {}),
   verifyIdToken: createLineIdTokenVerifier(channelId),
   adminLineUserIds,
   lineChannelSecret: process.env.LINE_CHANNEL_SECRET ?? "",

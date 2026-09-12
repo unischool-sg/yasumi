@@ -96,6 +96,8 @@ const breadcrumbJsonLd = {
     prefecture: string;
     city: string | null;
     websiteUrl: string | null;
+    logoUrl: string | null;
+    verified: boolean;
   };
 
   const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -125,8 +127,22 @@ const breadcrumbJsonLd = {
     const avatar = document.createElement("div");
     avatar.className = "sc-avatar";
     // MUI School アイコン相当の SVG（静的・ユーザー入力なしなので innerHTML で安全）。
-    avatar.innerHTML =
+    const iconSvg =
       '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M12 3 1 9l11 6 9-4.91V17h2V9L12 3zM5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg>';
+    if (s.logoUrl) {
+      // ロゴがあれば画像、失敗時は SVG にフォールバック。
+      const img = document.createElement("img");
+      img.className = "sc-logo";
+      img.src = s.logoUrl;
+      img.alt = "";
+      img.loading = "lazy";
+      img.addEventListener("error", () => {
+        avatar.innerHTML = iconSvg;
+      });
+      avatar.appendChild(img);
+    } else {
+      avatar.innerHTML = iconSvg;
+    }
     card.appendChild(avatar);
 
     const body = document.createElement("div");
@@ -135,6 +151,13 @@ const breadcrumbJsonLd = {
     const name = document.createElement("div");
     name.className = "sc-name";
     name.textContent = s.name;
+    if (s.verified) {
+      // プラン契約校＝公式連携済みバッジ（M22）。
+      const badge = document.createElement("span");
+      badge.className = "sc-verified";
+      badge.textContent = "公式連携";
+      name.appendChild(badge);
+    }
     body.appendChild(name);
 
     const meta = document.createElement("div");
@@ -339,6 +362,13 @@ const breadcrumbJsonLd = {
     color: var(--blue);
     display: grid;
     place-items: center;
+    overflow: hidden;
+  }
+  .sc-logo {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #fff;
   }
   .sc-body {
     flex: 1;
@@ -349,6 +379,17 @@ const breadcrumbJsonLd = {
     font-size: 16px;
     line-height: 1.35;
     overflow-wrap: anywhere;
+  }
+  .sc-verified {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--green);
+    background: var(--green-soft);
+    border-radius: 999px;
+    vertical-align: middle;
   }
   .sc-meta {
     color: var(--muted);

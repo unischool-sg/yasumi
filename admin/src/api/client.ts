@@ -55,6 +55,7 @@ export interface School {
   studentCount: number | null;
   plan: Plan | null;
   planExpiresAt: string | null;
+  logoKey: string | null;
   createdAt: string;
 }
 export interface Teacher {
@@ -151,6 +152,10 @@ export const api = {
   updateTeacher: (id: string, b: { role?: "owner" | "teacher"; disabled?: boolean; password?: string; name?: string }) =>
     request<Teacher>(`/teachers/${id}`, { method: "PATCH", body: JSON.stringify(b) }),
   deleteTeacher: (id: string) => request<void>(`/teachers/${id}`, { method: "DELETE" }),
+  // logo（RustFS）
+  uploadSchoolLogo: (id: string, contentType: string, dataBase64: string) =>
+    request<{ logoKey: string }>(`/schools/${id}/logo`, { method: "POST", body: JSON.stringify({ contentType, dataBase64 }) }),
+  deleteSchoolLogo: (id: string) => request<void>(`/schools/${id}/logo`, { method: "DELETE" }),
   createSchool: (b: { name: string; prefecture: string; city?: string; areaCodes?: string[]; warningTypes?: string[] }) =>
     request<School>("/schools", { method: "POST", body: JSON.stringify(b) }),
   updateSchool: (id: string, b: Record<string, unknown>) =>

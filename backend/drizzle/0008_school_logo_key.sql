@@ -1,0 +1,1 @@
+ALTER TABLE "schools" ADD COLUMN "logo_key" varchar(255);

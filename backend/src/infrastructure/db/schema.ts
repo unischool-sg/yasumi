@@ -59,6 +59,8 @@ export const schools = pgTable("schools", {
   // 有料プラン（学校向けSaaS）。null=無料/未契約。手動プロビジョニング（社内admin）で設定。
   plan: varchar("plan", { length: 20 }), // 'basic' | 'standard' | 'premium'
   planExpiresAt: timestamp("plan_expires_at", { withTimezone: true }),
+  // ロゴ画像の S3(RustFS) オブジェクトキー（例 logos/<schoolId>.png）。配信は /public/school-logo/:id。
+  logoKey: varchar("logo_key", { length: 255 }),
   createdBy: uuid("created_by"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

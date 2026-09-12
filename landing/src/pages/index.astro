@@ -80,6 +80,16 @@ const faqJsonLd = {
     </div>
   </section>
 
+  <!-- 導入校ロゴ（技術サイト風の流れる演出）。ロゴ登録校がある時だけ表示 -->
+  <section class="logos-sec" id="logos-sec" hidden>
+    <div class="container">
+      <p class="logos-label">やすみ？を導入している学校</p>
+    </div>
+    <div class="logos-viewport">
+      <div class="logos-track" id="logos-track"></div>
+    </div>
+  </section>
+
   <!-- Features (alternating panels) -->
   <div id="features">
     <!-- Feature 1 -->
@@ -226,6 +236,41 @@ const faqJsonLd = {
   items.forEach((el) => io.observe(el));
 </script>
 
+<script>
+  // 導入校ロゴのマーキー（技術サイト風）。ロゴ登録校を取得し、流れる帯として表示。
+  import { API_BASE } from "../consts";
+  type PublicSchool = { id: string; name: string; logoUrl: string | null };
+  (async () => {
+    const sec = document.getElementById("logos-sec");
+    const track = document.getElementById("logos-track");
+    if (!sec || !track) return;
+    try {
+      const res = await fetch(`${API_BASE}/public/schools`, { headers: { accept: "application/json" } });
+      if (!res.ok) return;
+      const schools = (await res.json()) as PublicSchool[];
+      let withLogo = schools.filter((s) => s.logoUrl);
+      if (withLogo.length === 0) return; // ロゴ登録校が無ければ非表示のまま
+      // 帯を埋めるため最低8枚まで複製し、さらにシームレスループ用に2倍にする。
+      let base = [...withLogo];
+      while (base.length < 8) base = base.concat(withLogo);
+      const loop = base.concat(base); // -50% アニメで継ぎ目なし
+      for (const s of loop) {
+        const item = document.createElement("div");
+        item.className = "logo-item";
+        const img = document.createElement("img");
+        img.src = s.logoUrl as string;
+        img.alt = s.name;
+        img.loading = "lazy";
+        item.appendChild(img);
+        track.appendChild(item);
+      }
+      sec.removeAttribute("hidden");
+    } catch {
+      /* 失敗時は非表示のまま */
+    }
+  })();
+</script>
+
 <style>
   /* Buttons: Google-ish */
   :global(.btn-outline) {
@@ -236,6 +281,66 @@ const faqJsonLd = {
   :global(.btn-outline:hover) {
     background: #f8faff;
     border-color: #c6dafc;
+  }
+
+  /* 導入校ロゴ マーキー */
+  .logos-sec {
+    padding: 32px 0 8px;
+  }
+  .logos-label {
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    margin-bottom: 20px;
+  }
+  .logos-viewport {
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  }
+  .logos-track {
+    display: flex;
+    gap: 48px;
+    width: max-content;
+    animation: logos-scroll 40s linear infinite;
+  }
+  .logos-track:hover {
+    animation-play-state: paused;
+  }
+  :global(.logo-item) {
+    flex: 0 0 auto;
+    height: 44px;
+    display: grid;
+    place-items: center;
+  }
+  :global(.logo-item img) {
+    height: 44px;
+    max-width: 150px;
+    object-fit: contain;
+    filter: grayscale(1);
+    opacity: 0.6;
+    transition:
+      filter 0.2s ease,
+      opacity 0.2s ease;
+  }
+  :global(.logo-item img:hover) {
+    filter: none;
+    opacity: 1;
+  }
+  @keyframes logos-scroll {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .logos-track {
+      animation: none;
+    }
   }
 
   /* Hero */

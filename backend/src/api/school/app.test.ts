@@ -424,6 +424,65 @@ suite("School (teacher) API", () => {
     expect(cross.status).toBe(404);
   });
 
+  it("ロゴ: admin アップロード→/public/school-logo 配信→/public/schools に logoUrl/verified", async () => {
+    const store = new Map<string, Uint8Array>();
+    const fakeStorage = {
+      async put(key: string, data: ArrayBuffer | Uint8Array) {
+        store.set(key, data instanceof Uint8Array ? data : new Uint8Array(data));
+      },
+      async get(key: string) {
+        return store.get(key) ?? null;
+      },
+      async delete(key: string) {
+        store.delete(key);
+      },
+    };
+    const lapp = createApp({
+      db: drizzle(sql, { schema }),
+      verifyIdToken: async (t) => ({ lineUserId: t }),
+      adminJwtSecret: ADMIN_SECRET,
+      schoolJwtSecret: SCHOOL_SECRET,
+      apiBaseUrl: "http://x",
+      storage: fakeStorage,
+    });
+    const lreq = (path: string, init?: RequestInit) => lapp.fetch(new Request(`http://x${path}`, init));
+
+    const dataBase64 = Buffer.from("PNGDATA").toString("base64");
+    // 非対応形式 → 400
+    const bad = await lreq(`/api/admin/schools/${schoolAId}/logo`, {
+      method: "POST", headers: { ...bearer(adminToken), "content-type": "application/json" },
+      body: JSON.stringify({ contentType: "application/pdf", dataBase64 }),
+    });
+    expect(bad.status).toBe(400);
+    // png アップロード
+    const up = await lreq(`/api/admin/schools/${schoolAId}/logo`, {
+      method: "POST", headers: { ...bearer(adminToken), "content-type": "application/json" },
+      body: JSON.stringify({ contentType: "image/png", dataBase64 }),
+    });
+    expect(up.status).toBe(200);
+    expect(((await up.json()) as { logoKey: string }).logoKey).toBe(`logos/${schoolAId}.png`);
+
+    // 配信
+    const img = await lreq(`/public/school-logo/${schoolAId}`);
+    expect(img.status).toBe(200);
+    expect(img.headers.get("content-type")).toBe("image/png");
+    expect(new Uint8Array(await img.arrayBuffer())).toEqual(new Uint8Array(Buffer.from("PNGDATA")));
+
+    // 公開一覧に logoUrl / verified(プラン有効)
+    const list = (await (await lreq("/public/schools")).json()) as { id: string; logoUrl: string | null; verified: boolean }[];
+    const a = list.find((s) => s.id === schoolAId)!;
+    expect(a.logoUrl).toBe(`http://x/public/school-logo/${schoolAId}`);
+    expect(a.verified).toBe(true);
+  });
+
+  it("ロゴ storage 未設定なら 503", async () => {
+    const res = await req(`/api/admin/schools/${schoolAId}/logo`, {
+      method: "POST", headers: { ...bearer(adminToken), "content-type": "application/json" },
+      body: JSON.stringify({ contentType: "image/png", dataBase64: "AAAA" }),
+    });
+    expect(res.status).toBe(503);
+  });
+
   it("無効化された教員はログイン不可＋既存トークンも即失効（disabled → 401）", async () => {
     // 無効化する前に一度ログインしてトークンを取得
     const pre = await req("/api/school/auth/login", {

@@ -25,5 +25,6 @@ export function buildClosureDraftText(result: CheckResult, warnings: Warning[] =
         : result === "PM_START"
           ? "午後からの登校となります。時間にご注意ください。"
           : "自宅で待機し、今後の連絡をお待ちください。";
+  
   return `【重要】本日の登校について\n\n${warnText}\n学校規則にもとづき、本日は「${label}」とします。\n${guide}\n\n最新情報は改めてお知らせします。`;
 }
