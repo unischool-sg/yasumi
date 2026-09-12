@@ -36,6 +36,8 @@ export interface AdminAppDeps {
   storage?: Storage;
   /** 学校登録などの活動通知先 Discord Webhook URL（秘密・env 注入）。 */
   discordEventsWebhookUrl?: string;
+  /** 管理画面の公開URL（活動通知のリンク用）。 */
+  adminBaseUrl?: string;
 }
 
 const roleSchema = z.enum(["superadmin", "admin"]);
@@ -148,7 +150,11 @@ export function createAdminApp(deps: AdminAppDeps) {
       if (b.areaCodes) await cfg.setAreaCodes(db, school.id, b.areaCodes);
       if (b.warningTypes) await cfg.setWarningTypes(db, school.id, b.warningTypes);
       if (deps.discordEventsWebhookUrl) {
-        await postDiscordMessage(deps.discordEventsWebhookUrl, `**学校が登録されました**（管理画面）\n学校: ${school.name}（${school.prefecture}）`);
+        const adminBase = deps.adminBaseUrl || "https://yasumi-admin.unischool.jp";
+        await postDiscordMessage(
+          deps.discordEventsWebhookUrl,
+          `**学校が登録されました**（管理画面）\n学校: ${school.name}（${school.prefecture}）\n学校: ${adminBase}/schools/${school.id}`,
+        );
       }
       return c.json(school, 201);
     },
