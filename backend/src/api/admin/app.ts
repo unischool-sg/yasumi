@@ -4,7 +4,9 @@ import { z } from "zod";
 import type { Db } from "../../infrastructure/db/client.ts";
 import type { NotificationProvider } from "../../domain/notification/provider.ts";
 import { notifyUser } from "../../domain/notification/dispatch.ts";
+import { prepareLogo } from "../../domain/logo.ts";
 import { getLineProfile } from "../../infrastructure/line/line-api.ts";
+import type { Storage } from "../../infrastructure/storage/s3.ts";
 import { rateLimit } from "../middleware/rate-limit.ts";
 import { type AdminEnv, adminAuthMiddleware, login, requireSuperadmin } from "./auth.ts";
 import * as adminsRepo from "../../infrastructure/db/repositories/admins.ts";
@@ -29,6 +31,8 @@ export interface AdminAppDeps {
   /** ユーザーへのメッセージ送信用（LINE / FCM 送り分け）。 */
   notificationProvider?: NotificationProvider;
   pushProvider?: NotificationProvider;
+  /** ロゴ等のオブジェクトストレージ（RustFS/S3）。未設定ならロゴ機能は無効。 */
+  storage?: Storage;
 }
 
 const roleSchema = z.enum(["superadmin", "admin"]);
@@ -285,6 +289,31 @@ export function createAdminApp(deps: AdminAppDeps) {
   app.delete("/teachers/:id", async (c) => {
     const t = await teachersRepo.findTeacherById(db, c.req.param("id"));
     if (t) await teachersRepo.deleteTeacherInSchool(db, t.schoolId, t.id);
+    return c.body(null, 204);
+  });
+
+  // --- 学校ロゴ（RustFS）---
+  app.post(
+    "/schools/:id/logo",
+    zValidator("json", z.object({ contentType: z.string().min(1), dataBase64: z.string().min(1) })),
+    async (c) => {
+      if (!deps.storage) return c.json({ error: "storage not configured" }, 503);
+      const id = c.req.param("id");
+      const school = await schoolsRepo.findSchoolById(db, id);
+      if (!school) return c.json({ error: "not found" }, 404);
+      const b = c.req.valid("json");
+      const prepared = prepareLogo(id, b.contentType, b.dataBase64);
+      if (!prepared.ok) return c.json({ error: prepared.error }, 400);
+      await deps.storage.put(prepared.key, prepared.bytes, prepared.contentType);
+      await schoolsRepo.updateSchool(db, id, { logoKey: prepared.key });
+      return c.json({ logoKey: prepared.key });
+    },
+  );
+  app.delete("/schools/:id/logo", async (c) => {
+    const id = c.req.param("id");
+    const school = await schoolsRepo.findSchoolById(db, id);
+    if (school?.logoKey && deps.storage) await deps.storage.delete(school.logoKey).catch(() => {});
+    if (school) await schoolsRepo.updateSchool(db, id, { logoKey: null });
     return c.body(null, 204);
   });
 

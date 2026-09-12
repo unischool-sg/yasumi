@@ -57,6 +57,27 @@ export function SchoolDetail({ id }: { id: string }) {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["school", id] });
   const onError = (e: unknown) => toast.error(`保存に失敗しました: ${(e as Error).message}`);
+  const apiBase = import.meta.env.VITE_ADMIN_API_BASE_URL ?? "";
+  const [logoVer, setLogoVer] = useState(0);
+  const uploadLogo = useMutation({
+    mutationFn: async (file: File) => {
+      const dataBase64 = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result).split(",")[1] ?? "");
+        r.onerror = () => reject(r.error);
+        r.readAsDataURL(file);
+      });
+      return api.uploadSchoolLogo(id, file.type, dataBase64);
+    },
+    onSuccess: () => { invalidate(); setLogoVer((v) => v + 1); toast.success("ロゴを保存しました"); },
+    onError,
+  });
+  const delLogo = useMutation({
+    mutationFn: () => api.deleteSchoolLogo(id),
+    onSuccess: () => { invalidate(); setLogoVer((v) => v + 1); toast.success("ロゴを削除しました"); },
+    onError,
+  });
+
   const save = useMutation({
     mutationFn: () =>
       api.updateSchool(id, {
@@ -177,6 +198,32 @@ export function SchoolDetail({ id }: { id: string }) {
               sx={{ width: 200, flexShrink: 0 }}
             />
           </Stack>
+          <Stack direction="row" spacing={2} sx={{ mb: 2, alignItems: "center" }}>
+            <Box
+              sx={{
+                width: 56, height: 56, borderRadius: 2, border: "1px solid", borderColor: "divider",
+                display: "grid", placeItems: "center", overflow: "hidden", bgcolor: "#fff", flexShrink: 0,
+              }}
+            >
+              {data.logoKey
+                ? <img src={`${apiBase}/public/school-logo/${id}?t=${logoVer}`} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                : <Typography variant="caption" color="text.secondary">ロゴ無</Typography>}
+            </Box>
+            <Button variant="outlined" component="label" size="small" disabled={uploadLogo.isPending}>
+              ロゴをアップロード
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                hidden
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadLogo.mutate(f); e.target.value = ""; }}
+              />
+            </Button>
+            {data.logoKey && (
+              <Button size="small" color="error" disabled={delLogo.isPending} onClick={() => delLogo.mutate()}>削除</Button>
+            )}
+            <Typography variant="caption" color="text.secondary">png/jpeg/webp/svg・512KBまで</Typography>
+          </Stack>
+
           <Typography variant="subtitle2" sx={{ mb: 1 }}>対象地域（都道府県ごとに追加・県跨ぎOK）</Typography>
           <Box sx={{ mb: 2 }}>
             <AreaBlocksPicker

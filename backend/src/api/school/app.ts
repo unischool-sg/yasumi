@@ -5,7 +5,9 @@ import { z } from "zod";
 import type { Db } from "../../infrastructure/db/client.ts";
 import type { NotificationProvider } from "../../domain/notification/provider.ts";
 import { notifyUser } from "../../domain/notification/dispatch.ts";
-import { announcementMonthlyLimit, jstMonthStart } from "../../domain/plan.ts";
+import { prepareLogo } from "../../domain/logo.ts";
+import { announcementMonthlyLimit, hasFeature, jstMonthStart } from "../../domain/plan.ts";
+import type { Storage } from "../../infrastructure/storage/s3.ts";
 import * as absenceReportsRepo from "../../infrastructure/db/repositories/absence-reports.ts";
 import * as closureDraftsRepo from "../../infrastructure/db/repositories/closure-drafts.ts";
 import * as msgRepo from "../../infrastructure/db/repositories/school-messages.ts";
@@ -24,6 +26,8 @@ export interface SchoolAppDeps {
   pushProvider?: NotificationProvider;
   /** 確認リンクの生成に使う API 公開URL（例 https://yasumi-api.unischool.jp）。未設定なら確認リンクを付けない。 */
   apiBaseUrl?: string;
+  /** ロゴ等のオブジェクトストレージ（RustFS/S3）。未設定ならロゴ機能は無効。 */
+  storage?: Storage;
 }
 
 /**
@@ -216,6 +220,36 @@ export function createSchoolApp(deps: SchoolAppDeps) {
       return c.json(updated);
     },
   );
+
+  // --- 学校ロゴ（owner・standard+ で自校のロゴを差し替え / M17）---
+  app.post(
+    "/logo",
+    zValidator("json", z.object({ contentType: z.string().min(1), dataBase64: z.string().min(1) })),
+    async (c) => {
+      const teacher = c.get("teacher");
+      if (teacher.role !== "owner") return c.json({ error: "forbidden" }, 403);
+      if (!deps.storage) return c.json({ error: "storage not configured" }, 503);
+      const school = await schoolsRepo.findSchoolById(db, teacher.schoolId);
+      if (!school) return c.json({ error: "not found" }, 404);
+      if (!hasFeature(school, "logo", deps.now?.() ?? new Date())) {
+        return c.json({ error: "ロゴ設定はスタンダード以上のプランで利用できます" }, 403);
+      }
+      const b = c.req.valid("json");
+      const prepared = prepareLogo(teacher.schoolId, b.contentType, b.dataBase64);
+      if (!prepared.ok) return c.json({ error: prepared.error }, 400);
+      await deps.storage.put(prepared.key, prepared.bytes, prepared.contentType);
+      await schoolsRepo.updateSchool(db, teacher.schoolId, { logoKey: prepared.key });
+      return c.json({ logoKey: prepared.key });
+    },
+  );
+  app.delete("/logo", async (c) => {
+    const teacher = c.get("teacher");
+    if (teacher.role !== "owner") return c.json({ error: "forbidden" }, 403);
+    const school = await schoolsRepo.findSchoolById(db, teacher.schoolId);
+    if (school?.logoKey && deps.storage) await deps.storage.delete(school.logoKey).catch(() => {});
+    if (school) await schoolsRepo.updateSchool(db, teacher.schoolId, { logoKey: null });
+    return c.body(null, 204);
+  });
 
   return app;
 }

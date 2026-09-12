@@ -12,6 +12,7 @@ export type NewSchool = {
   studentCount?: number | null;
   plan?: string | null;
   planExpiresAt?: Date | null;
+  logoKey?: string | null;
   createdBy?: string | null;
 };
 
@@ -65,6 +66,9 @@ export type PublicSchool = {
   prefecture: string;
   city: string | null;
   websiteUrl: string | null;
+  logoKey: string | null;
+  plan: string | null;
+  planExpiresAt: Date | null;
 };
 
 export async function listPublicSchools(db: Db): Promise<PublicSchool[]> {
@@ -75,6 +79,9 @@ export async function listPublicSchools(db: Db): Promise<PublicSchool[]> {
       prefecture: schools.prefecture,
       city: schools.city,
       websiteUrl: schools.websiteUrl,
+      logoKey: schools.logoKey,
+      plan: schools.plan,
+      planExpiresAt: schools.planExpiresAt,
     })
     .from(schools)
     .orderBy(schools.prefecture, schools.name);

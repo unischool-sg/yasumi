@@ -9,9 +9,10 @@ import { createSchoolApp } from "./school/app.ts";
 import { type AuthDeps, type AuthEnv, authMiddleware } from "./auth.ts";
 import { checkSchoolEditable } from "./authz.ts";
 import { notifyUser } from "../domain/notification/dispatch.ts";
-import { absenceEnabled } from "../domain/plan.ts";
+import { absenceEnabled, isPlanActive } from "../domain/plan.ts";
 import { postDiscordMessage } from "../infrastructure/discord/notify.ts";
 import { getLineProfile } from "../infrastructure/line/line-api.ts";
+import { type Storage, mimeFromKey } from "../infrastructure/storage/s3.ts";
 import { exchangeLineCode } from "./line-login.ts";
 import { rateLimit } from "./middleware/rate-limit.ts";
 import type { NotificationProvider } from "../domain/notification/provider.ts";
@@ -55,6 +56,8 @@ export interface AppDeps extends AuthDeps {
   discordWebhookUrl?: string;
   /** 管理画面の公開URL（Discord 転送に載せる連絡リンク用。例 https://yasumi-admin.unischool.jp）。 */
   adminBaseUrl?: string;
+  /** ロゴ等のオブジェクトストレージ（RustFS/S3）。未設定ならロゴ機能はドーマント。 */
+  storage?: Storage;
   /** テスト用 fetch 注入（Discord/LINE プロフィール取得）。未指定なら global fetch。 */
   fetchFn?: (url: string, init?: RequestInit) => Promise<Response>;
   /** ネイティブ LINE ログインのトークン交換用（LIFF と同じ LINE Login チャネル）。 */
@@ -163,7 +166,36 @@ export function createApp(deps: AppDeps) {
 
   // 公開: 登録済み学校の一覧（landing の学校一覧ページ / 認証不要・PII なし）。
   app.get("/public/schools", async (c) => {
-    return c.json(await schoolsRepo.listPublicSchools(deps.db));
+    const now = deps.now?.() ?? new Date();
+    const base = deps.apiBaseUrl ?? "";
+    const rows = await schoolsRepo.listPublicSchools(deps.db);
+    return c.json(
+      rows.map((s) => ({
+        id: s.id,
+        name: s.name,
+        prefecture: s.prefecture,
+        city: s.city,
+        websiteUrl: s.websiteUrl,
+        logoUrl: s.logoKey ? `${base}/public/school-logo/${s.id}` : null,
+        verified: isPlanActive(s, now), // プラン有効校＝公式連携済みバッジ用
+      })),
+    );
+  });
+
+  // 公開: 学校ロゴ画像を RustFS からプロキシ配信（認証不要）。
+  app.get("/public/school-logo/:id", async (c) => {
+    if (!deps.storage) return c.notFound();
+    const school = await schoolsRepo.findSchoolById(deps.db, c.req.param("id"));
+    if (!school?.logoKey) return c.notFound();
+    const bytes = await deps.storage.get(school.logoKey).catch(() => null);
+    if (!bytes) return c.notFound();
+    return new Response(bytes, {
+      status: 200,
+      headers: {
+        "content-type": mimeFromKey(school.logoKey),
+        "cache-control": "public, max-age=3600",
+      },
+    });
   });
 
   // 公式メッセージの「確認しました」リンク（認証不要・署名トークンで本人特定 / M15）。
@@ -569,6 +601,7 @@ export function createApp(deps: AppDeps) {
         ...(deps.lineChannelAccessToken ? { lineAccessToken: deps.lineChannelAccessToken } : {}),
         ...(deps.notificationProvider ? { notificationProvider: deps.notificationProvider } : {}),
         ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
+        ...(deps.storage ? { storage: deps.storage } : {}),
       }),
     );
   }
@@ -584,6 +617,7 @@ export function createApp(deps: AppDeps) {
         ...(deps.notificationProvider ? { notificationProvider: deps.notificationProvider } : {}),
         ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
         ...(deps.apiBaseUrl ? { apiBaseUrl: deps.apiBaseUrl } : {}),
+        ...(deps.storage ? { storage: deps.storage } : {}),
       }),
     );
   }

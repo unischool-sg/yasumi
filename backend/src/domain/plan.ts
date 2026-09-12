@@ -35,6 +35,46 @@ export function announcementMonthlyLimit(school: PlanFields, now: Date = new Dat
   }
 }
 
+/** 教員アカウントのプラン別上限（席数）。null=無制限。有効プラン無しは 0。 */
+export function teacherSeatLimit(school: PlanFields, now: Date = new Date()): number | null {
+  if (!isPlanActive(school, now)) return 0;
+  switch (school.plan) {
+    case "basic":
+      return 1;
+    case "standard":
+      return 5;
+    case "premium":
+      return null; // 無制限
+    default:
+      return 0;
+  }
+}
+
+/** 上位プラン機能。standard 以上 / premium 限定 を判定（すべて有効プラン前提）。 */
+export type PlanFeature = "logo" | "segment" | "messageKind" | "ownerManageTeachers" | "csvExport";
+
+const RANK: Record<string, number> = { basic: 1, standard: 2, premium: 3 };
+
+export function planRank(plan: string | null): number {
+  return plan ? (RANK[plan] ?? 0) : 0;
+}
+
+export function hasFeature(school: PlanFields, feature: PlanFeature, now: Date = new Date()): boolean {
+  if (!isPlanActive(school, now)) return false;
+  const rank = planRank(school.plan);
+  switch (feature) {
+    case "csvExport":
+      return rank >= 3; // premium
+    case "logo":
+    case "segment":
+    case "messageKind":
+    case "ownerManageTeachers":
+      return rank >= 2; // standard 以上
+    default:
+      return false;
+  }
+}
+
 /** JST 当月1日 00:00 に相当する UTC 時刻（月間集計の起点）。 */
 export function jstMonthStart(now: Date = new Date()): Date {
   const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
