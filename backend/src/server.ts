@@ -5,6 +5,7 @@ import { getDb } from "./infrastructure/db/client.ts";
 import { FcmNotificationProvider } from "./infrastructure/fcm/fcm-notification-provider.ts";
 import { JmaWarningProvider } from "./infrastructure/jma/jma-warning-provider.ts";
 import { LineNotificationProvider } from "./infrastructure/line/line-notification-provider.ts";
+import { createGoogleAdsConversionProvider } from "./infrastructure/google-ads/conversion.ts";
 import { createS3Storage } from "./infrastructure/storage/s3.ts";
 
 const port = Number(process.env.PORT ?? 3000);
@@ -47,9 +48,22 @@ const storage = createS3Storage({
 });
 if (!storage) console.warn("[yasumi] S3_* 未設定のためロゴ機能は無効");
 
+// Google Ads コンバージョン送信。資格情報が揃っている時だけ有効化。
+const adsConversionProvider = createGoogleAdsConversionProvider({
+  developerToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN ?? "",
+  clientId: process.env.GOOGLE_ADS_CLIENT_ID ?? "",
+  clientSecret: process.env.GOOGLE_ADS_CLIENT_SECRET ?? "",
+  refreshToken: process.env.GOOGLE_ADS_REFRESH_TOKEN ?? "",
+  customerId: process.env.GOOGLE_ADS_CUSTOMER_ID ?? "",
+  loginCustomerId: process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID ?? "",
+  conversionAction: process.env.GOOGLE_ADS_CONVERSION_ACTION ?? "",
+});
+if (!adsConversionProvider) console.warn("[yasumi] GOOGLE_ADS_* 未設定のためコンバージョン送信は無効（gclidは保存のみ）");
+
 const app = createApp({
   db: getDb(),
   ...(storage ? { storage } : {}),
+  ...(adsConversionProvider ? { adsConversionProvider } : {}),
   verifyIdToken: createLineIdTokenVerifier(channelId),
   adminLineUserIds,
   lineChannelSecret: process.env.LINE_CHANNEL_SECRET ?? "",

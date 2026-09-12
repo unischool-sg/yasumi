@@ -1,4 +1,4 @@
-import { count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, isNull } from "drizzle-orm";
 import type { Db } from "../client.ts";
 import { lineAccounts, subscriptions, users } from "../schema.ts";
 
@@ -56,6 +56,29 @@ export async function listAllUserIds(db: Db): Promise<string[]> {
 }
 
 /** 内部ユーザーの LINE ユーザーIDを取得（通知送信に使う）。 */
+/** gclid を first-touch で保存（既に入っていれば上書きしない）。 */
+export async function setGclidIfAbsent(db: Db, userId: string, gclid: string, now: Date = new Date()): Promise<void> {
+  await db.update(users).set({ gclid, gclidAt: now }).where(and(eq(users.id, userId), isNull(users.gclid)));
+}
+
+/** コンバージョン判定用に gclid と送信済み時刻を取得。 */
+export async function getAttribution(
+  db: Db,
+  userId: string,
+): Promise<{ gclid: string | null; gclidConvertedAt: Date | null } | undefined> {
+  const rows = await db
+    .select({ gclid: users.gclid, gclidConvertedAt: users.gclidConvertedAt })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  return rows[0];
+}
+
+/** コンバージョン送信済みを記録（二重送信防止）。 */
+export async function markGclidConverted(db: Db, userId: string, at: Date): Promise<void> {
+  await db.update(users).set({ gclidConvertedAt: at }).where(eq(users.id, userId));
+}
+
 export async function getLineUserId(db: Db, userId: string): Promise<string | undefined> {
   const rows = await db
     .select({ lineUserId: lineAccounts.lineUserId })

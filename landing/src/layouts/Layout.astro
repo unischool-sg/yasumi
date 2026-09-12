@@ -108,6 +108,20 @@ const jsonLd = [
   </head>
   <body>
     <slot />
+    <script>
+      // 広告計測: LIFF_ID 設定時、友だち追加CTAを LIFF 経由にして現在の gclid を引き継ぐ。
+      import { LIFF_ID } from "../consts";
+      (() => {
+        if (!LIFF_ID) return;
+        const gclid = new URLSearchParams(location.search).get("gclid");
+        const base = `https://liff.line.me/${LIFF_ID}`;
+        for (const a of document.querySelectorAll<HTMLAnchorElement>('a[href*="line.me/R/ti/p"]')) {
+          const u = new URL(base);
+          if (gclid) u.searchParams.set("gclid", gclid);
+          a.href = u.toString();
+        }
+      })();
+    </script>
     <style is:global>
       :root {
         --blue: #1a73e8;

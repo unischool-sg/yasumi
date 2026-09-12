@@ -4,7 +4,7 @@ import {
 import type { UserRow } from "../api/client.ts";
 
 // ── 型 ───────────────────────────────────────────────
-export type QueryField = "subscriptionCount" | "createdAt" | "lineUserId" | "id";
+export type QueryField = "subscriptionCount" | "createdAt" | "lineUserId" | "id" | "flag";
 export type Combinator = "and" | "or";
 export interface FilterBlock { id: string; field: QueryField; op: string; value: string }
 export interface SortBlock { id: string; field: QueryField; dir: "asc" | "desc" }
@@ -12,14 +12,15 @@ export interface UserQuery { combinator: Combinator; filters: FilterBlock[]; sor
 
 export const EMPTY_QUERY: UserQuery = { combinator: "and", filters: [], sorts: [] };
 
-const FIELDS: Record<QueryField, { label: string; type: "number" | "date" | "string" }> = {
+const FIELDS: Record<QueryField, { label: string; type: "number" | "date" | "string" | "flag" }> = {
   subscriptionCount: { label: "購読校数", type: "number" },
   createdAt: { label: "登録日", type: "date" },
   lineUserId: { label: "LINE ID", type: "string" },
   id: { label: "内部ID", type: "string" },
+  flag: { label: "フラグ", type: "flag" },
 };
 
-const OPS: Record<"number" | "date" | "string", { v: string; label: string; needsValue: boolean; valueType?: "number" | "date" | "text" }[]> = {
+const OPS: Record<"number" | "date" | "string" | "flag", { v: string; label: string; needsValue: boolean; valueType?: "number" | "date" | "text" }[]> = {
   number: [
     { v: "gte", label: "≧", needsValue: true, valueType: "number" },
     { v: "lte", label: "≦", needsValue: true, valueType: "number" },
@@ -40,6 +41,10 @@ const OPS: Record<"number" | "date" | "string", { v: string; label: string; need
     { v: "empty", label: "が空", needsValue: false },
     { v: "notEmpty", label: "がある", needsValue: false },
   ],
+  flag: [
+    { v: "hasFlag", label: "を持つ", needsValue: true, valueType: "text" },
+    { v: "notHasFlag", label: "を持たない", needsValue: true, valueType: "text" },
+  ],
 };
 
 const genId = () => (crypto.randomUUID ? crypto.randomUUID() : `b${Date.now()}${Math.random()}`);
@@ -48,6 +53,10 @@ const defaultOp = (field: QueryField) => OPS[FIELDS[field].type][0]!.v;
 // ── 評価・ソート（Users から利用）──────────────────────
 function evalBlock(u: UserRow, b: FilterBlock): boolean {
   const type = FIELDS[b.field].type;
+  if (type === "flag") {
+    const has = (u.flags ?? []).includes(b.value);
+    return b.op === "hasFlag" ? has : !has;
+  }
   if (type === "number") {
     const n = u.subscriptionCount;
     const v = Number(b.value);
@@ -116,7 +125,7 @@ export function querySummary(q: UserQuery): string {
 }
 
 // ── モーダル UI（Scratch風ブロック）─────────────────────
-export function UserQueryEditor({ open, onClose, query, onChange }: { open: boolean; onClose: () => void; query: UserQuery; onChange: (q: UserQuery) => void }) {
+export function UserQueryEditor({ open, onClose, query, onChange, flagNames = [] }: { open: boolean; onClose: () => void; query: UserQuery; onChange: (q: UserQuery) => void; flagNames?: string[] }) {
   const setFilters = (filters: FilterBlock[]) => onChange({ ...query, filters });
   const setSorts = (sorts: SortBlock[]) => onChange({ ...query, sorts });
 
@@ -161,11 +170,16 @@ export function UserQueryEditor({ open, onClose, query, onChange }: { open: bool
                 <TextField select size="small" variant="standard" value={b.op} onChange={(e) => updateFilter(b.id, { op: e.target.value, value: "" })} sx={{ minWidth: 130 }}>
                   {OPS[type].map((o) => <MenuItem key={o.v} value={o.v}>{o.label}</MenuItem>)}
                 </TextField>
-                {op?.needsValue && (
+                {op?.needsValue && type === "flag" ? (
+                  <TextField select size="small" variant="standard" value={b.value} onChange={(e) => updateFilter(b.id, { value: e.target.value })} sx={{ minWidth: 130 }}>
+                    {flagNames.length === 0 && <MenuItem value="" disabled>（フラグ未定義）</MenuItem>}
+                    {flagNames.map((n) => <MenuItem key={n} value={n}>{n}</MenuItem>)}
+                  </TextField>
+                ) : op?.needsValue ? (
                   <TextField size="small" variant="standard" type={op.valueType === "number" ? "number" : op.valueType === "date" ? "date" : "text"}
                     value={b.value} onChange={(e) => updateFilter(b.id, { value: e.target.value })}
                     slotProps={op.valueType === "date" ? { inputLabel: { shrink: true } } : undefined} sx={{ minWidth: 120 }} />
-                )}
+                ) : null}
                 <Box sx={{ flex: 1 }} />
                 <IconButton size="small" onClick={() => removeFilter(b.id)}>✕</IconButton>
               </Box>

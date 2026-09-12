@@ -272,6 +272,34 @@ suite("Admin API", () => {
     expect(((await r2.json()) as { sent: number }).sent).toBeGreaterThanOrEqual(2);
   });
 
+  it("フラグ: 定義・一括付与/解除・一覧反映", async () => {
+    const suT = await loginToken(suName);
+    const { userId } = (await (await req("/api/me", { headers: bearer("Uflag1") })).json()) as { userId: string };
+    // 定義作成
+    expect((await req("/api/admin/flag-defs", {
+      method: "POST", headers: { ...bearer(suT), "content-type": "application/json" },
+      body: JSON.stringify({ name: "送信済み", color: "#1a73e8" }),
+    })).status).toBe(201);
+    const defs = (await (await req("/api/admin/flag-defs", { headers: bearer(suT) })).json()) as { name: string }[];
+    expect(defs.some((d) => d.name === "送信済み")).toBe(true);
+    // 付与
+    const asg = await req("/api/admin/flags/assign", {
+      method: "POST", headers: { ...bearer(suT), "content-type": "application/json" },
+      body: JSON.stringify({ userIds: [userId], name: "送信済み" }),
+    });
+    expect(((await asg.json()) as { assigned: number }).assigned).toBe(1);
+    // 一覧に反映
+    const users = (await (await req("/api/admin/users", { headers: bearer(suT) })).json()) as { id: string; flags: string[] }[];
+    expect(users.find((u) => u.id === userId)?.flags).toContain("送信済み");
+    // 解除
+    await req("/api/admin/flags/unassign", {
+      method: "POST", headers: { ...bearer(suT), "content-type": "application/json" },
+      body: JSON.stringify({ userIds: [userId], name: "送信済み" }),
+    });
+    const users2 = (await (await req("/api/admin/users", { headers: bearer(suT) })).json()) as { id: string; flags: string[] }[];
+    expect(users2.find((u) => u.id === userId)?.flags ?? []).not.toContain("送信済み");
+  });
+
   it("ユーザー一覧に購読数・複数選択送信・定型文CRUD", async () => {
     const suT = await loginToken(suName);
     // 学校作成＋ユーザー購読
