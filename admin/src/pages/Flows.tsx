@@ -18,7 +18,7 @@ export function Flows() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [flowOpen, setFlowOpen] = useState(false);
   const [allUsers, setAllUsers] = useState(false);
-  const [newTpl, setNewTpl] = useState({ title: "", body: "" });
+  const [tplForm, setTplForm] = useState<{ id: string | null; title: string; body: string }>({ id: null, title: "", body: "" });
   const [tplModalOpen, setTplModalOpen] = useState(false);
   const [newFlag, setNewFlag] = useState("");
 
@@ -26,7 +26,14 @@ export function Flows() {
   const audienceIds = shown.map((u) => u.id);
 
   const onErr = (e: unknown) => toast.error(`失敗しました: ${(e as Error).message}`);
-  const addTpl = useMutation({ mutationFn: () => api.createMessageTemplate(newTpl), onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-templates"] }); setNewTpl({ title: "", body: "" }); setTplModalOpen(false); toast.success("定型文を保存しました"); }, onError: onErr });
+  const saveTpl = useMutation({
+    mutationFn: () => {
+      const b = { title: tplForm.title, body: tplForm.body };
+      return tplForm.id ? api.updateMessageTemplate(tplForm.id, b) : api.createMessageTemplate(b);
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-templates"] }); setTplForm({ id: null, title: "", body: "" }); setTplModalOpen(false); toast.success("定型文を保存しました"); },
+    onError: onErr,
+  });
   const delTpl = useMutation({ mutationFn: (id: string) => api.deleteMessageTemplate(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-templates"] }); toast.success("削除しました"); }, onError: onErr });
   const addFlagDef = useMutation({ mutationFn: () => api.createFlagDef({ name: newFlag.trim() }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["flag-defs"] }); setNewFlag(""); toast.success("フラグを作成しました"); }, onError: onErr });
   const delFlagDef = useMutation({ mutationFn: (name: string) => api.deleteFlagDef(name), onSuccess: () => { qc.invalidateQueries({ queryKey: ["flag-defs"] }); qc.invalidateQueries({ queryKey: ["users"] }); toast.success("フラグを削除しました"); }, onError: onErr });
@@ -74,13 +81,14 @@ export function Flows() {
               <Stack key={t.id} direction="row" spacing={1} sx={{ alignItems: "center" }}>
                 <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 140 }}>{t.title}</Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.body}</Typography>
+                <Button size="small" onClick={() => { setTplForm({ id: t.id, title: t.title, body: t.body }); setTplModalOpen(true); }}>編集</Button>
                 <Button size="small" color="error" onClick={() => delTpl.mutate(t.id)}>削除</Button>
               </Stack>
             ))}
             {templates.length === 0 && <Typography variant="caption" color="text.secondary">定型文がありません</Typography>}
           </Stack>
           <Divider sx={{ mb: 1.5 }} />
-          <Button variant="outlined" size="small" onClick={() => { setNewTpl({ title: "", body: "" }); setTplModalOpen(true); }}>＋ 定型文を追加</Button>
+          <Button variant="outlined" size="small" onClick={() => { setTplForm({ id: null, title: "", body: "" }); setTplModalOpen(true); }}>＋ 定型文を追加</Button>
         </CardContent>
       </Card>
 
@@ -100,16 +108,16 @@ export function Flows() {
       </Card>
 
       <Dialog open={tplModalOpen} onClose={() => setTplModalOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>定型文を追加</DialogTitle>
+        <DialogTitle>{tplForm.id ? "定型文を編集" : "定型文を追加"}</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2} sx={{ mt: 0.5 }}>
-            <TextField label="タイトル" value={newTpl.title} onChange={(e) => setNewTpl({ ...newTpl, title: e.target.value })} fullWidth />
-            <TextField label="本文" value={newTpl.body} onChange={(e) => setNewTpl({ ...newTpl, body: e.target.value })} fullWidth multiline minRows={5} />
+            <TextField label="タイトル" value={tplForm.title} onChange={(e) => setTplForm({ ...tplForm, title: e.target.value })} fullWidth />
+            <TextField label="本文" value={tplForm.body} onChange={(e) => setTplForm({ ...tplForm, body: e.target.value })} fullWidth multiline minRows={5} />
           </Stack>
         </DialogContent>
         <DialogActions>
           <Button color="inherit" onClick={() => setTplModalOpen(false)}>キャンセル</Button>
-          <Button variant="contained" disabled={!newTpl.title.trim() || !newTpl.body.trim() || addTpl.isPending} onClick={() => addTpl.mutate()}>保存</Button>
+          <Button variant="contained" disabled={!tplForm.title.trim() || !tplForm.body.trim() || saveTpl.isPending} onClick={() => saveTpl.mutate()}>保存</Button>
         </DialogActions>
       </Dialog>
 

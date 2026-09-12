@@ -375,6 +375,11 @@ export function createAdminApp(deps: AdminAppDeps) {
     zValidator("json", z.object({ title: z.string().min(1).max(100), body: z.string().min(1).max(1000) })),
     async (c) => c.json(await adminTemplatesRepo.createTemplate(db, c.req.valid("json")), 201),
   );
+  app.patch(
+    "/message-templates/:id",
+    zValidator("json", z.object({ title: z.string().min(1).max(100), body: z.string().min(1).max(1000) })),
+    async (c) => c.json(await adminTemplatesRepo.updateTemplate(db, c.req.param("id"), c.req.valid("json"))),
+  );
   app.delete("/message-templates/:id", async (c) => {
     await adminTemplatesRepo.deleteTemplate(db, c.req.param("id"));
     return c.body(null, 204);
