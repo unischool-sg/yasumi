@@ -15,6 +15,13 @@ export async function listTemplates(db: Db): Promise<AdminMessageTemplateRow[]> 
   return db.select().from(adminMessageTemplates).orderBy(desc(adminMessageTemplates.createdAt));
 }
 
+export async function updateTemplate(db: Db, id: string, input: { title: string; body: string }): Promise<AdminMessageTemplateRow> {
+  const rows = await db.update(adminMessageTemplates).set(input).where(eq(adminMessageTemplates.id, id)).returning();
+  const row = rows[0];
+  if (!row) throw new Error("admin template not found");
+  return row;
+}
+
 export async function deleteTemplate(db: Db, id: string): Promise<void> {
   await db.delete(adminMessageTemplates).where(eq(adminMessageTemplates.id, id));
 }

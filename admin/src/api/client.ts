@@ -199,6 +199,8 @@ export const api = {
   getMessageTemplates: () => request<AdminMessageTemplate[]>("/message-templates"),
   createMessageTemplate: (b: { title: string; body: string }) =>
     request<AdminMessageTemplate>("/message-templates", { method: "POST", body: JSON.stringify(b) }),
+  updateMessageTemplate: (id: string, b: { title: string; body: string }) =>
+    request<AdminMessageTemplate>(`/message-templates/${id}`, { method: "PATCH", body: JSON.stringify(b) }),
   deleteMessageTemplate: (id: string) => request<void>(`/message-templates/${id}`, { method: "DELETE" }),
   // フラグ
   getFlagDefs: () => request<FlagDef[]>("/flag-defs"),
