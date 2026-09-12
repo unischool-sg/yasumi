@@ -271,4 +271,41 @@ suite("Admin API", () => {
     });
     expect(((await r2.json()) as { sent: number }).sent).toBeGreaterThanOrEqual(2);
   });
+
+  it("ユーザー一覧に購読数・複数選択送信・定型文CRUD", async () => {
+    const suT = await loginToken(suName);
+    // 学校作成＋ユーザー購読
+    const school = (await (await req("/api/admin/schools", {
+      method: "POST", headers: { ...bearer(suT), "content-type": "application/json" },
+      body: JSON.stringify({ name: "購読数テスト校", prefecture: "兵庫県" }),
+    })).json()) as { id: string };
+    const { userId } = (await (await req("/api/me", { headers: bearer("Usubcount") })).json()) as { userId: string };
+    await req(`/api/admin/users/${userId}/subscriptions`, {
+      method: "POST", headers: { ...bearer(suT), "content-type": "application/json" },
+      body: JSON.stringify({ schoolId: school.id }),
+    });
+
+    // 一覧に subscriptionCount
+    const users = (await (await req("/api/admin/users", { headers: bearer(suT) })).json()) as { id: string; subscriptionCount: number }[];
+    expect(users.find((u) => u.id === userId)?.subscriptionCount).toBe(1);
+
+    // 複数選択（users型）送信
+    const bc = await req("/api/admin/broadcast", {
+      method: "POST", headers: { ...bearer(suT), "content-type": "application/json" },
+      body: JSON.stringify({ text: "選択送信", target: { type: "users", userIds: [userId] } }),
+    });
+    expect(bc.status).toBe(200);
+    expect(((await bc.json()) as { total: number }).total).toBe(1);
+
+    // 定型文 CRUD
+    const created = await req("/api/admin/message-templates", {
+      method: "POST", headers: { ...bearer(suT), "content-type": "application/json" },
+      body: JSON.stringify({ title: "お礼", body: "ご登録ありがとうございます" }),
+    });
+    expect(created.status).toBe(201);
+    const tpl = (await created.json()) as { id: string };
+    const list = (await (await req("/api/admin/message-templates", { headers: bearer(suT) })).json()) as { id: string; title: string }[];
+    expect(list.some((x) => x.id === tpl.id && x.title === "お礼")).toBe(true);
+    expect((await req(`/api/admin/message-templates/${tpl.id}`, { method: "DELETE", headers: bearer(suT) })).status).toBe(204);
+  });
 });

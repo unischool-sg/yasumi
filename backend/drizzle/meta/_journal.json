@@ -71,6 +71,13 @@
       "when": 1789173242077,
       "tag": "0009_message_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789200305432,
+      "tag": "0010_admin_message_templates",
+      "breakpoints": true
     }
   ]
 }
