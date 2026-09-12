@@ -5,7 +5,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { type UserRow, api } from "../api/client.ts";
 import { DataTable } from "../components/DataTable.tsx";
-import { EMPTY_QUERY, type UserQuery, UserQueryEditor, compareUsers, matchesQuery, querySummary } from "../components/UserQueryEditor.tsx";
+import { EMPTY_QUERY, type UserQuery, UserQueryEditor, compareUsers, matchesQuery, querySummary, schoolOptionsFromUsers } from "../components/UserQueryEditor.tsx";
 
 export function Users() {
   const navigate = useNavigate();
@@ -13,6 +13,7 @@ export function Users() {
   const { data: flagDefs = [] } = useQuery({ queryKey: ["flag-defs"], queryFn: api.getFlagDefs });
   const flagNames = flagDefs.map((f) => f.name);
 
+  const schoolOptions = schoolOptionsFromUsers(data);
   const [query, setQuery] = useState<UserQuery>(EMPTY_QUERY);
   const [editorOpen, setEditorOpen] = useState(false);
   const active = query.filters.length > 0 || query.sorts.length > 0;
@@ -74,7 +75,7 @@ export function Users() {
 
       <DataTable columns={columns} data={shown} empty="条件に一致するユーザーがいません" />
 
-      <UserQueryEditor open={editorOpen} onClose={() => setEditorOpen(false)} query={query} onChange={setQuery} flagNames={flagNames} />
+      <UserQueryEditor open={editorOpen} onClose={() => setEditorOpen(false)} query={query} onChange={setQuery} flagNames={flagNames} schoolOptions={schoolOptions} />
     </Box>
   );
 }

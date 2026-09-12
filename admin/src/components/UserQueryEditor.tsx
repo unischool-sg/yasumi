@@ -4,23 +4,26 @@ import {
 import type { UserRow } from "../api/client.ts";
 
 // ── 型 ───────────────────────────────────────────────
-export type QueryField = "subscriptionCount" | "createdAt" | "lineUserId" | "id" | "flag";
+export type QueryField = "subscriptionCount" | "createdAt" | "lineUserId" | "id" | "flag" | "school";
 export type Combinator = "and" | "or";
-export interface FilterBlock { id: string; field: QueryField; op: string; value: string }
+export interface FilterBlock { id: string; field: QueryField; op: string; value: string; label?: string }
 export interface SortBlock { id: string; field: QueryField; dir: "asc" | "desc" }
 export interface UserQuery { combinator: Combinator; filters: FilterBlock[]; sorts: SortBlock[] }
 
 export const EMPTY_QUERY: UserQuery = { combinator: "and", filters: [], sorts: [] };
 
-const FIELDS: Record<QueryField, { label: string; type: "number" | "date" | "string" | "flag" }> = {
+type FieldType = "number" | "date" | "string" | "flag" | "school";
+
+const FIELDS: Record<QueryField, { label: string; type: FieldType }> = {
   subscriptionCount: { label: "購読校数", type: "number" },
   createdAt: { label: "登録日", type: "date" },
   lineUserId: { label: "LINE ID", type: "string" },
   id: { label: "内部ID", type: "string" },
   flag: { label: "フラグ", type: "flag" },
+  school: { label: "購読中の学校", type: "school" },
 };
 
-const OPS: Record<"number" | "date" | "string" | "flag", { v: string; label: string; needsValue: boolean; valueType?: "number" | "date" | "text" }[]> = {
+const OPS: Record<FieldType, { v: string; label: string; needsValue: boolean; valueType?: "number" | "date" | "text" }[]> = {
   number: [
     { v: "gte", label: "≧", needsValue: true, valueType: "number" },
     { v: "lte", label: "≦", needsValue: true, valueType: "number" },
@@ -45,6 +48,10 @@ const OPS: Record<"number" | "date" | "string" | "flag", { v: string; label: str
     { v: "hasFlag", label: "を持つ", needsValue: true, valueType: "text" },
     { v: "notHasFlag", label: "を持たない", needsValue: true, valueType: "text" },
   ],
+  school: [
+    { v: "subscribes", label: "を購読している", needsValue: true, valueType: "text" },
+    { v: "notSubscribes", label: "を購読していない", needsValue: true, valueType: "text" },
+  ],
 };
 
 const genId = () => (crypto.randomUUID ? crypto.randomUUID() : `b${Date.now()}${Math.random()}`);
@@ -56,6 +63,10 @@ function evalBlock(u: UserRow, b: FilterBlock): boolean {
   if (type === "flag") {
     const has = (u.flags ?? []).includes(b.value);
     return b.op === "hasFlag" ? has : !has;
+  }
+  if (type === "school") {
+    const has = (u.subscribedSchools ?? []).some((s) => s.id === b.value);
+    return b.op === "subscribes" ? has : !has;
   }
   if (type === "number") {
     const n = u.subscriptionCount;
@@ -107,6 +118,13 @@ export function compareUsers(a: UserRow, b: UserRow, sorts: SortBlock[]): number
   return 0;
 }
 
+/** ロード済みユーザーの購読から、絞り込み用の学校候補（重複除去・名前順）を作る。 */
+export function schoolOptionsFromUsers(users: UserRow[]): { id: string; name: string }[] {
+  const map = new Map<string, string>();
+  for (const u of users) for (const s of u.subscribedSchools ?? []) map.set(s.id, s.name);
+  return [...map.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, "ja"));
+}
+
 export function querySummary(q: UserQuery): string {
   const parts: string[] = [];
   if (q.filters.length) {
@@ -115,6 +133,7 @@ export function querySummary(q: UserQuery): string {
       q.filters
         .map((b) => {
           const op = OPS[FIELDS[b.field].type].find((o) => o.v === b.op);
+          if (b.field === "school") return `${b.label ?? b.value}${op?.label ?? b.op}`;
           return `${FIELDS[b.field].label}${op?.label ?? b.op}${op?.needsValue ? ` ${b.value}` : ""}`;
         })
         .join(joiner),
@@ -125,7 +144,7 @@ export function querySummary(q: UserQuery): string {
 }
 
 // ── モーダル UI（Scratch風ブロック）─────────────────────
-export function UserQueryEditor({ open, onClose, query, onChange, flagNames = [] }: { open: boolean; onClose: () => void; query: UserQuery; onChange: (q: UserQuery) => void; flagNames?: string[] }) {
+export function UserQueryEditor({ open, onClose, query, onChange, flagNames = [], schoolOptions = [] }: { open: boolean; onClose: () => void; query: UserQuery; onChange: (q: UserQuery) => void; flagNames?: string[]; schoolOptions?: { id: string; name: string }[] }) {
   const setFilters = (filters: FilterBlock[]) => onChange({ ...query, filters });
   const setSorts = (sorts: SortBlock[]) => onChange({ ...query, sorts });
 
@@ -175,6 +194,12 @@ export function UserQueryEditor({ open, onClose, query, onChange, flagNames = []
                     {flagNames.length === 0 && <MenuItem value="" disabled>（フラグ未定義）</MenuItem>}
                     {flagNames.map((n) => <MenuItem key={n} value={n}>{n}</MenuItem>)}
                   </TextField>
+                ) : op?.needsValue && type === "school" ? (
+                  <TextField select size="small" variant="standard" value={b.value}
+                    onChange={(e) => updateFilter(b.id, { value: e.target.value, label: schoolOptions.find((s) => s.id === e.target.value)?.name })} sx={{ minWidth: 180 }}>
+                    {schoolOptions.length === 0 && <MenuItem value="" disabled>（購読校なし）</MenuItem>}
+                    {schoolOptions.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
+                  </TextField>
                 ) : op?.needsValue ? (
                   <TextField size="small" variant="standard" type={op.valueType === "number" ? "number" : op.valueType === "date" ? "date" : "text"}
                     value={b.value} onChange={(e) => updateFilter(b.id, { value: e.target.value })}
@@ -196,7 +221,7 @@ export function UserQueryEditor({ open, onClose, query, onChange, flagNames = []
             <Box key={s.id} sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", bgcolor: "#e6f4ea", borderRadius: 999, px: 1.5, py: 1 }}>
               <Chip size="small" label={i + 1} />
               <TextField select size="small" variant="standard" value={s.field} onChange={(e) => updateSort(s.id, { field: e.target.value as QueryField })} sx={{ minWidth: 110 }}>
-                {Object.entries(FIELDS).map(([k, v]) => <MenuItem key={k} value={k}>{v.label}</MenuItem>)}
+                {Object.entries(FIELDS).filter(([k]) => k !== "school").map(([k, v]) => <MenuItem key={k} value={k}>{v.label}</MenuItem>)}
               </TextField>
               <TextField select size="small" variant="standard" value={s.dir} onChange={(e) => updateSort(s.id, { dir: e.target.value as "asc" | "desc" })} sx={{ minWidth: 90 }}>
                 <MenuItem value="asc">昇順 ↑</MenuItem>
