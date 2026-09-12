@@ -16,8 +16,8 @@ export async function postDiscordMessage(
     const res = await fetchFn(webhookUrl, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      // Discord の content 上限は 2000 文字。
-      body: JSON.stringify({ content: content.slice(0, 1990) }),
+      // Discord の content 上限は 2000 文字。allowed_mentions で @everyone 等の ping を無効化。
+      body: JSON.stringify({ content: content.slice(0, 1990), allowed_mentions: { parse: [] } }),
     });
     return res.ok;
   } catch {

@@ -579,10 +579,18 @@ suite("School (teacher) API", () => {
     // 履歴に kind
     const hist = (await (await r2("/api/school/messages", { headers: bearer(token) })).json()) as { kind: string }[];
     expect(hist.some((m) => m.kind === "closure")).toBe(true);
+    // 数式インジェクション対策の確認: 先頭 = のメッセージを送って CSV で ' 無害化されること
+    await r2("/api/school/broadcast", {
+      method: "POST", headers: { ...bearer(token), "content-type": "application/json" },
+      body: JSON.stringify({ text: "=HACK()", category: "emergency" }),
+    });
     // CSV（A=premium）→ 200 text/csv
     const csv = await r2("/api/school/messages.csv", { headers: bearer(token) });
     expect(csv.status).toBe(200);
     expect(csv.headers.get("content-type")).toContain("text/csv");
+    const body = await csv.text();
+    expect(body).toContain("'=HACK()"); // 数式が ' で無害化されている
+    expect(body).not.toMatch(/(^|,)=HACK\(\)/); // 生の =HACK() でセルが始まらない
   });
 
   it("CSV は非premiumで 402", async () => {
