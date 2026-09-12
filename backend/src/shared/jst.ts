@@ -23,3 +23,11 @@ export function jstHhmm(date: Date): string {
 export function jstDateString(date: Date): string {
   return YMD.format(date);
 }
+
+const WEEKDAY = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", weekday: "short" });
+const WEEKDAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
+/** JST の曜日（0=日曜..6=土曜）。 */
+export function jstWeekday(date: Date): number {
+  return WEEKDAY_INDEX[WEEKDAY.format(date)] ?? 0;
+}

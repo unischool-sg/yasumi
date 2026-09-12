@@ -339,4 +339,60 @@ suite("Admin API", () => {
     expect(list.some((x) => x.id === tpl.id && x.title === "お礼")).toBe(true);
     expect((await req(`/api/admin/message-templates/${tpl.id}`, { method: "DELETE", headers: bearer(suT) })).status).toBe(204);
   });
+
+  it("フローテンプレート: 作成→手動実行でフラグ付与→スケジュールCRUD", async () => {
+    const suT = await loginToken(suName);
+    const jsonHeaders = { ...bearer(suT), "content-type": "application/json" };
+    // 対象ユーザーを用意し、絞り込み用フラグを付与
+    const { userId } = (await (await req("/api/me", { headers: bearer("Uflowtarget") })).json()) as { userId: string };
+    await req("/api/admin/flag-defs", { method: "POST", headers: jsonHeaders, body: JSON.stringify({ name: "flowtarget" }) });
+    await req("/api/admin/flag-defs", { method: "POST", headers: jsonHeaders, body: JSON.stringify({ name: "flowdone" }) });
+    await req("/api/admin/flags/assign", { method: "POST", headers: jsonHeaders, body: JSON.stringify({ userIds: [userId], name: "flowtarget" }) });
+
+    // テンプレート作成（flowtarget を持つ人 → flowdone を付与）
+    const tplBody = {
+      name: "テストフロー",
+      allUsers: false,
+      query: { combinator: "and", filters: [{ id: "f1", field: "flag", op: "hasFlag", value: "flowtarget" }], sorts: [] },
+      steps: [{ id: "s1", type: "addFlag", flag: "flowdone" }],
+    };
+    const created = await req("/api/admin/flow-templates", { method: "POST", headers: jsonHeaders, body: JSON.stringify(tplBody) });
+    expect(created.status).toBe(201);
+    const tpl = (await created.json()) as { id: string; name: string };
+    expect(tpl.name).toBe("テストフロー");
+
+    // 一覧
+    const list = (await (await req("/api/admin/flow-templates", { headers: bearer(suT) })).json()) as { id: string }[];
+    expect(list.some((x) => x.id === tpl.id)).toBe(true);
+
+    // 手動実行 → flowdone が付与される
+    const run = await req(`/api/admin/flow-templates/${tpl.id}/run`, { method: "POST", headers: bearer(suT) });
+    expect(run.status).toBe(200);
+    expect(((await run.json()) as { audienceCount: number }).audienceCount).toBe(1);
+    const detail = (await (await req(`/api/admin/users/${userId}`, { headers: bearer(suT) })).json()) as { flags: string[] };
+    expect(detail.flags).toContain("flowdone");
+
+    // 更新
+    const upd = await req(`/api/admin/flow-templates/${tpl.id}`, { method: "PATCH", headers: jsonHeaders, body: JSON.stringify({ ...tplBody, name: "更新後フロー" }) });
+    expect(((await upd.json()) as { name: string }).name).toBe("更新後フロー");
+
+    // スケジュール CRUD
+    const sc = await req("/api/admin/flow-schedules", { method: "POST", headers: jsonHeaders, body: JSON.stringify({ templateId: tpl.id, time: "07:00", daysOfWeek: [1, 2, 3, 4, 5] }) });
+    expect(sc.status).toBe(201);
+    const sched = (await sc.json()) as { id: string; time: string };
+    expect(sched.time).toBe("07:00");
+    const scList = (await (await req(`/api/admin/flow-schedules?templateId=${tpl.id}`, { headers: bearer(suT) })).json()) as { id: string }[];
+    expect(scList.some((x) => x.id === sched.id)).toBe(true);
+    const patched = await req(`/api/admin/flow-schedules/${sched.id}`, { method: "PATCH", headers: jsonHeaders, body: JSON.stringify({ enabled: false }) });
+    expect(((await patched.json()) as { enabled: boolean }).enabled).toBe(false);
+
+    // 時刻バリデーション（:15 は不可）
+    const bad = await req("/api/admin/flow-schedules", { method: "POST", headers: jsonHeaders, body: JSON.stringify({ templateId: tpl.id, time: "07:15", daysOfWeek: [] }) });
+    expect(bad.status).toBe(400);
+
+    // テンプレート削除でスケジュールも消える
+    expect((await req(`/api/admin/flow-templates/${tpl.id}`, { method: "DELETE", headers: bearer(suT) })).status).toBe(204);
+    const scList2 = (await (await req(`/api/admin/flow-schedules?templateId=${tpl.id}`, { headers: bearer(suT) })).json()) as unknown[];
+    expect(scList2.length).toBe(0);
+  });
 });

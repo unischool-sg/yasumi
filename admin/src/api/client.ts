@@ -1,3 +1,4 @@
+import type { FlowAudienceQuery, FlowStep } from "@yasumi/shared";
 import { type Auth, clearAuth, getAuth } from "../lib/auth.ts";
 
 const BASE = import.meta.env.VITE_ADMIN_API_BASE_URL ?? "";
@@ -106,6 +107,35 @@ export interface AdminMessageTemplate {
   body: string;
   createdAt: string;
 }
+export interface FlowTemplate {
+  id: string;
+  name: string;
+  allUsers: boolean;
+  query: FlowAudienceQuery;
+  steps: FlowStep[];
+  createdAt: string;
+  updatedAt: string;
+}
+export interface FlowTemplateInput {
+  name: string;
+  allUsers: boolean;
+  query: FlowAudienceQuery;
+  steps: FlowStep[];
+}
+export interface FlowSchedule {
+  id: string;
+  templateId: string;
+  time: string; // "HH:MM"
+  daysOfWeek: number[]; // 0=日..6=土、空配列は毎日
+  enabled: boolean;
+  lastRunAt: string | null;
+  lastRunDate: string | null;
+  createdAt: string;
+}
+export interface FlowRunResult {
+  audienceCount: number;
+  results: { type: FlowStep["type"]; flag?: string; sent?: number; total?: number }[];
+}
 export interface SchoolSubscriber {
   userId: string;
   lineUserId: string | null;
@@ -211,6 +241,19 @@ export const api = {
     request<{ assigned: number; total: number }>("/flags/assign", { method: "POST", body: JSON.stringify({ userIds, name }) }),
   unassignFlag: (userIds: string[], name: string) =>
     request<{ ok: boolean; total: number }>("/flags/unassign", { method: "POST", body: JSON.stringify({ userIds, name }) }),
+  // フロー（一括施策）テンプレート
+  getFlowTemplates: () => request<FlowTemplate[]>("/flow-templates"),
+  createFlowTemplate: (b: FlowTemplateInput) => request<FlowTemplate>("/flow-templates", { method: "POST", body: JSON.stringify(b) }),
+  updateFlowTemplate: (id: string, b: FlowTemplateInput) => request<FlowTemplate>(`/flow-templates/${id}`, { method: "PATCH", body: JSON.stringify(b) }),
+  deleteFlowTemplate: (id: string) => request<void>(`/flow-templates/${id}`, { method: "DELETE" }),
+  runFlowTemplate: (id: string) => request<FlowRunResult>(`/flow-templates/${id}/run`, { method: "POST" }),
+  // フロー定期実行スケジュール
+  getFlowSchedules: (templateId?: string) => request<FlowSchedule[]>(`/flow-schedules${templateId ? `?templateId=${templateId}` : ""}`),
+  createFlowSchedule: (b: { templateId: string; time: string; daysOfWeek: number[]; enabled?: boolean }) =>
+    request<FlowSchedule>("/flow-schedules", { method: "POST", body: JSON.stringify(b) }),
+  updateFlowSchedule: (id: string, b: { time?: string; daysOfWeek?: number[]; enabled?: boolean }) =>
+    request<FlowSchedule>(`/flow-schedules/${id}`, { method: "PATCH", body: JSON.stringify(b) }),
+  deleteFlowSchedule: (id: string) => request<void>(`/flow-schedules/${id}`, { method: "DELETE" }),
   addUserSubscription: (id: string, schoolId: string) =>
     request(`/users/${id}/subscriptions`, { method: "POST", body: JSON.stringify({ schoolId }) }),
   setUserSubscription: (id: string, schoolId: string, notificationEnabled: boolean) =>

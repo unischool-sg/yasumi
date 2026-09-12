@@ -13,6 +13,9 @@ import { type AdminEnv, adminAuthMiddleware, login, requireSuperadmin } from "./
 import * as adminsRepo from "../../infrastructure/db/repositories/admins.ts";
 import * as adminTemplatesRepo from "../../infrastructure/db/repositories/admin-message-templates.ts";
 import * as flagsRepo from "../../infrastructure/db/repositories/flags.ts";
+import * as flowTemplatesRepo from "../../infrastructure/db/repositories/flow-templates.ts";
+import * as flowSchedulesRepo from "../../infrastructure/db/repositories/flow-schedules.ts";
+import { executeFlow } from "../../domain/flow/execute.ts";
 import * as areasRepo from "../../infrastructure/db/repositories/areas.ts";
 import * as cfg from "../../infrastructure/db/repositories/school-config.ts";
 import * as deviceTokensRepo from "../../infrastructure/db/repositories/device-tokens.ts";
@@ -45,6 +48,21 @@ export interface AdminAppDeps {
 const roleSchema = z.enum(["superadmin", "admin"]);
 const checkResultSchema = z.enum(["NORMAL", "WAIT", "AM_OFF", "PM_START", "FULL_OFF", "UNKNOWN"]);
 const checkTimeSchema = z.string().regex(/^([01]\d|2[0-3]):(00|30)$/, "HH:00 または HH:30 のみ");
+
+// フロー（一括施策）テンプレート/スケジュールのバリデーション。
+const flowFieldSchema = z.enum(["subscriptionCount", "createdAt", "lineUserId", "id", "flag", "school"]);
+const flowFilterSchema = z.object({ id: z.string(), field: flowFieldSchema, op: z.string(), value: z.string(), label: z.string().optional() });
+const flowSortSchema = z.object({ id: z.string(), field: flowFieldSchema, dir: z.enum(["asc", "desc"]) });
+const flowQuerySchema = z.object({ combinator: z.enum(["and", "or"]), filters: z.array(flowFilterSchema), sorts: z.array(flowSortSchema) });
+const flowStepSchema = z.object({ id: z.string(), type: z.enum(["send", "addFlag", "removeFlag"]), text: z.string().max(1000).optional(), flag: z.string().max(50).optional() });
+const flowTemplateSchema = z.object({
+  name: z.string().min(1).max(100),
+  allUsers: z.boolean(),
+  query: flowQuerySchema,
+  steps: z.array(flowStepSchema).min(1).max(20),
+});
+const flowScheduleTimeSchema = z.string().regex(/^([01]\d|2[0-3]):(00|30)$/, "HH:00 または HH:30 のみ");
+const flowDaysSchema = z.array(z.number().int().min(0).max(6)).max(7);
 
 /** 管理画面 API（`/api/admin` にマウント）。独自 JWT 認証・LIFF とは別系統。 */
 export function createAdminApp(deps: AdminAppDeps) {
@@ -414,6 +432,63 @@ export function createAdminApp(deps: AdminAppDeps) {
       return c.json({ ok: true, total: userIds.length });
     },
   );
+
+  // --- フロー（一括施策）テンプレート ---
+  app.get("/flow-templates", async (c) => c.json(await flowTemplatesRepo.listTemplates(db)));
+  app.post("/flow-templates", zValidator("json", flowTemplateSchema), async (c) =>
+    c.json(await flowTemplatesRepo.createTemplate(db, c.req.valid("json")), 201),
+  );
+  app.patch("/flow-templates/:id", zValidator("json", flowTemplateSchema), async (c) =>
+    c.json(await flowTemplatesRepo.updateTemplate(db, c.req.param("id"), c.req.valid("json"))),
+  );
+  app.delete("/flow-templates/:id", async (c) => {
+    await flowTemplatesRepo.deleteTemplate(db, c.req.param("id"));
+    return c.body(null, 204);
+  });
+  // テンプレートを手動実行（cron と同じ executeFlow を使用）。
+  app.post("/flow-templates/:id/run", async (c) => {
+    const t = await flowTemplatesRepo.getTemplate(db, c.req.param("id"));
+    if (!t) return c.json({ error: "template not found" }, 404);
+    const run = await executeFlow(
+      {
+        db,
+        ...(deps.notificationProvider ? { notificationProvider: deps.notificationProvider } : {}),
+        ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
+        ...(deps.now ? { now: deps.now } : {}),
+      },
+      { allUsers: t.allUsers, query: t.query, steps: t.steps },
+    );
+    return c.json({
+      audienceCount: run.audienceIds.length,
+      results: run.results.map((r) => ({ type: r.step.type, flag: r.step.flag, sent: r.sent, total: r.total })),
+    });
+  });
+
+  // --- フロー定期実行スケジュール ---
+  app.get(
+    "/flow-schedules",
+    zValidator("query", z.object({ templateId: z.string().uuid().optional() })),
+    async (c) => c.json(await flowSchedulesRepo.listSchedules(db, c.req.valid("query").templateId)),
+  );
+  app.post(
+    "/flow-schedules",
+    zValidator("json", z.object({ templateId: z.string().uuid(), time: flowScheduleTimeSchema, daysOfWeek: flowDaysSchema, enabled: z.boolean().optional() })),
+    async (c) => {
+      const b = c.req.valid("json");
+      const t = await flowTemplatesRepo.getTemplate(db, b.templateId);
+      if (!t) return c.json({ error: "template not found" }, 404);
+      return c.json(await flowSchedulesRepo.createSchedule(db, b), 201);
+    },
+  );
+  app.patch(
+    "/flow-schedules/:id",
+    zValidator("json", z.object({ time: flowScheduleTimeSchema.optional(), daysOfWeek: flowDaysSchema.optional(), enabled: z.boolean().optional() })),
+    async (c) => c.json(await flowSchedulesRepo.updateSchedule(db, c.req.param("id"), c.req.valid("json"))),
+  );
+  app.delete("/flow-schedules/:id", async (c) => {
+    await flowSchedulesRepo.deleteSchedule(db, c.req.param("id"));
+    return c.body(null, 204);
+  });
 
   // --- ユーザー・購読 ---
   app.get("/users", async (c) => {
