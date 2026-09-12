@@ -95,11 +95,16 @@ async function notifyDiscordEvent(deps: AppDeps, text: string): Promise<void> {
 async function forwardFollowToDiscord(deps: AppDeps, ev: LineWebhookEvent): Promise<void> {
   const lineUserId = ev.source?.userId;
   if (!lineUserId) return;
+  const { userId } = await usersRepo.findOrCreateByLineUserId(deps.db, lineUserId);
+  const adminBase = deps.adminBaseUrl || "https://yasumi-admin.unischool.jp";
   const profile = deps.lineChannelAccessToken
     ? await getLineProfile(deps.lineChannelAccessToken, lineUserId, deps.fetchFn ? { fetchFn: deps.fetchFn } : {})
     : null;
   const name = profile?.displayName ?? "（不明）";
-  await notifyDiscordEvent(deps, ["**新しい友だち追加**", `名前: ${inlineCode(name)}`, `UID: ${inlineCode(lineUserId)}`].join("\n"));
+  await notifyDiscordEvent(
+    deps,
+    ["**新しい友だち追加**", `名前: ${inlineCode(name)}`, `UID: ${inlineCode(lineUserId)}`, `友だち: ${adminBase}/users/${userId}`].join("\n"),
+  );
 }
 
 /** 受信 LINE メッセージ1件を Discord に転送（送信主名・LINE UID・admin 連絡リンク・内容）。 */
@@ -349,10 +354,19 @@ export function createApp(deps: AppDeps) {
         `「${school.name}」を登録しました！\n同じ学校のみんなで共有されます。\n\n朝の判定時刻に自動でチェックして、休校などをお知らせします。`,
       );
       // 活動通知（Discord）
-      await notifyDiscordEvent(
-        deps,
-        ["**学校が登録されました**", `学校: ${school.name}（${school.prefecture}）`, `登録者: ${inlineCode(c.get("lineUserId") ?? "unknown")}`].join("\n"),
-      );
+      {
+        const adminBase = deps.adminBaseUrl || "https://yasumi-admin.unischool.jp";
+        await notifyDiscordEvent(
+          deps,
+          [
+            "**学校が登録されました**",
+            `学校: ${school.name}（${school.prefecture}）`,
+            `登録者: ${inlineCode(c.get("lineUserId") ?? "unknown")}`,
+            `学校: ${adminBase}/schools/${school.id}`,
+            `友だち: ${adminBase}/users/${c.get("userId")}`,
+          ].join("\n"),
+        );
+      }
       return c.json(school, 201);
     },
   );
@@ -498,7 +512,17 @@ export function createApp(deps: AppDeps) {
           ? await getLineProfile(deps.lineChannelAccessToken, lineUserId, deps.fetchFn ? { fetchFn: deps.fetchFn } : {})
           : null;
         const who = inlineCode(profile?.displayName ?? lineUserId ?? "unknown");
-        await notifyDiscordEvent(deps, ["**学校購読**", `学校: ${school.name}`, `購読者: ${who}`].join("\n"));
+        const adminBase = deps.adminBaseUrl || "https://yasumi-admin.unischool.jp";
+        await notifyDiscordEvent(
+          deps,
+          [
+            "**学校購読**",
+            `学校: ${school.name}`,
+            `購読者: ${who}`,
+            `学校: ${adminBase}/schools/${school.id}`,
+            `友だち: ${adminBase}/users/${c.get("userId")}`,
+          ].join("\n"),
+        );
       }
       return c.json(row, 201);
     },
@@ -656,6 +680,7 @@ export function createApp(deps: AppDeps) {
         ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
         ...(deps.storage ? { storage: deps.storage } : {}),
         ...(deps.discordEventsWebhookUrl ? { discordEventsWebhookUrl: deps.discordEventsWebhookUrl } : {}),
+        ...(deps.adminBaseUrl ? { adminBaseUrl: deps.adminBaseUrl } : {}),
       }),
     );
   }

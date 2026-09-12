@@ -317,7 +317,7 @@ suite("API integration", () => {
     const body = JSON.stringify({ events: [{ type: "follow", source: { userId: "Ufollow1" } }] });
     const sig = createHmac("sha256", LSECRET).update(body).digest("base64");
     await ereq("/api/webhooks/line", { method: "POST", headers: { "content-type": "application/json", "x-line-signature": sig }, body });
-    expect(events.some((e) => e.includes("新しい友だち追加") && e.includes("Ufollow1"))).toBe(true);
+    expect(events.some((e) => e.includes("新しい友だち追加") && e.includes("Ufollow1") && e.includes("/users/"))).toBe(true);
 
     // 学校購読（新規）
     const sub = await ereq("/api/me/subscriptions", {
@@ -325,7 +325,7 @@ suite("API integration", () => {
       body: JSON.stringify({ schoolId }),
     });
     expect(sub.status).toBe(201);
-    expect(events.some((e) => e.includes("学校購読"))).toBe(true);
+    expect(events.some((e) => e.includes("学校購読") && e.includes("/schools/") && e.includes("/users/"))).toBe(true);
 
     // 再購読は通知しない（件数が増えない）
     const before = events.length;
