@@ -21,6 +21,8 @@ services:
       SCHOOL_JWT_SECRET: ${SCHOOL_JWT_SECRET}
       # LINE 受信メッセージの Discord 転送先（秘密・未設定なら転送しない）。
       DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL}
+      # 友だち追加・学校購読・学校登録などの活動通知先（秘密・別チャンネル）。
+      DISCORD_EVENTS_WEBHOOK_URL: ${DISCORD_EVENTS_WEBHOOK_URL}
       # オブジェクトストレージ（RustFS/S3互換・ロゴ保存）。秘密は SSH で .env に設定。
       S3_ENDPOINT: ${S3_ENDPOINT}
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
