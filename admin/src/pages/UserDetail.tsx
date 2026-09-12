@@ -58,7 +58,21 @@ export function UserDetail({ id }: { id: string }) {
     onError,
   });
 
+  const { data: flagDefs = [] } = useQuery({ queryKey: ["flag-defs"], queryFn: api.getFlagDefs });
+  const addFlag = useMutation({
+    mutationFn: (name: string) => api.assignFlag([id], name),
+    onSuccess: () => { invalidate(); qc.invalidateQueries({ queryKey: ["users"] }); toast.success("フラグを付与しました"); },
+    onError,
+  });
+  const removeFlag = useMutation({
+    mutationFn: (name: string) => api.unassignFlag([id], name),
+    onSuccess: () => { invalidate(); qc.invalidateQueries({ queryKey: ["users"] }); toast.success("フラグを解除しました"); },
+    onError,
+  });
+
   if (!data) return <Typography>読み込み中…</Typography>;
+
+  const availableFlags = flagDefs.map((f) => f.name).filter((n) => !data.flags.includes(n));
 
   return (
     <Box>
@@ -91,6 +105,27 @@ export function UserDetail({ id }: { id: string }) {
               ※プロフィールは公式アカウントを友だち追加済みのユーザーのみ表示されます。
             </Typography>
           )}
+        </CardContent>
+      </Card>
+
+      {/* フラグ */}
+      <Card variant="outlined" sx={{ mb: 2 }}>
+        <CardContent>
+          <Typography variant="subtitle2" sx={{ mb: 1.5 }}>フラグ</Typography>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1, mb: 1.5 }}>
+            {data.flags.map((f) => (
+              <Chip key={f} label={f} onDelete={() => removeFlag.mutate(f)} color="primary" variant="outlined" />
+            ))}
+            {data.flags.length === 0 && <Typography variant="body2" color="text.secondary">フラグなし</Typography>}
+          </Stack>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1, alignItems: "center" }}>
+            <Typography variant="caption" color="text.secondary">付与：</Typography>
+            {availableFlags.map((n) => (
+              <Chip key={n} label={`＋ ${n}`} size="small" variant="outlined" onClick={() => addFlag.mutate(n)} />
+            ))}
+            {availableFlags.length === 0 && flagDefs.length > 0 && <Typography variant="caption" color="text.secondary">すべて付与済み</Typography>}
+            {flagDefs.length === 0 && <Typography variant="caption" color="text.secondary">フラグ未定義（「フロー」タブで作成）</Typography>}
+          </Stack>
         </CardContent>
       </Card>
 

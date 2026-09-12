@@ -422,9 +422,10 @@ export function createAdminApp(deps: AdminAppDeps) {
   app.get("/users/:id", async (c) => {
     const id = c.req.param("id");
     const lineUserId = await usersRepo.getLineUserId(db, id);
-    const [subscriptions, deviceTokens] = await Promise.all([
+    const [subscriptions, deviceTokens, flagsMap] = await Promise.all([
       subsRepo.listSubscriptionsWithSchoolByUser(db, id),
       deviceTokensRepo.listTokensByUser(db, id),
+      flagsRepo.listByUsers(db, [id]),
     ]);
     const profile = lineUserId && deps.lineAccessToken
       ? await getLineProfile(deps.lineAccessToken, lineUserId)
@@ -434,6 +435,7 @@ export function createAdminApp(deps: AdminAppDeps) {
       lineUserId: lineUserId ?? null,
       deviceTokenCount: deviceTokens.length,
       subscriptions,
+      flags: flagsMap.get(id) ?? [],
       profile,
     });
   });
