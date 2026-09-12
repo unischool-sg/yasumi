@@ -93,6 +93,7 @@ export interface UserRow {
   createdAt: string;
   subscriptionCount: number;
   flags: string[];
+  subscribedSchools: { id: string; name: string }[];
 }
 export interface FlagDef {
   name: string;

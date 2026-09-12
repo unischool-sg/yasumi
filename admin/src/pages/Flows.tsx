@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../api/client.ts";
 import { useToast } from "../components/Toast.tsx";
-import { EMPTY_QUERY, type UserQuery, UserQueryEditor, compareUsers, matchesQuery, querySummary } from "../components/UserQueryEditor.tsx";
+import { EMPTY_QUERY, type UserQuery, UserQueryEditor, compareUsers, matchesQuery, querySummary, schoolOptionsFromUsers } from "../components/UserQueryEditor.tsx";
 import { UserFlowRunner } from "../components/UserFlowRunner.tsx";
 
 export function Flows() {
@@ -13,6 +13,7 @@ export function Flows() {
   const { data: templates = [] } = useQuery({ queryKey: ["admin-templates"], queryFn: api.getMessageTemplates });
   const { data: flagDefs = [] } = useQuery({ queryKey: ["flag-defs"], queryFn: api.getFlagDefs });
   const flagNames = flagDefs.map((f) => f.name);
+  const schoolOptions = schoolOptionsFromUsers(users);
 
   const [query, setQuery] = useState<UserQuery>(EMPTY_QUERY);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -121,7 +122,7 @@ export function Flows() {
         </DialogActions>
       </Dialog>
 
-      <UserQueryEditor open={editorOpen} onClose={() => setEditorOpen(false)} query={query} onChange={setQuery} flagNames={flagNames} />
+      <UserQueryEditor open={editorOpen} onClose={() => setEditorOpen(false)} query={query} onChange={setQuery} flagNames={flagNames} schoolOptions={schoolOptions} />
       <UserFlowRunner open={flowOpen} onClose={() => setFlowOpen(false)} audienceIds={audienceIds} templates={templates} flagNames={flagNames} onRan={() => qc.invalidateQueries({ queryKey: ["users"] })} />
     </Box>
   );

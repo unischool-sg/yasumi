@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import type { Db } from "../client.ts";
 import { lineAccounts, schools, studentProfiles, subscriptions } from "../schema.ts";
 
@@ -24,6 +24,30 @@ export async function listSubscriptionsWithSchoolByUser(
     .innerJoin(schools, eq(schools.id, subscriptions.schoolId))
     .where(eq(subscriptions.userId, userId))
     .orderBy(desc(subscriptions.createdAt));
+}
+
+/** 管理画面: 複数ユーザーの購読学校（ID+名前）をまとめて取得。 */
+export async function listSubscribedSchoolsByUsers(
+  db: Db,
+  userIds: string[],
+): Promise<Map<string, { id: string; name: string }[]>> {
+  const map = new Map<string, { id: string; name: string }[]>();
+  if (userIds.length === 0) return map;
+  const rows = await db
+    .select({
+      userId: subscriptions.userId,
+      schoolId: subscriptions.schoolId,
+      schoolName: schools.name,
+    })
+    .from(subscriptions)
+    .innerJoin(schools, eq(schools.id, subscriptions.schoolId))
+    .where(inArray(subscriptions.userId, userIds));
+  for (const r of rows) {
+    const list = map.get(r.userId) ?? [];
+    list.push({ id: r.schoolId, name: r.schoolName });
+    map.set(r.userId, list);
+  }
+  return map;
 }
 
 /** 購読を作成/更新（PRD §37 POST subscriptions）。 */

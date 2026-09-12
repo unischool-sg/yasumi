@@ -418,8 +418,12 @@ export function createAdminApp(deps: AdminAppDeps) {
   // --- ユーザー・購読 ---
   app.get("/users", async (c) => {
     const rows = await usersRepo.listUsers(db, { limit: 1000 });
-    const flags = await flagsRepo.listByUsers(db, rows.map((r) => r.id));
-    return c.json(rows.map((r) => ({ ...r, flags: flags.get(r.id) ?? [] })));
+    const ids = rows.map((r) => r.id);
+    const [flags, subs] = await Promise.all([
+      flagsRepo.listByUsers(db, ids),
+      subsRepo.listSubscribedSchoolsByUsers(db, ids),
+    ]);
+    return c.json(rows.map((r) => ({ ...r, flags: flags.get(r.id) ?? [], subscribedSchools: subs.get(r.id) ?? [] })));
   });
   app.get("/subscriptions", async (c) => c.json(await subsRepo.listAllSubscriptions(db, { limit: 200 })));
 
