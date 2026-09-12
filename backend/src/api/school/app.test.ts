@@ -553,7 +553,7 @@ suite("School (teacher) API", () => {
     });
     const r2 = (p: string, i?: RequestInit) => app2.fetch(new Request(`http://x${p}`, i));
     // 2ユーザー: 学年1/学年2 のプロフィール＋購読（学校Aはpremium）
-    for (const [u, grade] of [["Useg1", "1年"], ["Useg2", "2年"]]) {
+    for (const { u, grade } of [{ u: "Useg1", grade: "1年" }, { u: "Useg2", grade: "2年" }]) {
       const { userId } = (await (await r2("/api/me", { headers: bearer(u) })).json()) as { userId: string };
       await r2("/api/me/student-profiles", {
         method: "POST", headers: { ...bearer(u), "content-type": "application/json" },
