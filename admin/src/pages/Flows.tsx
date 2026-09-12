@@ -1,4 +1,4 @@
-import { Box, Button, Card, CardContent, Checkbox, Chip, Divider, FormControlLabel, Stack, TextField, Typography } from "@mui/material";
+import { Box, Button, Card, CardContent, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, FormControlLabel, Stack, TextField, Typography } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../api/client.ts";
@@ -19,13 +19,14 @@ export function Flows() {
   const [flowOpen, setFlowOpen] = useState(false);
   const [allUsers, setAllUsers] = useState(false);
   const [newTpl, setNewTpl] = useState({ title: "", body: "" });
+  const [tplModalOpen, setTplModalOpen] = useState(false);
   const [newFlag, setNewFlag] = useState("");
 
   const shown = allUsers ? users : users.filter((u) => matchesQuery(u, query)).sort((a, b) => compareUsers(a, b, query.sorts));
   const audienceIds = shown.map((u) => u.id);
 
   const onErr = (e: unknown) => toast.error(`失敗しました: ${(e as Error).message}`);
-  const addTpl = useMutation({ mutationFn: () => api.createMessageTemplate(newTpl), onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-templates"] }); setNewTpl({ title: "", body: "" }); toast.success("定型文を保存しました"); }, onError: onErr });
+  const addTpl = useMutation({ mutationFn: () => api.createMessageTemplate(newTpl), onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-templates"] }); setNewTpl({ title: "", body: "" }); setTplModalOpen(false); toast.success("定型文を保存しました"); }, onError: onErr });
   const delTpl = useMutation({ mutationFn: (id: string) => api.deleteMessageTemplate(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-templates"] }); toast.success("削除しました"); }, onError: onErr });
   const addFlagDef = useMutation({ mutationFn: () => api.createFlagDef({ name: newFlag.trim() }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["flag-defs"] }); setNewFlag(""); toast.success("フラグを作成しました"); }, onError: onErr });
   const delFlagDef = useMutation({ mutationFn: (name: string) => api.deleteFlagDef(name), onSuccess: () => { qc.invalidateQueries({ queryKey: ["flag-defs"] }); qc.invalidateQueries({ queryKey: ["users"] }); toast.success("フラグを削除しました"); }, onError: onErr });
@@ -79,11 +80,7 @@ export function Flows() {
             {templates.length === 0 && <Typography variant="caption" color="text.secondary">定型文がありません</Typography>}
           </Stack>
           <Divider sx={{ mb: 1.5 }} />
-          <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start", flexWrap: "wrap" }}>
-            <TextField size="small" label="タイトル" value={newTpl.title} onChange={(e) => setNewTpl({ ...newTpl, title: e.target.value })} sx={{ width: 160 }} />
-            <TextField size="small" label="本文" value={newTpl.body} onChange={(e) => setNewTpl({ ...newTpl, body: e.target.value })} sx={{ flex: 1, minWidth: 220 }} multiline />
-            <Button variant="outlined" disabled={!newTpl.title.trim() || !newTpl.body.trim() || addTpl.isPending} onClick={() => addTpl.mutate()}>保存</Button>
-          </Stack>
+          <Button variant="outlined" size="small" onClick={() => { setNewTpl({ title: "", body: "" }); setTplModalOpen(true); }}>＋ 定型文を追加</Button>
         </CardContent>
       </Card>
 
@@ -101,6 +98,20 @@ export function Flows() {
           </Stack>
         </CardContent>
       </Card>
+
+      <Dialog open={tplModalOpen} onClose={() => setTplModalOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>定型文を追加</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2} sx={{ mt: 0.5 }}>
+            <TextField label="タイトル" value={newTpl.title} onChange={(e) => setNewTpl({ ...newTpl, title: e.target.value })} fullWidth />
+            <TextField label="本文" value={newTpl.body} onChange={(e) => setNewTpl({ ...newTpl, body: e.target.value })} fullWidth multiline minRows={5} />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button color="inherit" onClick={() => setTplModalOpen(false)}>キャンセル</Button>
+          <Button variant="contained" disabled={!newTpl.title.trim() || !newTpl.body.trim() || addTpl.isPending} onClick={() => addTpl.mutate()}>保存</Button>
+        </DialogActions>
+      </Dialog>
 
       <UserQueryEditor open={editorOpen} onClose={() => setEditorOpen(false)} query={query} onChange={setQuery} flagNames={flagNames} />
       <UserFlowRunner open={flowOpen} onClose={() => setFlowOpen(false)} audienceIds={audienceIds} templates={templates} flagNames={flagNames} onRan={() => qc.invalidateQueries({ queryKey: ["users"] })} />

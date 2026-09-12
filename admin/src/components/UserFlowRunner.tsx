@@ -23,6 +23,8 @@ export function UserFlowRunner({
   const toast = useToast();
   const [steps, setSteps] = useState<Step[]>([]);
   const [running, setRunning] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
 
   const add = (type: StepType) => setSteps((s) => [...s, { id: genId(), type, text: "", flag: flagNames[0] ?? "" }]);
   const update = (id: string, patch: Partial<Step>) => setSteps((s) => s.map((x) => (x.id === id ? { ...x, ...patch } : x)));
@@ -74,11 +76,10 @@ export function UserFlowRunner({
               <Typography variant="body2" sx={{ fontWeight: 700, minWidth: 96 }}>{i + 1}. {STEP_LABEL[st.type]}</Typography>
               {st.type === "send" ? (
                 <Stack direction="row" spacing={1} sx={{ flex: 1, minWidth: 200, alignItems: "center" }}>
-                  <TextField select size="small" variant="standard" label="定型文" value="" onChange={(e) => { const t = templates.find((x) => x.id === e.target.value); if (t) update(st.id, { text: t.body }); }} sx={{ width: 120 }}>
-                    {templates.length === 0 && <MenuItem value="" disabled>なし</MenuItem>}
-                    {templates.map((t) => <MenuItem key={t.id} value={t.id}>{t.title}</MenuItem>)}
-                  </TextField>
-                  <TextField size="small" variant="standard" placeholder="本文" value={st.text} onChange={(e) => update(st.id, { text: e.target.value })} sx={{ flex: 1 }} multiline />
+                  <Typography variant="body2" color={st.text?.trim() ? "text.primary" : "text.secondary"} sx={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {st.text?.trim() ? st.text : "本文未設定"}
+                  </Typography>
+                  <Button size="small" onClick={() => { setEditId(st.id); setDraft(st.text ?? ""); }}>本文を編集</Button>
                 </Stack>
               ) : (
                 <TextField select size="small" variant="standard" label="フラグ" value={st.flag} onChange={(e) => update(st.id, { flag: e.target.value })} sx={{ minWidth: 140 }}>
@@ -106,6 +107,22 @@ export function UserFlowRunner({
           実行（確認あり）
         </Button>
       </DialogActions>
+
+      {/* 本文編集モーダル */}
+      <Dialog open={editId !== null} onClose={() => setEditId(null)} fullWidth maxWidth="sm">
+        <DialogTitle>本文を編集</DialogTitle>
+        <DialogContent dividers>
+          <TextField select size="small" fullWidth label="定型文から挿入" value="" onChange={(e) => { const t = templates.find((x) => x.id === e.target.value); if (t) setDraft(t.body); }} sx={{ mb: 2 }}>
+            {templates.length === 0 && <MenuItem value="" disabled>（定型文がありません）</MenuItem>}
+            {templates.map((t) => <MenuItem key={t.id} value={t.id}>{t.title}</MenuItem>)}
+          </TextField>
+          <TextField fullWidth multiline minRows={5} placeholder="メッセージ本文" value={draft} onChange={(e) => setDraft(e.target.value)} />
+        </DialogContent>
+        <DialogActions>
+          <Button color="inherit" onClick={() => setEditId(null)}>キャンセル</Button>
+          <Button variant="contained" disabled={!draft.trim()} onClick={() => { if (editId) update(editId, { text: draft }); setEditId(null); }}>OK</Button>
+        </DialogActions>
+      </Dialog>
     </Dialog>
   );
 }
