@@ -402,6 +402,24 @@ M14 [Phase 3] 通数カウンタ／請求運用の型／(後で)Stripe・生徒�
 - [x] ダッシュボード上部に**下書きバナー**（本文編集可・ワンタップ公式送信/却下）
 - [x] DB-gated テスト（一覧/送信/却下・テナント越境404）green（全91 pass）
 
+## M23. 運用強化: ユーザーフラグ＋フロー＋条件エディター  ✅ 実装済み（develop）
+
+> 📄 [docs/plans/2026-09-12-user-flags-and-flows.md](./docs/plans/2026-09-12-user-flags-and-flows.md)
+
+- [x] **フラグ**（`flag_defs`/`user_flags`・migration 0011）：admin で定義CRUD・一括付与/解除・一覧に flags 列
+- [x] **条件エディター（Scratch風ブロック・モーダル）**：購読校数/登録日/LINE ID/内部ID/**フラグ**の AND/OR 複数条件＋複数キー並び替え。一致を一括選択
+- [x] **フロー**：対象（絞り込み結果スナップショット）→ ステップ（送信/フラグ付与/解除）を組み、**実行前に件数確認**して順次実行
+- [ ] Phase2（未）：フローの保存・再利用・cron 定期実行・実行履歴（自動送信は誤送信防止の観点で要検討）
+
+## M24. Google Ads コンバージョン計測（gclid→学校購読）Phase1  ✅ 実装済み（develop）
+
+> 📄 [docs/plans/2026-09-12-google-ads-conversion.md](./docs/plans/2026-09-12-google-ads-conversion.md)
+
+- [x] `users.gclid/gclid_at/gclid_converted_at`。`POST /api/me/attribution`（first-touch）
+- [x] 新規購読時に gclid 未送信ならコンバージョン送信→converted 記録（env-gated `GoogleAdsConversionProvider`）
+- [x] frontend(LIFF): 起動時に gclid（URL/`liff.state`）を保存。LP: `PUBLIC_LIFF_ID` 設定時 CTA を LIFF 経由にして gclid 引継ぎ
+- [ ] Phase2（外部準備）：Ads 実送信の有効化には `GOOGLE_ADS_*`（開発者トークン/OAuth/customer id/conversion action）を prod .env に設定＋Google Ads 側で自動タグ付けON・コンバージョンアクション作成。`PUBLIC_LIFF_ID` 設定で CTA が LIFF 化
+
 ## 段階リリースと KPI
 
 | フェーズ | ゲート / KPI |
