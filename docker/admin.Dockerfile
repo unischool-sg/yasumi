@@ -15,6 +15,7 @@ COPY packages/shared/package.json ./packages/shared/
 RUN bun install --frozen-lockfile
 
 COPY tsconfig.base.json ./
+COPY packages ./packages
 COPY admin ./admin
 RUN bun run --cwd admin build
 
