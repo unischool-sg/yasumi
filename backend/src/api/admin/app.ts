@@ -252,6 +252,8 @@ export function createAdminApp(deps: AdminAppDeps) {
       const school = await schoolsRepo.findSchoolById(db, schoolId);
       if (!school) return c.json({ error: "school not found" }, 404);
       const b = c.req.valid("json");
+      // 社内 admin の発行はプラン席上限の対象外（開通時にプランと合わせて発行するため）。
+      // 上限は school 側 owner の自己管理でのみ強制する（M18）。
       if (await teachersRepo.findTeacherByEmail(db, b.email)) return c.json({ error: "email taken" }, 409);
       const passwordHash = await Bun.password.hash(b.password);
       const row = await teachersRepo.createTeacher(db, {

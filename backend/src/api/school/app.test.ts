@@ -483,6 +483,113 @@ suite("School (teacher) API", () => {
     expect(res.status).toBe(503);
   });
 
+  // 指定プランの学校＋owner(admin発行)を作り、owner のログイン token を返す
+  async function makeSchoolWithOwner(plan: string): Promise<{ schoolId: string; token: string }> {
+    const schoolId = ((await (await req("/api/admin/schools", {
+      method: "POST", headers: { ...bearer(adminToken), "content-type": "application/json" },
+      body: JSON.stringify({ name: `${plan}校_${Math.random().toString(36).slice(2, 6)}`, prefecture: "兵庫県" }),
+    })).json()) as { id: string }).id;
+    await req(`/api/admin/schools/${schoolId}`, {
+      method: "PATCH", headers: { ...bearer(adminToken), "content-type": "application/json" },
+      body: JSON.stringify({ plan }),
+    });
+    const email = `owner_${Math.random().toString(36).slice(2, 8)}@x.example`;
+    await req(`/api/admin/schools/${schoolId}/teachers`, {
+      method: "POST", headers: { ...bearer(adminToken), "content-type": "application/json" },
+      body: JSON.stringify({ email, password: "ownerpass12", name: "校長", role: "owner" }),
+    });
+    const token = ((await (await req("/api/school/auth/login", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password: "ownerpass12" }),
+    })).json()) as { token: string }).token;
+    return { schoolId, token };
+  }
+
+  it("職員席上限: basic は owner 自己管理 402 / standard は席5超で 409", async () => {
+    const addTeacher = (token: string) => req("/api/school/teachers", {
+      method: "POST", headers: { ...bearer(token), "content-type": "application/json" },
+      body: JSON.stringify({ email: `t_${Math.random().toString(36).slice(2, 8)}@x.example`, password: "teacherpass9", name: "先生", role: "teacher" }),
+    });
+    // basic: 自己管理はスタンダード以上のみ → 402
+    const basic = await makeSchoolWithOwner("basic");
+    expect((await addTeacher(basic.token)).status).toBe(402);
+    // standard: 上限5。owner=1 なので +4 は成功、5人追加目（合計6）で 409
+    const std = await makeSchoolWithOwner("standard");
+    for (let i = 0; i < 4; i++) expect((await addTeacher(std.token)).status).toBe(201);
+    expect((await addTeacher(std.token)).status).toBe(409);
+  });
+
+  it("owner が自校の教員を自己管理（standard+）", async () => {
+    // 学校A は premium。owner=emailA でログイン
+    const { token } = (await (await req("/api/school/auth/login", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: emailA, password: "teacherpass1" }),
+    })).json()) as { token: string };
+    const email = `owneradd_${Math.random().toString(36).slice(2, 7)}@a.example`;
+    const add = await req("/api/school/teachers", {
+      method: "POST", headers: { ...bearer(token), "content-type": "application/json" },
+      body: JSON.stringify({ email, password: "ownadd12345", name: "追加先生", role: "teacher" }),
+    });
+    expect(add.status).toBe(201);
+    expect(((await add.json()) as Record<string, unknown>).passwordHash).toBeUndefined();
+    const list = (await (await req("/api/school/teachers", { headers: bearer(token) })).json()) as { email: string }[];
+    expect(list.some((t) => t.email === email)).toBe(true);
+    // 追加した教員(role=teacher)は owner 管理不可（403）
+    const teacherLogin = (await (await req("/api/school/auth/login", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password: "ownadd12345" }),
+    })).json()) as { token: string };
+    expect((await req("/api/school/teachers", { headers: bearer(teacherLogin.token) })).status).toBe(403);
+  });
+
+  it("セグメント配信＋分類(kind)＋CSV（M19/M20/M21）", async () => {
+    const sent: string[] = [];
+    const app2 = createApp({
+      db: drizzle(sql, { schema }),
+      verifyIdToken: async (t) => ({ lineUserId: t }),
+      adminJwtSecret: ADMIN_SECRET,
+      schoolJwtSecret: SCHOOL_SECRET,
+      notificationProvider: { async send(t) { if (t.lineUserId) sent.push(t.lineUserId); } },
+    });
+    const r2 = (p: string, i?: RequestInit) => app2.fetch(new Request(`http://x${p}`, i));
+    // 2ユーザー: 学年1/学年2 のプロフィール＋購読（学校Aはpremium）
+    for (const { u, grade } of [{ u: "Useg1", grade: "1年" }, { u: "Useg2", grade: "2年" }]) {
+      const { userId } = (await (await r2("/api/me", { headers: bearer(u) })).json()) as { userId: string };
+      await r2("/api/me/student-profiles", {
+        method: "POST", headers: { ...bearer(u), "content-type": "application/json" },
+        body: JSON.stringify({ schoolId: schoolAId, studentName: "生徒", grade, className: "A" }),
+      });
+      await r2(`/api/admin/users/${userId}/subscriptions`, {
+        method: "POST", headers: { ...bearer(adminToken), "content-type": "application/json" },
+        body: JSON.stringify({ schoolId: schoolAId }),
+      });
+    }
+    const { token } = (await (await r2("/api/school/auth/login", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: emailA, password: "teacherpass1" }),
+    })).json()) as { token: string };
+    // 1年だけに配信（kind=closure）
+    const bc = await r2("/api/school/broadcast", {
+      method: "POST", headers: { ...bearer(token), "content-type": "application/json" },
+      body: JSON.stringify({ text: "1年生へ", category: "emergency", kind: "closure", target: { grade: "1年" } }),
+    });
+    expect(bc.status).toBe(200);
+    expect(sent).toContain("Useg1");
+    expect(sent).not.toContain("Useg2");
+    // 履歴に kind
+    const hist = (await (await r2("/api/school/messages", { headers: bearer(token) })).json()) as { kind: string }[];
+    expect(hist.some((m) => m.kind === "closure")).toBe(true);
+    // CSV（A=premium）→ 200 text/csv
+    const csv = await r2("/api/school/messages.csv", { headers: bearer(token) });
+    expect(csv.status).toBe(200);
+    expect(csv.headers.get("content-type")).toContain("text/csv");
+  });
+
+  it("CSV は非premiumで 402", async () => {
+    const std = await makeSchoolWithOwner("standard");
+    expect((await req("/api/school/messages.csv", { headers: bearer(std.token) })).status).toBe(402);
+  });
+
   it("無効化された教員はログイン不可＋既存トークンも即失効（disabled → 401）", async () => {
     // 無効化する前に一度ログインしてトークンを取得
     const pre = await req("/api/school/auth/login", {

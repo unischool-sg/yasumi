@@ -1,0 +1,2 @@
+ALTER TABLE "message_templates" ADD COLUMN "kind" varchar(20) DEFAULT 'general' NOT NULL;--> statement-breakpoint
+ALTER TABLE "school_messages" ADD COLUMN "kind" varchar(20) DEFAULT 'general' NOT NULL;

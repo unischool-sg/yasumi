@@ -4,11 +4,12 @@ import {
 } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { type MessageCategory, api } from "../api/client.ts";
+import { type MessageCategory, type MessageKind, api } from "../api/client.ts";
 import { PlanChip } from "../components/Layout.tsx";
 import { useToast } from "../components/Toast.tsx";
 
 const CAT_LABEL: Record<MessageCategory, string> = { emergency: "休校・緊急", announcement: "お知らせ" };
+const KIND_LABEL: Record<string, string> = { closure: "休校", event: "行事", safety: "防犯", health: "保健", general: "一般" };
 
 // 組み込みプリセット（DB保存の学校テンプレに加えて常に選べる）。
 const PRESETS: { title: string; category: MessageCategory; body: string }[] = [
@@ -29,8 +30,15 @@ export function Dashboard() {
 
   const [text, setText] = useState("");
   const [category, setCategory] = useState<MessageCategory>("emergency");
+  const [kind, setKind] = useState<MessageKind>("general");
   const [requireConfirmation, setRequireConfirmation] = useState(false);
+  const [targetGrade, setTargetGrade] = useState("");
+  const [targetClass, setTargetClass] = useState("");
   const [newTpl, setNewTpl] = useState<{ title: string; category: MessageCategory; body: string }>({ title: "", category: "emergency", body: "" });
+
+  const plan = me?.school?.plan ?? null;
+  const canAdvanced = plan === "standard" || plan === "premium"; // 分類・セグメント
+  const canCsv = plan === "premium";
 
   const invalidateAll = () => {
     qc.invalidateQueries({ queryKey: ["messages"] });
@@ -38,7 +46,13 @@ export function Dashboard() {
   };
 
   const send = useMutation({
-    mutationFn: () => api.broadcast(text, category, requireConfirmation),
+    mutationFn: () => api.broadcast(text, category, {
+      requireConfirmation,
+      ...(canAdvanced && kind !== "general" ? { kind } : {}),
+      ...(canAdvanced && (targetGrade.trim() || targetClass.trim())
+        ? { target: { ...(targetGrade.trim() ? { grade: targetGrade.trim() } : {}), ...(targetClass.trim() ? { className: targetClass.trim() } : {}) } }
+        : {}),
+    }),
     onSuccess: (r) => { setText(""); invalidateAll(); toast.success(`送信しました（到達 ${r.sent}/${r.total} 件）`); },
     onError: (e) => toast.error(`送信に失敗しました: ${(e as Error).message}`),
   });
@@ -70,6 +84,20 @@ export function Dashboard() {
   const doSend = () => {
     if (!window.confirm(`購読者 ${subscribers.length} 名に「${CAT_LABEL[category]}」として送信します。よろしいですか？`)) return;
     send.mutate();
+  };
+
+  const downloadCsv = async (which: "messages" | "absences") => {
+    try {
+      const blob = await api.getCsv(which);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${which}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error(`CSVの取得に失敗しました: ${(e as Error).message}`);
+    }
   };
 
   const allTemplates = [...PRESETS.map((p, i) => ({ id: `preset-${i}`, ...p })), ...templates];
@@ -107,6 +135,22 @@ export function Dashboard() {
                 </Typography>
               )}
             </Stack>
+            {canAdvanced && (
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+                <TextField select size="small" label="分類" value={kind} onChange={(e) => setKind(e.target.value as MessageKind)} sx={{ width: 130 }}>
+                  <MenuItem value="general">一般</MenuItem>
+                  <MenuItem value="closure">休校</MenuItem>
+                  <MenuItem value="event">行事</MenuItem>
+                  <MenuItem value="safety">防犯</MenuItem>
+                  <MenuItem value="health">保健</MenuItem>
+                </TextField>
+                <TextField size="small" label="学年（任意）" placeholder="例: 1年" value={targetGrade} onChange={(e) => setTargetGrade(e.target.value)} sx={{ width: 120 }} />
+                <TextField size="small" label="組（任意）" placeholder="例: A" value={targetClass} onChange={(e) => setTargetClass(e.target.value)} sx={{ width: 100 }} />
+                {(targetGrade.trim() || targetClass.trim()) && (
+                  <Typography variant="caption" color="text.secondary">対象を絞って送信（生徒情報を登録済みの家庭のみ届きます）</Typography>
+                )}
+              </Stack>
+            )}
             <TextField fullWidth multiline minRows={3} placeholder="例）本日は暴風警報発表のため休校とします。登校の必要はありません。" value={text} onChange={(e) => setText(e.target.value)} />
             <FormControlLabel
               control={<Checkbox size="small" checked={requireConfirmation} onChange={(e) => setRequireConfirmation(e.target.checked)} />}
@@ -156,13 +200,23 @@ export function Dashboard() {
       {/* 送信履歴 */}
       <Card variant="outlined">
         <CardContent>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>送信履歴・到達/確認状況</Typography>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 1 }}>
+            <Typography variant="subtitle2">送信履歴・到達/確認状況</Typography>
+            <Box sx={{ flex: 1 }} />
+            {canCsv && (
+              <>
+                <Button size="small" onClick={() => downloadCsv("messages")}>送信履歴CSV</Button>
+                <Button size="small" onClick={() => downloadCsv("absences")}>欠席CSV</Button>
+              </>
+            )}
+          </Stack>
           <Divider sx={{ mb: 1 }} />
           <Table size="small">
             <TableHead>
               <TableRow>
                 <TableCell>日時</TableCell>
                 <TableCell>種別</TableCell>
+                <TableCell>分類</TableCell>
                 <TableCell>本文</TableCell>
                 <TableCell align="right">到達</TableCell>
                 <TableCell align="right">確認</TableCell>
@@ -173,6 +227,7 @@ export function Dashboard() {
                 <TableRow key={m.id}>
                   <TableCell sx={{ whiteSpace: "nowrap" }}>{new Date(m.createdAt).toLocaleString("ja-JP")}</TableCell>
                   <TableCell sx={{ whiteSpace: "nowrap" }}>{CAT_LABEL[m.category]}</TableCell>
+                  <TableCell sx={{ whiteSpace: "nowrap" }}>{KIND_LABEL[m.kind] ?? m.kind}</TableCell>
                   <TableCell sx={{ maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.text}</TableCell>
                   <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
                     <b>{m.sent}</b> / {m.total}{m.failed > 0 && <Typography component="span" variant="caption" color="error"> （失敗{m.failed}）</Typography>}
@@ -183,7 +238,7 @@ export function Dashboard() {
                 </TableRow>
               ))}
               {messages.length === 0 && (
-                <TableRow><TableCell colSpan={5}><Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: "center" }}>まだ送信していません</Typography></TableCell></TableRow>
+                <TableRow><TableCell colSpan={6}><Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: "center" }}>まだ送信していません</Typography></TableCell></TableRow>
               )}
             </TableBody>
           </Table>
