@@ -290,4 +290,49 @@ suite("API integration", () => {
     expect(bad.status).toBe(401);
     expect(posts.length).toBe(1);
   });
+
+  it("活動通知: 友だち追加(follow)と学校購読を events Webhook に送る", async () => {
+    const LSECRET = "linesecret2";
+    const events: string[] = [];
+    const fetchFn = async (url: string, init?: RequestInit): Promise<Response> => {
+      if (url.startsWith("https://api.line.me/v2/bot/profile/")) {
+        return new Response(JSON.stringify({ displayName: "花子" }), { status: 200 });
+      }
+      if (url.includes("events-webhook")) {
+        events.push((JSON.parse(String(init?.body)) as { content: string }).content);
+      }
+      return new Response("", { status: 204 });
+    };
+    const eapp = createApp({
+      db: drizzle(sql, { schema }),
+      verifyIdToken: async (t) => ({ lineUserId: t }),
+      lineChannelSecret: LSECRET,
+      lineChannelAccessToken: "tok",
+      discordEventsWebhookUrl: "https://discord.test/events-webhook",
+      fetchFn,
+    });
+    const ereq = (p: string, i?: RequestInit) => eapp.fetch(new Request(`http://x${p}`, i));
+
+    // follow イベント
+    const body = JSON.stringify({ events: [{ type: "follow", source: { userId: "Ufollow1" } }] });
+    const sig = createHmac("sha256", LSECRET).update(body).digest("base64");
+    await ereq("/api/webhooks/line", { method: "POST", headers: { "content-type": "application/json", "x-line-signature": sig }, body });
+    expect(events.some((e) => e.includes("新しい友だち追加") && e.includes("Ufollow1"))).toBe(true);
+
+    // 学校購読（新規）
+    const sub = await ereq("/api/me/subscriptions", {
+      method: "POST", headers: { ...auth("Usub1"), "content-type": "application/json" },
+      body: JSON.stringify({ schoolId }),
+    });
+    expect(sub.status).toBe(201);
+    expect(events.some((e) => e.includes("学校購読"))).toBe(true);
+
+    // 再購読は通知しない（件数が増えない）
+    const before = events.length;
+    await ereq("/api/me/subscriptions", {
+      method: "POST", headers: { ...auth("Usub1"), "content-type": "application/json" },
+      body: JSON.stringify({ schoolId }),
+    });
+    expect(events.length).toBe(before);
+  });
 });

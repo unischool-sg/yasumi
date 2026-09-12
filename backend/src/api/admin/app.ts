@@ -5,6 +5,7 @@ import type { Db } from "../../infrastructure/db/client.ts";
 import type { NotificationProvider } from "../../domain/notification/provider.ts";
 import { notifyUser } from "../../domain/notification/dispatch.ts";
 import { prepareLogo } from "../../domain/logo.ts";
+import { postDiscordMessage } from "../../infrastructure/discord/notify.ts";
 import { getLineProfile } from "../../infrastructure/line/line-api.ts";
 import type { Storage } from "../../infrastructure/storage/s3.ts";
 import { rateLimit } from "../middleware/rate-limit.ts";
@@ -33,6 +34,8 @@ export interface AdminAppDeps {
   pushProvider?: NotificationProvider;
   /** ロゴ等のオブジェクトストレージ（RustFS/S3）。未設定ならロゴ機能は無効。 */
   storage?: Storage;
+  /** 学校登録などの活動通知先 Discord Webhook URL（秘密・env 注入）。 */
+  discordEventsWebhookUrl?: string;
 }
 
 const roleSchema = z.enum(["superadmin", "admin"]);
@@ -144,6 +147,9 @@ export function createAdminApp(deps: AdminAppDeps) {
       });
       if (b.areaCodes) await cfg.setAreaCodes(db, school.id, b.areaCodes);
       if (b.warningTypes) await cfg.setWarningTypes(db, school.id, b.warningTypes);
+      if (deps.discordEventsWebhookUrl) {
+        await postDiscordMessage(deps.discordEventsWebhookUrl, `**学校が登録されました**（管理画面）\n学校: ${school.name}（${school.prefecture}）`);
+      }
       return c.json(school, 201);
     },
   );
