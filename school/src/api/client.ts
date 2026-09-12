@@ -58,6 +58,15 @@ export interface MessageTemplate {
   body: string;
   createdAt: string;
 }
+export interface Teacher {
+  id: string;
+  schoolId: string;
+  email: string;
+  role: "owner" | "teacher";
+  name: string;
+  disabled: boolean;
+  createdAt: string;
+}
 export interface ClosureDraft {
   id: string;
   targetDate: string;
@@ -107,6 +116,17 @@ export const api = {
   sendDraft: (id: string, text?: string) =>
     request<BroadcastResult>(`/drafts/${id}/send`, { method: "POST", body: JSON.stringify(text ? { text } : {}) }),
   dismissDraft: (id: string) => request<ClosureDraft>(`/drafts/${id}/dismiss`, { method: "POST" }),
+  // 教員管理（owner・standard+）
+  getTeachers: () => request<Teacher[]>("/teachers"),
+  createTeacher: (b: { email: string; password: string; name: string; role?: "owner" | "teacher" }) =>
+    request<Teacher>("/teachers", { method: "POST", body: JSON.stringify(b) }),
+  updateTeacher: (id: string, b: { disabled?: boolean; password?: string; name?: string; role?: "owner" | "teacher" }) =>
+    request<Teacher>(`/teachers/${id}`, { method: "PATCH", body: JSON.stringify(b) }),
+  deleteTeacher: (id: string) => request<void>(`/teachers/${id}`, { method: "DELETE" }),
+  // ロゴ（owner・standard+）
+  uploadLogo: (contentType: string, dataBase64: string) =>
+    request<{ logoKey: string }>("/logo", { method: "POST", body: JSON.stringify({ contentType, dataBase64 }) }),
+  deleteLogo: () => request<void>("/logo", { method: "DELETE" }),
   getQuota: () => request<Quota>("/quota"),
   getAbsences: (status?: AbsenceStatus) =>
     request<AbsenceReport[]>(`/absences${status ? `?status=${status}` : ""}`),

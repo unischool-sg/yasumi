@@ -483,6 +483,65 @@ suite("School (teacher) API", () => {
     expect(res.status).toBe(503);
   });
 
+  // 指定プランの学校＋owner(admin発行)を作り、owner のログイン token を返す
+  async function makeSchoolWithOwner(plan: string): Promise<{ schoolId: string; token: string }> {
+    const schoolId = ((await (await req("/api/admin/schools", {
+      method: "POST", headers: { ...bearer(adminToken), "content-type": "application/json" },
+      body: JSON.stringify({ name: `${plan}校_${Math.random().toString(36).slice(2, 6)}`, prefecture: "兵庫県" }),
+    })).json()) as { id: string }).id;
+    await req(`/api/admin/schools/${schoolId}`, {
+      method: "PATCH", headers: { ...bearer(adminToken), "content-type": "application/json" },
+      body: JSON.stringify({ plan }),
+    });
+    const email = `owner_${Math.random().toString(36).slice(2, 8)}@x.example`;
+    await req(`/api/admin/schools/${schoolId}/teachers`, {
+      method: "POST", headers: { ...bearer(adminToken), "content-type": "application/json" },
+      body: JSON.stringify({ email, password: "ownerpass12", name: "校長", role: "owner" }),
+    });
+    const token = ((await (await req("/api/school/auth/login", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password: "ownerpass12" }),
+    })).json()) as { token: string }).token;
+    return { schoolId, token };
+  }
+
+  it("職員席上限: basic は owner 自己管理 402 / standard は席5超で 409", async () => {
+    const addTeacher = (token: string) => req("/api/school/teachers", {
+      method: "POST", headers: { ...bearer(token), "content-type": "application/json" },
+      body: JSON.stringify({ email: `t_${Math.random().toString(36).slice(2, 8)}@x.example`, password: "teacherpass9", name: "先生", role: "teacher" }),
+    });
+    // basic: 自己管理はスタンダード以上のみ → 402
+    const basic = await makeSchoolWithOwner("basic");
+    expect((await addTeacher(basic.token)).status).toBe(402);
+    // standard: 上限5。owner=1 なので +4 は成功、5人追加目（合計6）で 409
+    const std = await makeSchoolWithOwner("standard");
+    for (let i = 0; i < 4; i++) expect((await addTeacher(std.token)).status).toBe(201);
+    expect((await addTeacher(std.token)).status).toBe(409);
+  });
+
+  it("owner が自校の教員を自己管理（standard+）", async () => {
+    // 学校A は premium。owner=emailA でログイン
+    const { token } = (await (await req("/api/school/auth/login", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: emailA, password: "teacherpass1" }),
+    })).json()) as { token: string };
+    const email = `owneradd_${Math.random().toString(36).slice(2, 7)}@a.example`;
+    const add = await req("/api/school/teachers", {
+      method: "POST", headers: { ...bearer(token), "content-type": "application/json" },
+      body: JSON.stringify({ email, password: "ownadd12345", name: "追加先生", role: "teacher" }),
+    });
+    expect(add.status).toBe(201);
+    expect(((await add.json()) as Record<string, unknown>).passwordHash).toBeUndefined();
+    const list = (await (await req("/api/school/teachers", { headers: bearer(token) })).json()) as { email: string }[];
+    expect(list.some((t) => t.email === email)).toBe(true);
+    // 追加した教員(role=teacher)は owner 管理不可（403）
+    const teacherLogin = (await (await req("/api/school/auth/login", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password: "ownadd12345" }),
+    })).json()) as { token: string };
+    expect((await req("/api/school/teachers", { headers: bearer(teacherLogin.token) })).status).toBe(403);
+  });
+
   it("無効化された教員はログイン不可＋既存トークンも即失効（disabled → 401）", async () => {
     // 無効化する前に一度ログインしてトークンを取得
     const pre = await req("/api/school/auth/login", {

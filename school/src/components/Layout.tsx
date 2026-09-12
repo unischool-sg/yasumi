@@ -9,6 +9,7 @@ const nav = [
   { to: "/", label: "送信" },
   { to: "/absences", label: "欠席受付" },
 ];
+const ownerNav = [{ to: "/manage", label: "管理" }];
 
 export function Layout() {
   const navigate = useNavigate();
@@ -28,7 +29,7 @@ export function Layout() {
             やすみ？ 先生ダッシュボード
           </Typography>
           <Stack direction="row" spacing={1} sx={{ flexGrow: 1 }}>
-            {nav.map((n) => {
+            {[...nav, ...(auth?.teacher.role === "owner" ? ownerNav : [])].map((n) => {
               const active = n.to === "/" ? path === "/" : path.startsWith(n.to);
               return (
                 <Button

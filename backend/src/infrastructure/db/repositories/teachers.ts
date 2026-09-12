@@ -22,6 +22,12 @@ export async function createTeacher(db: Db, input: NewTeacher): Promise<TeacherR
   return row;
 }
 
+/** 自校の教員数（プラン別 席数上限の判定用）。 */
+export async function countBySchool(db: Db, schoolId: string): Promise<number> {
+  const rows = await db.select({ id: teachers.id }).from(teachers).where(eq(teachers.schoolId, schoolId));
+  return rows.length;
+}
+
 export async function findTeacherByEmail(db: Db, email: string): Promise<TeacherRow | undefined> {
   const rows = await db.select().from(teachers).where(eq(teachers.email, email)).limit(1);
   return rows[0];

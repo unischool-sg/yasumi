@@ -6,7 +6,8 @@ import type { Db } from "../../infrastructure/db/client.ts";
 import type { NotificationProvider } from "../../domain/notification/provider.ts";
 import { notifyUser } from "../../domain/notification/dispatch.ts";
 import { prepareLogo } from "../../domain/logo.ts";
-import { announcementMonthlyLimit, hasFeature, jstMonthStart } from "../../domain/plan.ts";
+import { announcementMonthlyLimit, hasFeature, jstMonthStart, teacherSeatLimit } from "../../domain/plan.ts";
+import * as teachersRepo from "../../infrastructure/db/repositories/teachers.ts";
 import type { Storage } from "../../infrastructure/storage/s3.ts";
 import * as absenceReportsRepo from "../../infrastructure/db/repositories/absence-reports.ts";
 import * as closureDraftsRepo from "../../infrastructure/db/repositories/closure-drafts.ts";
@@ -220,6 +221,76 @@ export function createSchoolApp(deps: SchoolAppDeps) {
       return c.json(updated);
     },
   );
+
+  // --- 教員アカウントの自己管理（owner・standard+ / M18）---
+  const ownerManage = async (c: { get: (k: "teacher") => SchoolEnv["Variables"]["teacher"] }) => {
+    const t = c.get("teacher");
+    if (t.role !== "owner") return { err: 403 as const };
+    const school = await schoolsRepo.findSchoolById(db, t.schoolId);
+    if (!school) return { err: 404 as const };
+    if (!hasFeature(school, "ownerManageTeachers", deps.now?.() ?? new Date())) return { err: 402 as const };
+    return { school, schoolId: t.schoolId };
+  };
+
+  app.get("/teachers", async (c) => {
+    const t = c.get("teacher");
+    if (t.role !== "owner") return c.json({ error: "forbidden" }, 403);
+    return c.json(await teachersRepo.listTeachersBySchool(db, t.schoolId));
+  });
+  app.post(
+    "/teachers",
+    zValidator("json", z.object({
+      email: z.string().email(),
+      password: z.string().min(8),
+      name: z.string().min(1),
+      role: z.enum(["owner", "teacher"]).optional(),
+    })),
+    async (c) => {
+      const g = await ownerManage(c);
+      if ("err" in g) return c.json({ error: g.err === 402 ? "スタンダード以上のプランで教員を追加できます" : g.err === 404 ? "not found" : "forbidden" }, g.err);
+      const b = c.req.valid("json");
+      const limit = teacherSeatLimit(g.school, deps.now?.() ?? new Date());
+      if (limit !== null && (await teachersRepo.countBySchool(db, g.schoolId)) >= limit) {
+        return c.json({ error: `教員アカウント上限（${limit}）に達しています` }, 409);
+      }
+      if (await teachersRepo.findTeacherByEmail(db, b.email)) return c.json({ error: "email taken" }, 409);
+      const passwordHash = await Bun.password.hash(b.password);
+      const row = await teachersRepo.createTeacher(db, { schoolId: g.schoolId, email: b.email, passwordHash, name: b.name, ...(b.role ? { role: b.role } : {}) });
+      const { passwordHash: _o, ...safe } = row;
+      return c.json(safe, 201);
+    },
+  );
+  app.patch(
+    "/teachers/:id",
+    zValidator("json", z.object({
+      role: z.enum(["owner", "teacher"]).optional(),
+      disabled: z.boolean().optional(),
+      password: z.string().min(8).optional(),
+      name: z.string().min(1).optional(),
+    })),
+    async (c) => {
+      const g = await ownerManage(c);
+      if ("err" in g) return c.json({ error: "forbidden" }, g.err);
+      // 自校の教員のみ更新可
+      const target = await teachersRepo.findTeacherInSchool(db, g.schoolId, c.req.param("id"));
+      if (!target) return c.json({ error: "not found" }, 404);
+      const b = c.req.valid("json");
+      const patch: { role?: "owner" | "teacher"; disabled?: boolean; passwordHash?: string; name?: string } = {};
+      if (b.role !== undefined) patch.role = b.role;
+      if (b.disabled !== undefined) patch.disabled = b.disabled;
+      if (b.name !== undefined) patch.name = b.name;
+      if (b.password !== undefined) patch.passwordHash = await Bun.password.hash(b.password);
+      const updated = await teachersRepo.updateTeacher(db, target.id, patch);
+      const { passwordHash: _o, ...safe } = updated!;
+      return c.json(safe);
+    },
+  );
+  app.delete("/teachers/:id", async (c) => {
+    const g = await ownerManage(c);
+    if ("err" in g) return c.json({ error: "forbidden" }, g.err);
+    await teachersRepo.deleteTeacherInSchool(db, g.schoolId, c.req.param("id"));
+    return c.body(null, 204);
+  });
 
   // --- 学校ロゴ（owner・standard+ で自校のロゴを差し替え / M17）---
   app.post(
