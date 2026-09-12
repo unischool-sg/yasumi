@@ -11,6 +11,7 @@ import type { Storage } from "../../infrastructure/storage/s3.ts";
 import { rateLimit } from "../middleware/rate-limit.ts";
 import { type AdminEnv, adminAuthMiddleware, login, requireSuperadmin } from "./auth.ts";
 import * as adminsRepo from "../../infrastructure/db/repositories/admins.ts";
+import * as adminTemplatesRepo from "../../infrastructure/db/repositories/admin-message-templates.ts";
 import * as areasRepo from "../../infrastructure/db/repositories/areas.ts";
 import * as cfg from "../../infrastructure/db/repositories/school-config.ts";
 import * as deviceTokensRepo from "../../infrastructure/db/repositories/device-tokens.ts";
@@ -341,6 +342,7 @@ export function createAdminApp(deps: AdminAppDeps) {
         target: z.discriminatedUnion("type", [
           z.object({ type: z.literal("all") }),
           z.object({ type: z.literal("school"), schoolId: z.string().uuid() }),
+          z.object({ type: z.literal("users"), userIds: z.array(z.string().uuid()).min(1).max(500) }),
         ]),
       }),
     ),
@@ -349,7 +351,9 @@ export function createAdminApp(deps: AdminAppDeps) {
       const userIds =
         target.type === "all"
           ? await usersRepo.listAllUserIds(db)
-          : (await subsRepo.listSubscribersBySchool(db, target.schoolId)).map((s) => s.userId);
+          : target.type === "school"
+            ? (await subsRepo.listSubscribersBySchool(db, target.schoolId)).map((s) => s.userId)
+            : target.userIds;
       const notifyDeps = {
         db,
         ...(deps.notificationProvider ? { notificationProvider: deps.notificationProvider } : {}),
@@ -362,6 +366,18 @@ export function createAdminApp(deps: AdminAppDeps) {
       return c.json({ total: userIds.length, sent, failed: userIds.length - sent });
     },
   );
+
+  // --- メッセージ定型文（管理画面・ユーザー送信用）---
+  app.get("/message-templates", async (c) => c.json(await adminTemplatesRepo.listTemplates(db)));
+  app.post(
+    "/message-templates",
+    zValidator("json", z.object({ title: z.string().min(1).max(100), body: z.string().min(1).max(1000) })),
+    async (c) => c.json(await adminTemplatesRepo.createTemplate(db, c.req.valid("json")), 201),
+  );
+  app.delete("/message-templates/:id", async (c) => {
+    await adminTemplatesRepo.deleteTemplate(db, c.req.param("id"));
+    return c.body(null, 204);
+  });
 
   // --- ユーザー・購読 ---
   app.get("/users", async (c) => c.json(await usersRepo.listUsers(db, { limit: 200 })));

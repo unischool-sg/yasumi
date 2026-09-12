@@ -30,6 +30,14 @@ export const admins = pgTable("admins", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// 管理画面のメッセージ定型文（全体スコープ・学校向けとは別 / admin ユーザー送信用）。
+export const adminMessageTemplates = pgTable("admin_message_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: varchar("title", { length: 100 }).notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const lineAccounts = pgTable("line_accounts", {
   userId: uuid("user_id").primaryKey(),
   lineUserId: varchar("line_user_id", { length: 255 }).notNull().unique(),

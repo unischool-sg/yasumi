@@ -1,6 +1,6 @@
-import { desc, eq } from "drizzle-orm";
+import { count, desc, eq } from "drizzle-orm";
 import type { Db } from "../client.ts";
-import { lineAccounts, users } from "../schema.ts";
+import { lineAccounts, subscriptions, users } from "../schema.ts";
 
 /**
  * LINE ユーザーIDから内部ユーザーを取得。無ければ users + line_accounts を作成（PRD §21, §55）。
@@ -27,11 +27,18 @@ export async function findOrCreateByLineUserId(db: Db, lineUserId: string): Prom
 export async function listUsers(
   db: Db,
   opts: { limit?: number; offset?: number } = {},
-): Promise<{ id: string; lineUserId: string | null; createdAt: Date }[]> {
+): Promise<{ id: string; lineUserId: string | null; createdAt: Date; subscriptionCount: number }[]> {
   return db
-    .select({ id: users.id, lineUserId: lineAccounts.lineUserId, createdAt: users.createdAt })
+    .select({
+      id: users.id,
+      lineUserId: lineAccounts.lineUserId,
+      createdAt: users.createdAt,
+      subscriptionCount: count(subscriptions.schoolId),
+    })
     .from(users)
     .leftJoin(lineAccounts, eq(lineAccounts.userId, users.id))
+    .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
+    .groupBy(users.id, lineAccounts.lineUserId)
     .orderBy(desc(users.createdAt))
     .limit(opts.limit ?? 100)
     .offset(opts.offset ?? 0);

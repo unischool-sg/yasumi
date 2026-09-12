@@ -91,6 +91,13 @@ export interface UserRow {
   id: string;
   lineUserId: string | null;
   createdAt: string;
+  subscriptionCount: number;
+}
+export interface AdminMessageTemplate {
+  id: string;
+  title: string;
+  body: string;
+  createdAt: string;
 }
 export interface SchoolSubscriber {
   userId: string;
@@ -173,11 +180,19 @@ export const api = {
   getUser: (id: string) => request<UserDetail>(`/users/${id}`),
   sendUserMessage: (id: string, text: string) =>
     request<{ ok: boolean }>(`/users/${id}/message`, { method: "POST", body: JSON.stringify({ text }) }),
-  broadcast: (text: string, target: { type: "all" } | { type: "school"; schoolId: string }) =>
+  broadcast: (
+    text: string,
+    target: { type: "all" } | { type: "school"; schoolId: string } | { type: "users"; userIds: string[] },
+  ) =>
     request<{ total: number; sent: number; failed: number }>("/broadcast", {
       method: "POST",
       body: JSON.stringify({ text, target }),
     }),
+  // メッセージ定型文（ユーザー送信用）
+  getMessageTemplates: () => request<AdminMessageTemplate[]>("/message-templates"),
+  createMessageTemplate: (b: { title: string; body: string }) =>
+    request<AdminMessageTemplate>("/message-templates", { method: "POST", body: JSON.stringify(b) }),
+  deleteMessageTemplate: (id: string) => request<void>(`/message-templates/${id}`, { method: "DELETE" }),
   addUserSubscription: (id: string, schoolId: string) =>
     request(`/users/${id}/subscriptions`, { method: "POST", body: JSON.stringify({ schoolId }) }),
   setUserSubscription: (id: string, schoolId: string, notificationEnabled: boolean) =>
