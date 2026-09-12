@@ -9,9 +9,11 @@ export interface NotificationTarget {
   deviceTokens?: string[];
 }
 
-/** 通知メッセージ（MVP は text のみ / 将来 Flex 等）。 */
+/** 通知メッセージ。action があれば LINE はボタン付き Flex で送る（FCM は本文にURLを付与）。 */
 export interface NotificationMessage {
   text: string;
+  /** タップで URL を開くボタン（例: 「確認する」）。 */
+  action?: { label: string; url: string };
 }
 
 /** 通知処理の抽象（PRD §50, §62）。LINE 依存にしない。 */

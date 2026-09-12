@@ -21,6 +21,22 @@ describe("LineNotificationProvider", () => {
     expect(body.messages[0].text).toBe("hello");
   });
 
+  it("action があれば Flex ボタン付きで送る", async () => {
+    let body: Record<string, unknown> = {};
+    const provider = new LineNotificationProvider({
+      accessToken: "T",
+      fetchFn: async (_u, init) => { body = JSON.parse(init.body as string); return new Response("{}", { status: 200 }); },
+    });
+    await provider.send({ lineUserId: "U1" }, { text: "本日は休校です", action: { label: "確認する", url: "https://x/c/abc" } });
+    const msg = (body.messages as Record<string, unknown>[])[0]!;
+    expect(msg.type).toBe("flex");
+    const contents = msg.contents as { footer: { contents: { action: { type: string; uri: string; label: string } }[] } };
+    const btn = contents.footer.contents[0]!.action;
+    expect(btn.type).toBe("uri");
+    expect(btn.uri).toBe("https://x/c/abc");
+    expect(btn.label).toBe("確認する");
+  });
+
   it("HTTP エラーで例外", async () => {
     const provider = new LineNotificationProvider({
       accessToken: "T",
