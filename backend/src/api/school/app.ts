@@ -124,12 +124,12 @@ export function createSchoolApp(deps: SchoolAppDeps) {
       };
       let sent = 0;
       for (const s of subs) {
-        let body = text;
+        let action: { label: string; url: string } | undefined;
         if (withConfirm) {
           const token = await sign({ m: row.id, u: s.userId }, deps.schoolJwtSecret, "HS256");
-          body = `${text}\n\n▼受け取ったら確認をお願いします\n${deps.apiBaseUrl}/c/${token}`;
+          action = { label: "確認する", url: `${deps.apiBaseUrl}/c/${token}` };
         }
-        if (await notifyUser(notifyDeps, s.userId, body)) sent++;
+        if (await notifyUser(notifyDeps, s.userId, text, action)) sent++;
       }
       await msgRepo.updateCounts(db, row.id, sent, total - sent);
       return c.json({ id: row.id, total, sent, failed: total - sent });

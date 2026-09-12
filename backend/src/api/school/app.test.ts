@@ -344,14 +344,14 @@ suite("School (teacher) API", () => {
   });
 
   it("確認ボタン: requireConfirmation 送信→/c/:token→confirmedCount 反映", async () => {
-    const captured: string[] = [];
+    const captured: { text: string; url?: string }[] = [];
     const cApp = createApp({
       db: drizzle(sql, { schema }),
       verifyIdToken: async (t) => ({ lineUserId: t }),
       adminJwtSecret: ADMIN_SECRET,
       schoolJwtSecret: SCHOOL_SECRET,
       apiBaseUrl: "http://x",
-      notificationProvider: { async send(_t, m) { captured.push(m.text); } },
+      notificationProvider: { async send(_t, m) { captured.push({ text: m.text, ...(m.action ? { url: m.action.url } : {}) }); } },
     });
     const creq = (path: string, init?: RequestInit) => cApp.fetch(new Request(`http://x${path}`, init));
 
@@ -371,10 +371,10 @@ suite("School (teacher) API", () => {
       body: JSON.stringify({ text: "本日は休校です", category: "emergency", requireConfirmation: true }),
     });
     const { id: msgId } = (await bc.json()) as { id: string };
-    // 送信本文に確認リンクが含まれる
-    const sentText = captured.find((t) => t.includes("/c/"))!;
-    expect(sentText).toContain("http://x/c/");
-    const confirmPath = sentText.match(/\/c\/([A-Za-z0-9._-]+)/)![0];
+    // 確認リンクは Flex ボタンの action.url として送られる
+    const withUrl = captured.find((c) => c.url?.includes("/c/"))!;
+    expect(withUrl.url).toContain("http://x/c/");
+    const confirmPath = withUrl.url!.match(/\/c\/([A-Za-z0-9._-]+)/)![0];
 
     // 確認前は 0
     let hist = (await (await creq("/api/school/messages", { headers: bearer(token) })).json()) as { id: string; confirmedCount: number }[];
