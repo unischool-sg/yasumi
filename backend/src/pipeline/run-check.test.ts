@@ -29,9 +29,14 @@ const activeStorm: Warning[] = [
 ];
 
 function providerReturning(warnings: Warning[]): WarningProvider {
-  return { getActiveWarnings: async () => warnings };
+  return { getActiveWarnings: async () => ({ warnings, failedPrefCodes: [] }) };
 }
+// 兵庫(280000)の取得に失敗した状態を再現（部分失敗）。
 const providerFailing: WarningProvider = {
+  getActiveWarnings: async () => ({ warnings: [], failedPrefCodes: ["280000"] }),
+};
+// provider 自体が例外を投げる異常系（呼び出し側の防御 catch を検証）。
+const providerThrowing: WarningProvider = {
   getActiveWarnings: async () => {
     throw new Error("JMA down");
   },
@@ -119,6 +124,66 @@ suite("runCheck pipeline", () => {
     );
     expect(summary.fetchFailed).toBe(true);
     expect(summary.notificationsSent).toBe(1);
+    expect(sent[0]?.text).toContain("判定できませんでした");
+  });
+
+  it("都道府県の部分失敗 → 失敗県のみ UNKNOWN・成功県は通常判定（§51）", async () => {
+    const OSAKA = "2710000";
+    // 兵庫の学校（取得失敗する県）
+    const hyogo = await createSchool(db, { name: "部分失敗-兵庫校", prefecture: "兵庫県" });
+    await cfg.setAreaCodes(db, hyogo.id, [SANDA]);
+    await cfg.setWarningTypes(db, hyogo.id, ["暴風警報"]);
+    await createRule(db, { schoolId: hyogo.id, checkTime: "08:15", result: "AM_OFF" });
+    const hyogoUser = await findOrCreateByLineUserId(db, "Ucron_part_hyogo");
+    await upsertSubscription(db, { userId: hyogoUser.userId, schoolId: hyogo.id });
+    // 大阪の学校（取得成功・警報あり）
+    const osaka = await createSchool(db, { name: "部分失敗-大阪校", prefecture: "大阪府" });
+    await cfg.setAreaCodes(db, osaka.id, [OSAKA]);
+    await cfg.setWarningTypes(db, osaka.id, ["暴風警報"]);
+    await createRule(db, { schoolId: osaka.id, checkTime: "08:15", result: "AM_OFF" });
+    const osakaUser = await findOrCreateByLineUserId(db, "Ucron_part_osaka");
+    await upsertSubscription(db, { userId: osakaUser.userId, schoolId: osaka.id });
+
+    const at0815 = new Date("2026-09-09T08:15:00+09:00");
+    const partialProvider: WarningProvider = {
+      getActiveWarnings: async () => ({
+        warnings: [
+          { areaCode: OSAKA, areaName: "大阪市", warningType: "暴風警報", status: "active", issuedAt: at0815 },
+        ],
+        failedPrefCodes: ["280000"], // 兵庫のみ失敗
+      }),
+    };
+
+    sent.length = 0;
+    const summary = await runCheck(
+      { db, warningProvider: partialProvider, notificationProvider: notifier, now: () => at0815 },
+      { triggeredAt: at0815 },
+    );
+
+    expect(summary.fetchFailed).toBe(true);
+    const hyogoMsg = sent.find((m) => m.text.includes("部分失敗-兵庫校"));
+    const osakaMsg = sent.find((m) => m.text.includes("部分失敗-大阪校"));
+    // 兵庫は UNKNOWN、大阪は通常判定（AM_OFF）
+    expect(hyogoMsg?.text).toContain("判定できませんでした");
+    expect(osakaMsg).toBeDefined();
+    expect(osakaMsg?.text).not.toContain("判定できませんでした");
+  });
+
+  it("provider が例外 → 全対象県を安全側で UNKNOWN 扱い（防御 catch）", async () => {
+    const s = await createSchool(db, { name: "例外校", prefecture: "兵庫県" });
+    await cfg.setAreaCodes(db, s.id, [SANDA]);
+    await cfg.setWarningTypes(db, s.id, ["暴風警報"]);
+    await createRule(db, { schoolId: s.id, checkTime: "08:45", result: "AM_OFF" });
+    const { userId } = await findOrCreateByLineUserId(db, "Ucron_throw");
+    await upsertSubscription(db, { userId, schoolId: s.id });
+
+    sent.length = 0;
+    const at0845 = new Date("2026-09-09T08:45:00+09:00");
+    const summary = await runCheck(
+      { db, warningProvider: providerThrowing, notificationProvider: notifier, now: () => at0845 },
+      { triggeredAt: at0845 },
+    );
+    expect(summary.fetchFailed).toBe(true);
     expect(sent[0]?.text).toContain("判定できませんでした");
   });
 
