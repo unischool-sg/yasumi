@@ -25,3 +25,17 @@ export const liffAuthProvider: AuthProvider = {
     return liff.getIDToken();
   },
 };
+
+/**
+ * 公式アカウントの友だち状態を取得する（LIFF のみ）。
+ * true=友だち / false=未友だち / null=判定不能（非LIFF・未初期化・API不可）。
+ * 未友だちだと LINE プッシュが届かない（送信側が 400）ため、追加導線の出し分けに使う。
+ */
+export async function getLiffFriendFlag(): Promise<boolean | null> {
+  try {
+    const fs = await liff.getFriendship();
+    return fs.friendFlag;
+  } catch {
+    return null;
+  }
+}
