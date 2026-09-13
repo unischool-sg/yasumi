@@ -8,6 +8,7 @@ import type { Db } from "../infrastructure/db/client.ts";
 import * as flagsRepo from "../infrastructure/db/repositories/flags.ts";
 import * as schedulesRepo from "../infrastructure/db/repositories/flow-schedules.ts";
 import * as templatesRepo from "../infrastructure/db/repositories/flow-templates.ts";
+import * as flowRunLogsRepo from "../infrastructure/db/repositories/flow-run-logs.ts";
 import { findOrCreateByLineUserId } from "../infrastructure/db/repositories/users.ts";
 import * as schema from "../infrastructure/db/schema.ts";
 import { runFlows } from "./run-flows.ts";
@@ -66,6 +67,13 @@ suite("runFlows pipeline", () => {
     expect(s1.flowsRun).toBe(1);
     const detail = await flagsRepo.listByUsers(db, [userId]);
     expect(detail.get(userId) ?? []).toContain("cron-done");
+
+    // 実行ログが DB に記録される（定期・成功）
+    const runLogs = await flowRunLogsRepo.listFlowRunLogs(db, { templateId: tpl.id });
+    expect(runLogs.length).toBe(1);
+    expect(runLogs[0]?.trigger).toBe("schedule");
+    expect(runLogs[0]?.status).toBe("success");
+    expect(runLogs[0]?.templateName).toBe("毎朝フロー");
 
     // Discord ログに対象者URL・テンプレURL・操作内容が載る
     expect(posted.length).toBe(1);

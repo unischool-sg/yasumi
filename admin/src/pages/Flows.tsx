@@ -1,4 +1,4 @@
-import { Box, Button, Card, CardContent, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, FormControlLabel, Stack, TextField, Typography } from "@mui/material";
+import { Box, Button, Card, CardContent, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, FormControlLabel, Stack, Tab, Tabs, TextField, Typography } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { describeFlowStep } from "@yasumi/shared";
@@ -8,6 +8,7 @@ import { EMPTY_QUERY, type UserQuery, UserQueryEditor, compareUsers, matchesQuer
 import { UserFlowRunner } from "../components/UserFlowRunner.tsx";
 import { FlowTemplateEditor } from "../components/FlowTemplateEditor.tsx";
 import { FlowScheduleManager } from "../components/FlowScheduleManager.tsx";
+import { FlowRunLogs } from "../components/FlowRunLogs.tsx";
 
 export function Flows() {
   const qc = useQueryClient();
@@ -28,6 +29,7 @@ export function Flows() {
   const [newFlag, setNewFlag] = useState("");
   const [flowTplEditor, setFlowTplEditor] = useState<{ open: boolean; initial: FlowTemplate | null }>({ open: false, initial: null });
   const [scheduleFor, setScheduleFor] = useState<FlowTemplate | null>(null);
+  const [tab, setTab] = useState(0);
 
   // テンプレートの対象人数をクライアント側の users から見積り（実行前確認用）。
   const templateCount = (t: FlowTemplate) => (t.allUsers ? users.length : users.filter((u) => matchesQuery(u, t.query)).length);
@@ -69,6 +71,15 @@ export function Flows() {
     <Box>
       <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>フロー（一括施策）</Typography>
 
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+        <Tab label="設定・実行" />
+        <Tab label="実行ログ" />
+      </Tabs>
+
+      {tab === 1 && <FlowRunLogs />}
+
+      {tab === 0 && (
+      <>
       {/* 対象 */}
       <Card variant="outlined" sx={{ mb: 2 }}>
         <CardContent>
@@ -167,6 +178,8 @@ export function Flows() {
           </Stack>
         </CardContent>
       </Card>
+      </>
+      )}
 
       <Dialog open={tplModalOpen} onClose={() => setTplModalOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>{tplForm.id ? "定型文を編集" : "定型文を追加"}</DialogTitle>

@@ -31,6 +31,7 @@ import * as subsRepo from "../infrastructure/db/repositories/subscriptions.ts";
 import * as usersRepo from "../infrastructure/db/repositories/users.ts";
 import * as warningChecksRepo from "../infrastructure/db/repositories/warning-checks.ts";
 import { runCheck } from "../pipeline/run-check.ts";
+import { runFlowLogRetention } from "../pipeline/flow-log-retention.ts";
 import { runFlows } from "../pipeline/run-flows.ts";
 import { jstDateString } from "../shared/jst.ts";
 
@@ -260,6 +261,19 @@ export function createApp(deps: AppDeps) {
       { triggeredAt },
     );
     return c.json(summary);
+  });
+
+  // cron 内部エンドポイント: フロー実行ログの保持期間管理（30日超を S3 退避のうえ削除）。
+  app.post("/api/internal/flow-logs-retention", async (c) => {
+    if (!deps.internalCronToken || c.req.header("x-internal-token") !== deps.internalCronToken) {
+      return c.json({ error: "unauthorized" }, 401);
+    }
+    const result = await runFlowLogRetention({
+      db: deps.db,
+      ...(deps.storage ? { storage: deps.storage } : {}),
+      ...(deps.now ? { now: deps.now } : {}),
+    });
+    return c.json(result);
   });
 
   // 公開: 登録済み学校の一覧（landing の学校一覧ページ / 認証不要・PII なし）。

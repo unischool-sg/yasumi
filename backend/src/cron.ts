@@ -1,6 +1,8 @@
 // 同一プロセス cron（backend/CRON.md）。30分ごと(毎時 :00 / :30)に発火し、
 // app.fetch で内部判定エンドポイントを叩く。多重発火は in-flight guard で防ぐ。
 
+import { jstHhmm } from "./shared/jst.ts";
+
 interface FetchApp {
   fetch: (req: Request) => Response | Promise<Response>;
 }
@@ -56,6 +58,10 @@ export function startCron(app: FetchApp, opts: StartCronOptions): () => void {
       await callInternal("/api/internal/run-check", triggeredAt);
       // フロー定期実行（既存 cron を再利用）。
       await callInternal("/api/internal/run-flows", triggeredAt);
+      // フロー実行ログの保持期間管理（1日1回・JST 03:00 のみ）。30日超を S3 退避のうえ削除。
+      if (jstHhmm(boundary) === "03:00") {
+        await callInternal("/api/internal/flow-logs-retention", triggeredAt);
+      }
     } finally {
       running = false;
     }

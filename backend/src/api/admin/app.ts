@@ -15,7 +15,9 @@ import * as adminTemplatesRepo from "../../infrastructure/db/repositories/admin-
 import * as flagsRepo from "../../infrastructure/db/repositories/flags.ts";
 import * as flowTemplatesRepo from "../../infrastructure/db/repositories/flow-templates.ts";
 import * as flowSchedulesRepo from "../../infrastructure/db/repositories/flow-schedules.ts";
+import * as flowRunLogsRepo from "../../infrastructure/db/repositories/flow-run-logs.ts";
 import { executeFlow } from "../../domain/flow/execute.ts";
+import { toLogSteps } from "../../pipeline/run-flows.ts";
 import * as areasRepo from "../../infrastructure/db/repositories/areas.ts";
 import * as cfg from "../../infrastructure/db/repositories/school-config.ts";
 import * as deviceTokensRepo from "../../infrastructure/db/repositories/device-tokens.ts";
@@ -445,24 +447,59 @@ export function createAdminApp(deps: AdminAppDeps) {
     await flowTemplatesRepo.deleteTemplate(db, c.req.param("id"));
     return c.body(null, 204);
   });
-  // テンプレートを手動実行（cron と同じ executeFlow を使用）。
+  // テンプレートを手動実行（cron と同じ executeFlow を使用）。実行結果はログに記録する。
   app.post("/flow-templates/:id/run", async (c) => {
     const t = await flowTemplatesRepo.getTemplate(db, c.req.param("id"));
     if (!t) return c.json({ error: "template not found" }, 404);
-    const run = await executeFlow(
-      {
-        db,
-        ...(deps.notificationProvider ? { notificationProvider: deps.notificationProvider } : {}),
-        ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
-        ...(deps.now ? { now: deps.now } : {}),
-      },
-      { allUsers: t.allUsers, query: t.query, steps: t.steps },
-    );
-    return c.json({
-      audienceCount: run.audienceIds.length,
-      results: run.results.map((r) => ({ type: r.step.type, flag: r.step.flag, sent: r.sent, total: r.total })),
-    });
+    try {
+      const run = await executeFlow(
+        {
+          db,
+          ...(deps.notificationProvider ? { notificationProvider: deps.notificationProvider } : {}),
+          ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
+          ...(deps.now ? { now: deps.now } : {}),
+        },
+        { allUsers: t.allUsers, query: t.query, steps: t.steps },
+      );
+      await flowRunLogsRepo
+        .recordFlowRun(db, {
+          templateId: t.id,
+          templateName: t.name,
+          trigger: "manual",
+          audienceCount: run.audienceIds.length,
+          results: toLogSteps(run.results),
+          status: "success",
+        })
+        .catch((e) => console.error("[admin] flow run log failed", e));
+      return c.json({
+        audienceCount: run.audienceIds.length,
+        results: run.results.map((r) => ({ type: r.step.type, flag: r.step.flag, sent: r.sent, total: r.total })),
+      });
+    } catch (e) {
+      await flowRunLogsRepo
+        .recordFlowRun(db, {
+          templateId: t.id,
+          templateName: t.name,
+          trigger: "manual",
+          audienceCount: 0,
+          results: [],
+          status: "error",
+          error: e instanceof Error ? e.message : String(e),
+        })
+        .catch((err) => console.error("[admin] flow error-log failed", err));
+      return c.json({ error: e instanceof Error ? e.message : "flow execution failed" }, 500);
+    }
   });
+
+  // フロー実行ログ一覧（新しい順・任意でテンプレ絞り込み）。
+  app.get(
+    "/flow-run-logs",
+    zValidator("query", z.object({ templateId: z.string().optional() })),
+    async (c) => {
+      const { templateId } = c.req.valid("query");
+      return c.json(await flowRunLogsRepo.listFlowRunLogs(db, templateId ? { templateId } : {}));
+    },
+  );
 
   // --- フロー定期実行スケジュール ---
   app.get(

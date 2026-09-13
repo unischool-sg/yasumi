@@ -1,9 +1,15 @@
 import { describeFlowStep } from "@yasumi/shared";
-import { type FlowExecuteDeps, type FlowRunResult, executeFlow } from "../domain/flow/execute.ts";
+import {
+  type FlowExecuteDeps,
+  type FlowRunResult,
+  type FlowStepResult,
+  executeFlow,
+} from "../domain/flow/execute.ts";
 import type { Db } from "../infrastructure/db/client.ts";
 import { postDiscordMessage } from "../infrastructure/discord/notify.ts";
 import * as schedulesRepo from "../infrastructure/db/repositories/flow-schedules.ts";
 import type { FlowTemplate } from "../infrastructure/db/repositories/flow-templates.ts";
+import { type FlowRunLogStep, recordFlowRun } from "../infrastructure/db/repositories/flow-run-logs.ts";
 import { jstDateString, jstHhmm, jstWeekday } from "../shared/jst.ts";
 
 type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
@@ -26,6 +32,16 @@ export interface RunFlowsSummary {
 }
 
 const MAX_LISTED_USERS = 25;
+
+/** FlowStepResult[] を実行ログ用のステップ配列に変換（手動/定期で共通）。 */
+export function toLogSteps(results: FlowStepResult[]): FlowRunLogStep[] {
+  return results.map((r) => ({
+    type: r.step.type,
+    flag: r.step.flag ?? null,
+    sent: r.sent ?? null,
+    total: r.total ?? null,
+  }));
+}
 
 /** cron 実行ログを Discord に送る（対象者一覧＋操作内容＋テンプレURL）。 */
 async function postFlowLog(
@@ -90,8 +106,27 @@ export async function runFlows(deps: RunFlowsDeps, params: { triggeredAt: Date }
       });
       summary.flowsRun++;
       await postFlowLog(deps, template, run);
+      await recordFlowRun(deps.db, {
+        templateId: template.id,
+        templateName: template.name,
+        trigger: "schedule",
+        scheduleId: schedule.id,
+        audienceCount: run.audienceIds.length,
+        results: toLogSteps(run.results),
+        status: "success",
+      }).catch((e) => console.error("[run-flows] log record failed", e));
     } catch (e) {
       console.error("[run-flows] execute error", template.id, e);
+      await recordFlowRun(deps.db, {
+        templateId: template.id,
+        templateName: template.name,
+        trigger: "schedule",
+        scheduleId: schedule.id,
+        audienceCount: 0,
+        results: [],
+        status: "error",
+        error: e instanceof Error ? e.message : String(e),
+      }).catch((err) => console.error("[run-flows] error-log record failed", err));
     }
   }
 

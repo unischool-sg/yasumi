@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  index,
   integer,
   jsonb,
   pgTable,
@@ -83,6 +84,25 @@ export const flowSchedules = pgTable("flow_schedules", {
   lastRunDate: varchar("last_run_date", { length: 10 }), // JST "YYYY-MM-DD"（同日二重実行防止）
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// フロー実行ログ（手動/定期の両方を記録）。1ヶ月で S3 退避のうえ削除（retention）。
+export const flowRunLogs = pgTable(
+  "flow_run_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // テンプレは削除されうるため FK/NOT NULL にしない。名前は実行時点のスナップショットを保持。
+    templateId: uuid("template_id"),
+    templateName: varchar("template_name", { length: 100 }).notNull(),
+    trigger: varchar("trigger", { length: 20 }).notNull(), // 'manual' | 'schedule'
+    scheduleId: uuid("schedule_id"),
+    audienceCount: integer("audience_count").notNull().default(0),
+    results: jsonb("results").notNull(), // FlowRunLogStep[]
+    status: varchar("status", { length: 20 }).notNull(), // 'success' | 'error'
+    error: text("error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("flow_run_logs_created_at_idx").on(t.createdAt)],
+);
 
 export const lineAccounts = pgTable("line_accounts", {
   userId: uuid("user_id").primaryKey(),
