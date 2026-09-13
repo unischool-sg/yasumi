@@ -316,3 +316,43 @@ export function availableAudienceModes(event: FlowEventType): FlowTriggerAudienc
   modes.push("query");
   return modes;
 }
+
+// ── メッセージ本文の変数（{{name}} 等）: 送信時に受信者ごとに置換する ──
+
+/** 本文で使える変数の定義（単一情報源）。defaultWord は解決できなかった時の既定語。 */
+export interface MessageVariable {
+  key: string;
+  /** 挿入UIのラベル。 */
+  label: string;
+  /** 値が解決できないときに使う既定語。 */
+  defaultWord: string;
+  /** 挿入UI等の補足説明。 */
+  hint: string;
+}
+
+export const MESSAGE_VARIABLES: MessageVariable[] = [
+  { key: "name", label: "名前", defaultWord: "みなさん", hint: "受信者のLINE表示名" },
+  { key: "school", label: "学校名", defaultWord: "学校", hint: "対象校 / 購読中の学校名" },
+  { key: "today", label: "日付", defaultWord: "", hint: "送信日（例 2026-09-13）" },
+  { key: "weekday", label: "曜日", defaultWord: "", hint: "送信日の曜日（例 日）" },
+];
+
+export const MESSAGE_VARIABLE_KEYS: string[] = MESSAGE_VARIABLES.map((v) => v.key);
+
+/** 本文が指定変数を参照しているか（{{key}} を含むか）。 */
+export function templateReferencesVariable(text: string, key: string): boolean {
+  return new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`).test(text);
+}
+
+/**
+ * 本文の {{key}} を values で置換する。値が空/未指定なら既定語（未知の変数は空）に置換。
+ * 受信者ごとに解決した values を渡して使う（純関数）。
+ */
+export function renderMessageTemplate(text: string, values: Record<string, string | undefined>): string {
+  return text.replace(/\{\{\s*(\w+)\s*\}\}/g, (_m, key: string) => {
+    const v = values[key];
+    if (v !== undefined && v !== "") return v;
+    const def = MESSAGE_VARIABLES.find((m) => m.key === key);
+    return def ? def.defaultWord : "";
+  });
+}

@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { Db } from "../../infrastructure/db/client.ts";
 import type { NotificationProvider } from "../../domain/notification/provider.ts";
 import { notifyUser } from "../../domain/notification/dispatch.ts";
+import { makeMessageRenderer } from "../../domain/notification/render.ts";
 import { prepareLogo } from "../../domain/logo.ts";
 import { postDiscordMessage } from "../../infrastructure/discord/notify.ts";
 import { getLineProfile } from "../../infrastructure/line/line-api.ts";
@@ -393,9 +394,14 @@ export function createAdminApp(deps: AdminAppDeps) {
         ...(deps.notificationProvider ? { notificationProvider: deps.notificationProvider } : {}),
         ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
       };
+      const render = makeMessageRenderer({
+        db,
+        ...(deps.lineAccessToken ? { lineAccessToken: deps.lineAccessToken } : {}),
+        ...(deps.now ? { now: deps.now } : {}),
+      });
       let sent = 0;
       for (const uid of userIds) {
-        if (await notifyUser(notifyDeps, uid, text)) sent++;
+        if (await notifyUser(notifyDeps, uid, await render(uid, text))) sent++;
       }
       return c.json({ total: userIds.length, sent, failed: userIds.length - sent });
     },
@@ -470,6 +476,7 @@ export function createAdminApp(deps: AdminAppDeps) {
           db,
           ...(deps.notificationProvider ? { notificationProvider: deps.notificationProvider } : {}),
           ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
+          ...(deps.lineAccessToken ? { lineAccessToken: deps.lineAccessToken } : {}),
           ...(deps.now ? { now: deps.now } : {}),
         },
         { allUsers: t.allUsers, query: t.query, steps: t.steps },
@@ -620,10 +627,16 @@ export function createAdminApp(deps: AdminAppDeps) {
     "/users/:id/message",
     zValidator("json", z.object({ text: z.string().min(1).max(1000) })),
     async (c) => {
+      const userId = c.req.param("id");
+      const render = makeMessageRenderer({
+        db,
+        ...(deps.lineAccessToken ? { lineAccessToken: deps.lineAccessToken } : {}),
+        ...(deps.now ? { now: deps.now } : {}),
+      });
       const ok = await notifyUser(
         { db, ...(deps.notificationProvider ? { notificationProvider: deps.notificationProvider } : {}), ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}) },
-        c.req.param("id"),
-        c.req.valid("json").text,
+        userId,
+        await render(userId, c.req.valid("json").text),
       );
       if (!ok) return c.json({ error: "送信できませんでした（通知先が無い/未設定）" }, 400);
       return c.json({ ok: true });

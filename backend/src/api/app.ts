@@ -286,6 +286,7 @@ export function createApp(deps: AppDeps) {
         ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
         ...(deps.discordFlowWebhookUrl ? { discordFlowWebhookUrl: deps.discordFlowWebhookUrl } : {}),
         ...(deps.adminBaseUrl ? { adminBaseUrl: deps.adminBaseUrl } : {}),
+        ...(deps.lineChannelAccessToken ? { lineAccessToken: deps.lineChannelAccessToken } : {}),
         ...(deps.fetchFn ? { fetchFn: deps.fetchFn } : {}),
         ...(deps.now ? { now: deps.now } : {}),
       },
@@ -311,6 +312,8 @@ export function createApp(deps: AppDeps) {
         reportError,
         ...(deps.notificationProvider ? { notificationProvider: deps.notificationProvider } : {}),
         ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
+        ...(deps.lineChannelAccessToken ? { lineAccessToken: deps.lineChannelAccessToken } : {}),
+        ...(deps.fetchFn ? { fetchFn: deps.fetchFn } : {}),
         ...(deps.now ? { now: deps.now } : {}),
       },
       {

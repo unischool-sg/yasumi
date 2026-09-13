@@ -3,6 +3,7 @@ import { type FlowExecuteDeps, executeFlow } from "../domain/flow/execute.ts";
 import type { Db } from "../infrastructure/db/client.ts";
 import * as triggersRepo from "../infrastructure/db/repositories/flow-event-triggers.ts";
 import { recordFlowRun } from "../infrastructure/db/repositories/flow-run-logs.ts";
+import * as schoolsRepo from "../infrastructure/db/repositories/schools.ts";
 import * as subsRepo from "../infrastructure/db/repositories/subscriptions.ts";
 import { toLogSteps } from "./run-flows.ts";
 
@@ -50,6 +51,11 @@ export async function runEventFlows(deps: RunEventFlowsDeps, ctx: EventContext):
   const triggers = await triggersRepo.listEnabledByEvent(deps.db, ctx.eventType);
   summary.triggersMatched = triggers.length;
 
+  // {{school}} 用に対象校名を一度だけ解決（schoolId があるイベントのみ）。
+  const schoolName = ctx.schoolId
+    ? (await schoolsRepo.findSchoolById(deps.db, ctx.schoolId).catch(() => null))?.name
+    : undefined;
+
   for (const { trigger, template } of triggers) {
     try {
       // query モードは executeFlow に query 解決させる。それ以外は明示 audience。
@@ -78,6 +84,7 @@ export async function runEventFlows(deps: RunEventFlowsDeps, ctx: EventContext):
         query: template.query,
         steps: template.steps,
         ...(audienceIds ? { audienceIds } : {}),
+        ...(schoolName ? { schoolName } : {}),
       });
       summary.flowsRun++;
       await recordFlowRun(deps.db, {
