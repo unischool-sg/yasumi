@@ -1,4 +1,4 @@
-import type { FlowAudienceQuery, FlowStep } from "@yasumi/shared";
+import type { FlowAudienceQuery, FlowEventType, FlowStep, FlowTriggerAudienceMode } from "@yasumi/shared";
 import { type Auth, clearAuth, getAuth } from "../lib/auth.ts";
 
 const BASE = import.meta.env.VITE_ADMIN_API_BASE_URL ?? "";
@@ -132,6 +132,14 @@ export interface FlowSchedule {
   lastRunDate: string | null;
   createdAt: string;
 }
+export interface FlowEventTrigger {
+  id: string;
+  templateId: string;
+  eventType: FlowEventType;
+  audienceMode: FlowTriggerAudienceMode;
+  enabled: boolean;
+  createdAt: string;
+}
 export interface FlowRunResult {
   audienceCount: number;
   results: { type: FlowStep["type"]; flag?: string; sent?: number; total?: number }[];
@@ -140,8 +148,9 @@ export interface FlowRunLog {
   id: string;
   templateId: string | null;
   templateName: string;
-  trigger: "manual" | "schedule";
+  trigger: "manual" | "schedule" | "event";
   scheduleId: string | null;
+  eventType: FlowEventType | null;
   audienceCount: number;
   results: { type: FlowStep["type"]; flag?: string | null; sent?: number | null; total?: number | null }[];
   status: "success" | "error";
@@ -270,6 +279,13 @@ export const api = {
   updateFlowSchedule: (id: string, b: { time?: string; daysOfWeek?: number[]; enabled?: boolean }) =>
     request<FlowSchedule>(`/flow-schedules/${id}`, { method: "PATCH", body: JSON.stringify(b) }),
   deleteFlowSchedule: (id: string) => request<void>(`/flow-schedules/${id}`, { method: "DELETE" }),
+  getFlowTriggers: (templateId?: string) =>
+    request<FlowEventTrigger[]>(`/flow-triggers${templateId ? `?templateId=${templateId}` : ""}`),
+  createFlowTrigger: (b: { templateId: string; eventType: FlowEventType; audienceMode: FlowTriggerAudienceMode; enabled?: boolean }) =>
+    request<FlowEventTrigger>("/flow-triggers", { method: "POST", body: JSON.stringify(b) }),
+  updateFlowTrigger: (id: string, b: { eventType?: FlowEventType; audienceMode?: FlowTriggerAudienceMode; enabled?: boolean }) =>
+    request<FlowEventTrigger>(`/flow-triggers/${id}`, { method: "PATCH", body: JSON.stringify(b) }),
+  deleteFlowTrigger: (id: string) => request<void>(`/flow-triggers/${id}`, { method: "DELETE" }),
   addUserSubscription: (id: string, schoolId: string) =>
     request(`/users/${id}/subscriptions`, { method: "POST", body: JSON.stringify({ schoolId }) }),
   setUserSubscription: (id: string, schoolId: string, notificationEnabled: boolean) =>

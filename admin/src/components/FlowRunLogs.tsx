@@ -2,8 +2,11 @@ import { Chip, Link as MuiLink, Stack, Tooltip, Typography } from "@mui/material
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { type ColumnDef } from "@tanstack/react-table";
+import { FLOW_EVENT_LABEL } from "@yasumi/shared";
 import { type FlowRunLog, api } from "../api/client.ts";
 import { DataTable } from "./DataTable.tsx";
+
+const TRIGGER_LABEL: Record<FlowRunLog["trigger"], string> = { manual: "手動", schedule: "定期", event: "イベント" };
 
 /** ステップ結果を1行の要約に整形（送信は sent/total、フラグは付与/解除＋名称）。 */
 function summarizeResults(results: FlowRunLog["results"]): string {
@@ -56,13 +59,14 @@ export function FlowRunLogs() {
     {
       header: "トリガー",
       accessorKey: "trigger",
-      cell: (c) => (
-        <Chip
-          size="small"
-          variant="outlined"
-          label={(c.getValue() as string) === "manual" ? "手動" : "定期"}
-        />
-      ),
+      cell: (c) => {
+        const row = c.row.original;
+        const label =
+          row.trigger === "event" && row.eventType
+            ? `イベント: ${FLOW_EVENT_LABEL[row.eventType]}`
+            : TRIGGER_LABEL[row.trigger];
+        return <Chip size="small" variant="outlined" label={label} />;
+      },
     },
     { header: "対象数", accessorKey: "audienceCount", cell: (c) => `${c.getValue() as number} 名` },
     {

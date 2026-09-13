@@ -45,4 +45,11 @@ describe("buildNotificationText", () => {
     const text = buildNotificationText({ result: "AM_OFF", schoolName: "X", checkTime: "08:00", matchedWarnings: dup });
     expect(text.match(/三田市 暴風警報/g)?.length).toBe(1);
   });
+
+  it("解除にもとづく PM_START: 警報が発表中とは書かず『解除』の文言", () => {
+    const text = buildNotificationText({ result: "PM_START", schoolName: "三田学園", checkTime: "10:00", matchedWarnings: [] });
+    expect(text).toContain("午後から登校");
+    expect(text).toContain("解除");
+    expect(text).not.toContain("発表されています");
+  });
 });

@@ -1,4 +1,4 @@
-import type { CheckResult, SchoolRule } from "@yasumi/shared";
+import type { CheckResult, RuleCondition, SchoolRule } from "@yasumi/shared";
 import type { ApiClient, NewSchoolInput, SchoolPatch } from "./client.ts";
 import type { AbsenceReport, Area, SchoolDetail, SchoolStatus, SchoolSummary, StudentProfile, Subscription } from "./types.ts";
 
@@ -106,10 +106,30 @@ export function createMockClient(): ApiClient {
       }
       return delay((s ?? schools[0]!) as SchoolSummary);
     },
-    createRule: (schoolId: string, input: { checkTime: string; result: CheckResult }) => {
-      const rule: SchoolRule = { id: `r${Date.now()}`, schoolId, condition: { type: "WARNING_ACTIVE" }, ...input };
+    createRule: (schoolId: string, input: { checkTime: string; result: CheckResult; condition?: RuleCondition }) => {
+      const rule: SchoolRule = {
+        id: `r${Date.now()}`,
+        schoolId,
+        condition: input.condition ?? { type: "WARNING_ACTIVE" },
+        checkTime: input.checkTime,
+        result: input.result,
+      };
       (rulesBySchool[schoolId] ??= []).push(rule);
       return delay(rule);
+    },
+    updateRule: (
+      ruleId: string,
+      patch: { checkTime?: string; result?: CheckResult; condition?: RuleCondition },
+    ) => {
+      let updated: SchoolRule | undefined;
+      for (const k of Object.keys(rulesBySchool)) {
+        rulesBySchool[k] = rulesBySchool[k]!.map((r) => {
+          if (r.id !== ruleId) return r;
+          updated = { ...r, ...patch };
+          return updated;
+        });
+      }
+      return delay((updated ?? { id: ruleId, schoolId: "", checkTime: "08:00", result: "AM_OFF", condition: { type: "WARNING_ACTIVE" } }) as SchoolRule);
     },
     deleteRule: (ruleId: string) => {
       for (const k of Object.keys(rulesBySchool)) {

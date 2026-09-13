@@ -28,6 +28,8 @@ export interface RunCheckDeps {
   pushProvider?: NotificationProvider;
   /** 運用アラート送信（JMA 取得失敗など）。未設定なら送らない。失敗しても主処理は止めない。 */
   alert?: (message: string) => Promise<void>;
+  /** イベント連動フローの発火（休校判定など）。best-effort。 */
+  emitEvent?: (event: { eventType: "judgment.closure"; schoolId: string }) => void;
   now?: () => Date;
 }
 
@@ -106,6 +108,15 @@ export async function runCheck(
     }
   }
 
+  // 3.5 その日の「より早い checkTime」で確定済みの判定を school ごとに取得
+  //     （WARNING_CLEARED 条件の afterClosureOnly=「午前が休みだったか」判定に使う）。
+  const priorResults = await warningChecksRepo.listPriorResultsBySchool(
+    deps.db,
+    schoolIds,
+    targetDate,
+    checkTime,
+  );
+
   // 4. ルールごとに評価 → 保存 → 通知
   for (const ruleRow of rules) {
     summary.rulesProcessed++;
@@ -126,7 +137,12 @@ export async function runCheck(
       matched = false;
       matchedWarnings = [];
     } else {
-      const ev = evaluateSchoolRule({ school, rule, activeWarnings: warnings });
+      const ev = evaluateSchoolRule({
+        school,
+        rule,
+        activeWarnings: warnings,
+        dayContext: { priorResult: priorResults.get(ruleRow.schoolId) },
+      });
       result = ev.result;
       matched = ev.matched;
       matchedWarnings = ev.matchedWarnings;
@@ -146,6 +162,11 @@ export async function runCheck(
 
     // 通知（NORMAL は通知しない §19）。保存済みの結果(row.result)を採用（確定性）
     const storedResult = row.result as CheckResult;
+
+    // イベント連動フロー（休校などの判定）。新規確定時のみ・休み系のみ発火（同日重複しない）。
+    if (created && isClosureResult(storedResult)) {
+      deps.emitEvent?.({ eventType: "judgment.closure", schoolId: ruleRow.schoolId });
+    }
 
     // 警報連動の休校ドラフト自動生成（プラン有効校のみ・同日1件 / M16）。
     // 先生がダッシュボードで確認→ワンタップで公式送信できる叩き台。

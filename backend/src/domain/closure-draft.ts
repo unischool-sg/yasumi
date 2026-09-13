@@ -1,4 +1,7 @@
-import type { CheckResult, Warning } from "@yasumi/shared";
+import { type CheckResult, type Warning, isClosureResult } from "@yasumi/shared";
+
+// 休校系判定は単一情報源（@yasumi/shared）を再エクスポート（既存 import 互換のため）。
+export { isClosureResult };
 
 const RESULT_LABEL: Record<string, string> = {
   WAIT: "自宅待機",
@@ -6,11 +9,6 @@ const RESULT_LABEL: Record<string, string> = {
   PM_START: "午後から登校",
   FULL_OFF: "全日休校",
 };
-
-/** 休校系の判定結果か（NORMAL/UNKNOWN 以外で下書きを作る対象）。 */
-export function isClosureResult(result: CheckResult): boolean {
-  return result === "WAIT" || result === "AM_OFF" || result === "PM_START" || result === "FULL_OFF";
-}
 
 /** 警報連動の休校連絡ドラフト本文を生成（先生が編集・送信する叩き台）。 */
 export function buildClosureDraftText(result: CheckResult, warnings: Warning[] = []): string {

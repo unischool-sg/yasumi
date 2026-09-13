@@ -8,6 +8,7 @@ import { EMPTY_QUERY, type UserQuery, UserQueryEditor, compareUsers, matchesQuer
 import { UserFlowRunner } from "../components/UserFlowRunner.tsx";
 import { FlowTemplateEditor } from "../components/FlowTemplateEditor.tsx";
 import { FlowScheduleManager } from "../components/FlowScheduleManager.tsx";
+import { FlowTriggerManager } from "../components/FlowTriggerManager.tsx";
 import { FlowRunLogs } from "../components/FlowRunLogs.tsx";
 
 export function Flows() {
@@ -29,6 +30,7 @@ export function Flows() {
   const [newFlag, setNewFlag] = useState("");
   const [flowTplEditor, setFlowTplEditor] = useState<{ open: boolean; initial: FlowTemplate | null }>({ open: false, initial: null });
   const [scheduleFor, setScheduleFor] = useState<FlowTemplate | null>(null);
+  const [triggerFor, setTriggerFor] = useState<FlowTemplate | null>(null);
   const [tab, setTab] = useState(0);
 
   // テンプレートの対象人数をクライアント側の users から見積り（実行前確認用）。
@@ -131,6 +133,7 @@ export function Flows() {
                   <Box sx={{ flex: 1 }} />
                   <Button size="small" variant="contained" disabled={runFlowTpl.isPending} onClick={() => runTemplate(t)}>今すぐ実行</Button>
                   <Button size="small" onClick={() => setScheduleFor(t)}>スケジュール</Button>
+                  <Button size="small" onClick={() => setTriggerFor(t)}>イベント連動</Button>
                   <Button size="small" onClick={() => setFlowTplEditor({ open: true, initial: t })}>編集</Button>
                   <Button size="small" color="error" onClick={() => { if (window.confirm(`「${t.name}」を削除しますか？（スケジュールも削除されます）`)) delFlowTpl.mutate(t.id); }}>削除</Button>
                 </Stack>
@@ -199,6 +202,7 @@ export function Flows() {
       <UserFlowRunner open={flowOpen} onClose={() => setFlowOpen(false)} audienceIds={audienceIds} templates={templates} flagNames={flagNames} onRan={() => qc.invalidateQueries({ queryKey: ["users"] })} />
       <FlowTemplateEditor open={flowTplEditor.open} onClose={() => setFlowTplEditor({ open: false, initial: null })} initial={flowTplEditor.initial} templates={templates} flagNames={flagNames} schoolOptions={schoolOptions} />
       <FlowScheduleManager open={scheduleFor !== null} onClose={() => setScheduleFor(null)} template={scheduleFor} />
+      <FlowTriggerManager open={triggerFor !== null} onClose={() => setTriggerFor(null)} template={triggerFor} />
     </Box>
   );
 }

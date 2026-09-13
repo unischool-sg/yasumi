@@ -39,10 +39,62 @@ export interface Warning {
 }
 
 /**
- * ルール成立条件（PRD §25）。判別可能ユニオンで将来拡張（§30）に備える。
- * MVP は WARNING_ACTIVE のみ。詳細は backend/RULE_ENGINE.md。
+ * ルール成立条件（PRD §25）。判別可能ユニオンで将来拡張（§30）に備える。詳細は backend/RULE_ENGINE.md。
+ * - WARNING_ACTIVE: 対象地域×対象警報のいずれかが active なら成立（既定・従来互換）。
+ * - WARNING_CLEARED: 対象警報が出ていない（解除）なら成立。詳細エディタで「解除されたら午後登校」等に使う。
+ *   afterClosureOnly=true（既定）なら、その日の午前が休み系だった場合のみ成立（通常日に誤発火させない）。
  */
-export type RuleCondition = { type: "WARNING_ACTIVE" };
+export type RuleCondition =
+  | { type: "WARNING_ACTIVE" }
+  | { type: "WARNING_CLEARED"; afterClosureOnly?: boolean };
+
+/** 各条件の日本語ラベル（詳細エディタ・文面の共通表記）。 */
+export const RULE_CONDITION_LABEL: Record<RuleCondition["type"], string> = {
+  WARNING_ACTIVE: "警報が出ている",
+  WARNING_CLEARED: "警報が解除された",
+};
+
+/** 休み系（登校に影響する）判定結果か。closure ドラフト生成・解除条件の前提判定に使う単一情報源。 */
+export function isClosureResult(result: CheckResult | undefined | null): boolean {
+  return result === "WAIT" || result === "AM_OFF" || result === "PM_START" || result === "FULL_OFF";
+}
+
+/**
+ * 対象警報種別の定義（単一情報源）。adminOnly=true は管理画面からのみ有効化できる。
+ * warningType 文字列は気象庁 JMA の警報名と完全一致させる（backend/infrastructure/jma/warning-codes.ts）。
+ */
+export interface WarningTypeOption {
+  name: string;
+  adminOnly: boolean;
+}
+
+export const WARNING_TYPE_OPTIONS: WarningTypeOption[] = [
+  { name: "暴風警報", adminOnly: false },
+  { name: "大雨警報", adminOnly: false },
+  { name: "洪水警報", adminOnly: false },
+  { name: "大雪警報", adminOnly: false },
+  { name: "暴風雪警報", adminOnly: true },
+  { name: "高潮警報", adminOnly: true },
+  { name: "波浪警報", adminOnly: true },
+];
+
+/** 学校（生徒/保護者）が自分で選べる警報種別（adminOnly を除く）。 */
+export const SCHOOL_SELECTABLE_WARNING_TYPES: string[] = WARNING_TYPE_OPTIONS.filter(
+  (w) => !w.adminOnly,
+).map((w) => w.name);
+
+/** 管理画面からのみ有効化できる警報種別。 */
+export const ADMIN_ONLY_WARNING_TYPES: string[] = WARNING_TYPE_OPTIONS.filter((w) => w.adminOnly).map(
+  (w) => w.name,
+);
+
+/** 既知の全警報種別名（未知文字列の防御用）。 */
+export const ALL_WARNING_TYPES: string[] = WARNING_TYPE_OPTIONS.map((w) => w.name);
+
+/** 管理画面からのみ有効化できる警報種別か。 */
+export function isAdminOnlyWarningType(name: string): boolean {
+  return ADMIN_ONLY_WARNING_TYPES.includes(name);
+}
 
 /**
  * 判定に必要な学校情報の最小セット（PRD §9, §28）。
@@ -196,4 +248,71 @@ export function describeFlowStep(st: FlowStep): string {
   if (st.type === "send") return `メッセージ送信: 「${(st.text ?? "").replace(/\n/g, " ")}」`;
   if (st.type === "addFlag") return `フラグ付与: 「${st.flag ?? ""}」`;
   return `フラグ解除: 「${st.flag ?? ""}」`;
+}
+
+// ── フローのイベント連動（イベント発火時に自動実行）──
+
+/** フローを起動するイベント種別（単一情報源）。 */
+export type FlowEventType =
+  | "user.follow" // LINE 友だち追加（初回）
+  | "school.subscribe" // 学校を購読（初回）
+  | "school.register" // 学校を登録
+  | "absence.report" // 欠席連絡が出された
+  | "judgment.closure"; // 休校等の判定が確定
+
+export const FLOW_EVENT_LABEL: Record<FlowEventType, string> = {
+  "user.follow": "友だち追加",
+  "school.subscribe": "学校を購読",
+  "school.register": "学校を登録",
+  "absence.report": "欠席連絡",
+  "judgment.closure": "休校などの判定",
+};
+
+export const FLOW_EVENT_TYPES: FlowEventType[] = [
+  "user.follow",
+  "school.subscribe",
+  "school.register",
+  "absence.report",
+  "judgment.closure",
+];
+
+/** イベントが「トリガーした本人(userId)」を持つか（trigger_user モードの可否）。 */
+export const FLOW_EVENT_HAS_USER: Record<FlowEventType, boolean> = {
+  "user.follow": true,
+  "school.subscribe": true,
+  "school.register": true,
+  "absence.report": true,
+  "judgment.closure": false,
+};
+
+/** イベントが「対象校(schoolId)」を持つか（school_subscribers モードの可否）。 */
+export const FLOW_EVENT_HAS_SCHOOL: Record<FlowEventType, boolean> = {
+  "user.follow": false,
+  "school.subscribe": true,
+  "school.register": true,
+  "absence.report": true,
+  "judgment.closure": true,
+};
+
+/**
+ * トリガー時の対象者の決め方。
+ * - trigger_user: イベントを起こした本人に実行。
+ * - school_subscribers: 対象校の購読者に実行。
+ * - query: テンプレートの対象条件（他の人）で実行。
+ */
+export type FlowTriggerAudienceMode = "trigger_user" | "school_subscribers" | "query";
+
+export const FLOW_TRIGGER_AUDIENCE_LABEL: Record<FlowTriggerAudienceMode, string> = {
+  trigger_user: "本人",
+  school_subscribers: "対象校の購読者",
+  query: "対象条件（他の人）",
+};
+
+/** そのイベントで選べる audienceMode 一覧。 */
+export function availableAudienceModes(event: FlowEventType): FlowTriggerAudienceMode[] {
+  const modes: FlowTriggerAudienceMode[] = [];
+  if (FLOW_EVENT_HAS_USER[event]) modes.push("trigger_user");
+  if (FLOW_EVENT_HAS_SCHOOL[event]) modes.push("school_subscribers");
+  modes.push("query");
+  return modes;
 }

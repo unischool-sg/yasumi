@@ -1,4 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
+import { ALL_WARNING_TYPES } from "@yasumi/shared";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Db } from "../../infrastructure/db/client.ts";
@@ -15,6 +16,7 @@ import * as adminTemplatesRepo from "../../infrastructure/db/repositories/admin-
 import * as flagsRepo from "../../infrastructure/db/repositories/flags.ts";
 import * as flowTemplatesRepo from "../../infrastructure/db/repositories/flow-templates.ts";
 import * as flowSchedulesRepo from "../../infrastructure/db/repositories/flow-schedules.ts";
+import * as flowTriggersRepo from "../../infrastructure/db/repositories/flow-event-triggers.ts";
 import * as flowRunLogsRepo from "../../infrastructure/db/repositories/flow-run-logs.ts";
 import { executeFlow } from "../../domain/flow/execute.ts";
 import { toLogSteps } from "../../pipeline/run-flows.ts";
@@ -65,6 +67,14 @@ const flowTemplateSchema = z.object({
 });
 const flowScheduleTimeSchema = z.string().regex(/^([01]\d|2[0-3]):(00|30)$/, "HH:00 または HH:30 のみ");
 const flowDaysSchema = z.array(z.number().int().min(0).max(6)).max(7);
+const flowEventTypeSchema = z.enum([
+  "user.follow",
+  "school.subscribe",
+  "school.register",
+  "absence.report",
+  "judgment.closure",
+]);
+const flowAudienceModeSchema = z.enum(["trigger_user", "school_subscribers", "query"]);
 
 /** 管理画面 API（`/api/admin` にマウント）。独自 JWT 認証・LIFF とは別系統。 */
 export function createAdminApp(deps: AdminAppDeps) {
@@ -170,7 +180,9 @@ export function createAdminApp(deps: AdminAppDeps) {
         createdBy: null,
       });
       if (b.areaCodes) await cfg.setAreaCodes(db, school.id, b.areaCodes);
-      if (b.warningTypes) await cfg.setWarningTypes(db, school.id, b.warningTypes);
+      // 管理画面は全7種（管理者限定含む）を設定可。未知種別のみ除外（防御）。
+      if (b.warningTypes)
+        await cfg.setWarningTypes(db, school.id, b.warningTypes.filter((t) => ALL_WARNING_TYPES.includes(t)));
       if (deps.discordEventsWebhookUrl) {
         const adminBase = deps.adminBaseUrl || "https://yasumi-admin.unischool.jp";
         await postDiscordMessage(
@@ -205,7 +217,8 @@ export function createAdminApp(deps: AdminAppDeps) {
       };
       if (Object.keys(patch).length > 0) await schoolsRepo.updateSchool(db, id, patch);
       if (areaCodes) await cfg.setAreaCodes(db, id, areaCodes);
-      if (warningTypes) await cfg.setWarningTypes(db, id, warningTypes);
+      if (warningTypes)
+        await cfg.setWarningTypes(db, id, warningTypes.filter((t) => ALL_WARNING_TYPES.includes(t)));
       return c.json(await schoolsRepo.findSchoolById(db, id));
     },
   );
@@ -524,6 +537,47 @@ export function createAdminApp(deps: AdminAppDeps) {
   );
   app.delete("/flow-schedules/:id", async (c) => {
     await flowSchedulesRepo.deleteSchedule(db, c.req.param("id"));
+    return c.body(null, 204);
+  });
+
+  // --- フローのイベント連動トリガー ---
+  app.get(
+    "/flow-triggers",
+    zValidator("query", z.object({ templateId: z.string().uuid().optional() })),
+    async (c) => c.json(await flowTriggersRepo.listTriggers(db, c.req.valid("query").templateId)),
+  );
+  app.post(
+    "/flow-triggers",
+    zValidator(
+      "json",
+      z.object({
+        templateId: z.string().uuid(),
+        eventType: flowEventTypeSchema,
+        audienceMode: flowAudienceModeSchema,
+        enabled: z.boolean().optional(),
+      }),
+    ),
+    async (c) => {
+      const b = c.req.valid("json");
+      const t = await flowTemplatesRepo.getTemplate(db, b.templateId);
+      if (!t) return c.json({ error: "template not found" }, 404);
+      return c.json(await flowTriggersRepo.createTrigger(db, b), 201);
+    },
+  );
+  app.patch(
+    "/flow-triggers/:id",
+    zValidator(
+      "json",
+      z.object({
+        eventType: flowEventTypeSchema.optional(),
+        audienceMode: flowAudienceModeSchema.optional(),
+        enabled: z.boolean().optional(),
+      }),
+    ),
+    async (c) => c.json(await flowTriggersRepo.updateTrigger(db, c.req.param("id"), c.req.valid("json"))),
+  );
+  app.delete("/flow-triggers/:id", async (c) => {
+    await flowTriggersRepo.deleteTrigger(db, c.req.param("id"));
     return c.body(null, 204);
   });
 

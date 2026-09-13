@@ -1,17 +1,17 @@
-import type { CheckResult, SchoolRule } from "@yasumi/shared";
+import type { CheckResult, RuleCondition, SchoolRule } from "@yasumi/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../client.ts";
 import { schoolRules } from "../schema.ts";
 
 export type RuleRow = typeof schoolRules.$inferSelect;
 
-/** DB 行を Rule Engine（M2）の SchoolRule へマップ。MVP の condition は WARNING_ACTIVE 固定。 */
+/** DB 行を Rule Engine（M2）の SchoolRule へマップ。condition は null なら WARNING_ACTIVE 扱い。 */
 export function toSchoolRule(row: RuleRow): SchoolRule {
   return {
     id: row.id,
     schoolId: row.schoolId,
     checkTime: toHhmm(row.checkTime),
-    condition: { type: "WARNING_ACTIVE" },
+    condition: (row.condition as RuleCondition | null) ?? { type: "WARNING_ACTIVE" },
     result: row.result as CheckResult,
   };
 }
@@ -27,7 +27,13 @@ export async function findRuleById(db: Db, id: string): Promise<RuleRow | undefi
 
 export async function createRule(
   db: Db,
-  input: { schoolId: string; checkTime: string; result: CheckResult; message?: string | null },
+  input: {
+    schoolId: string;
+    checkTime: string;
+    result: CheckResult;
+    condition?: RuleCondition;
+    message?: string | null;
+  },
 ): Promise<RuleRow> {
   const rows = await db
     .insert(schoolRules)
@@ -35,6 +41,7 @@ export async function createRule(
       schoolId: input.schoolId,
       checkTime: toDbTime(input.checkTime),
       result: input.result,
+      condition: input.condition ?? { type: "WARNING_ACTIVE" },
       message: input.message ?? null,
     })
     .returning();
@@ -46,11 +53,12 @@ export async function createRule(
 export async function updateRule(
   db: Db,
   id: string,
-  patch: { checkTime?: string; result?: CheckResult; message?: string | null },
+  patch: { checkTime?: string; result?: CheckResult; condition?: RuleCondition; message?: string | null },
 ): Promise<RuleRow | undefined> {
   const set: Partial<RuleRow> = {};
   if (patch.checkTime !== undefined) set.checkTime = toDbTime(patch.checkTime);
   if (patch.result !== undefined) set.result = patch.result;
+  if (patch.condition !== undefined) set.condition = patch.condition;
   if (patch.message !== undefined) set.message = patch.message;
   const rows = await db.update(schoolRules).set(set).where(eq(schoolRules.id, id)).returning();
   return rows[0];

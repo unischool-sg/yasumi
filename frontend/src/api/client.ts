@@ -1,4 +1,4 @@
-import type { CheckResult, SchoolRule } from "@yasumi/shared";
+import type { CheckResult, RuleCondition, SchoolRule } from "@yasumi/shared";
 import type {
   AbsenceReport, AbsenceSchool, AbsenceType, Area, Me, SchoolDetail, SchoolStatus,
   SchoolSummary, StudentProfile, Subscription,
@@ -69,11 +69,15 @@ export function createApiClient(idToken: string) {
     /** 学校を更新（作成者/管理者のみ）。 */
     updateSchool: (id: string, patch: SchoolPatch) =>
       request<SchoolSummary>(`/api/schools/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
-    createRule: (schoolId: string, input: { checkTime: string; result: CheckResult }) =>
+    createRule: (schoolId: string, input: { checkTime: string; result: CheckResult; condition?: RuleCondition }) =>
       request<SchoolRule>(`/api/schools/${schoolId}/rules`, {
         method: "POST",
         body: JSON.stringify(input),
       }),
+    updateRule: (
+      ruleId: string,
+      patch: { checkTime?: string; result?: CheckResult; condition?: RuleCondition },
+    ) => request<SchoolRule>(`/api/rules/${ruleId}`, { method: "PATCH", body: JSON.stringify(patch) }),
     deleteRule: (ruleId: string) =>
       request<void>(`/api/rules/${ruleId}`, { method: "DELETE" }),
     /** 広告アトリビューション（gclid）を保存（Google Ads コンバージョン計測）。 */

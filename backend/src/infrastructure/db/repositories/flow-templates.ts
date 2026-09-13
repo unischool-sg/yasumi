@@ -1,7 +1,7 @@
 import type { FlowAudienceQuery, FlowStep } from "@yasumi/shared";
 import { desc, eq } from "drizzle-orm";
 import type { Db } from "../client.ts";
-import { flowSchedules, flowTemplates } from "../schema.ts";
+import { flowEventTriggers, flowSchedules, flowTemplates } from "../schema.ts";
 
 export interface FlowTemplate {
   id: string;
@@ -60,7 +60,8 @@ export async function updateTemplate(db: Db, id: string, input: FlowTemplateInpu
 }
 
 export async function deleteTemplate(db: Db, id: string): Promise<void> {
-  // スケジュールも合わせて削除（FK 制約なしのため明示）。
+  // スケジュール・イベントトリガーも合わせて削除（FK 制約なしのため明示）。
   await db.delete(flowSchedules).where(eq(flowSchedules.templateId, id));
+  await db.delete(flowEventTriggers).where(eq(flowEventTriggers.templateId, id));
   await db.delete(flowTemplates).where(eq(flowTemplates.id, id));
 }

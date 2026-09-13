@@ -187,6 +187,58 @@ suite("runCheck pipeline", () => {
     expect(sent[0]?.text).toContain("判定できませんでした");
   });
 
+  it("詳細ルール: 午前休 → 10:00に解除で午後登校(PM_START)／通常日は発火しない", async () => {
+    // 台風校: 08:15 警報→午前休, 10:15 解除(afterClosureOnly)→午後登校
+    const typhoon = await createSchool(db, { name: "台風校", prefecture: "兵庫県" });
+    await cfg.setAreaCodes(db, typhoon.id, [SANDA]);
+    await cfg.setWarningTypes(db, typhoon.id, ["暴風警報"]);
+    await createRule(db, { schoolId: typhoon.id, checkTime: "08:15", result: "AM_OFF" });
+    await createRule(db, {
+      schoolId: typhoon.id,
+      checkTime: "10:15",
+      result: "PM_START",
+      condition: { type: "WARNING_CLEARED", afterClosureOnly: true },
+    });
+    const tUser = await findOrCreateByLineUserId(db, "Ucron_typhoon");
+    await upsertSubscription(db, { userId: tUser.userId, schoolId: typhoon.id });
+
+    // 通常校: 同じ 10:15 に解除ルールを持つが、午前は休みにならない
+    const normal = await createSchool(db, { name: "通常校", prefecture: "兵庫県" });
+    await cfg.setAreaCodes(db, normal.id, [SANDA]);
+    await cfg.setWarningTypes(db, normal.id, ["暴風警報"]);
+    await createRule(db, {
+      schoolId: normal.id,
+      checkTime: "10:15",
+      result: "PM_START",
+      condition: { type: "WARNING_CLEARED", afterClosureOnly: true },
+    });
+    const nUser = await findOrCreateByLineUserId(db, "Ucron_normal");
+    await upsertSubscription(db, { userId: nUser.userId, schoolId: normal.id });
+
+    // 1) 08:15 警報あり → 台風校は AM_OFF 確定
+    sent.length = 0;
+    const at0815 = new Date("2026-09-09T08:15:00+09:00");
+    await runCheck(
+      { db, warningProvider: providerReturning(activeStorm), notificationProvider: notifier, now: () => at0815 },
+      { triggeredAt: at0815 },
+    );
+    expect(sent.find((m) => m.text.includes("台風校"))?.text).toContain("午前休");
+
+    // 2) 10:15 警報なし(解除) → 台風校は午前が休みなので PM_START、通常校は非発火(NORMAL)
+    sent.length = 0;
+    const at1015 = new Date("2026-09-09T10:15:00+09:00");
+    const summary = await runCheck(
+      { db, warningProvider: providerReturning([]), notificationProvider: notifier, now: () => at1015 },
+      { triggeredAt: at1015 },
+    );
+    const typhoonMsg = sent.find((m) => m.text.includes("台風校"));
+    expect(typhoonMsg?.text).toContain("午後から登校");
+    expect(typhoonMsg?.text).toContain("解除");
+    // 通常校は afterClosureOnly により発火せず通知なし
+    expect(sent.find((m) => m.text.includes("通常校"))).toBeUndefined();
+    expect(summary.rulesProcessed).toBe(2);
+  });
+
   it("デバイストークン登録済み → FCM(pushProvider)へ送信し LINE には送らない", async () => {
     const s = await createSchool(db, { name: "FCM校", prefecture: "兵庫県" });
     await cfg.setAreaCodes(db, s.id, [SANDA]);

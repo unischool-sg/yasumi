@@ -169,4 +169,68 @@ describe("evaluateSchoolRule", () => {
     expect(activeWarnings).toEqual(snapshot);
     expect(activeWarnings).toHaveLength(1);
   });
+
+  // ── WARNING_CLEARED（詳細エディタ: 警報解除 → 午後登校 等）──
+  const clearedRule = (afterClosureOnly = true): SchoolRule => ({
+    id: "rule-c",
+    schoolId: school.id,
+    checkTime: "10:00",
+    condition: { type: "WARNING_CLEARED", afterClosureOnly },
+    result: "PM_START",
+  });
+
+  it("C1: 解除・afterClosureOnly かつ午前が休み(AM_OFF) → 成立(PM_START)・matchedWarnings空", () => {
+    const result = evaluateSchoolRule({
+      school,
+      rule: clearedRule(true),
+      activeWarnings: [],
+      dayContext: { priorResult: "AM_OFF" },
+    });
+    expect(result.matched).toBe(true);
+    expect(result.result).toBe("PM_START");
+    expect(result.matchedWarnings).toEqual([]);
+  });
+
+  it("C2: 解除・afterClosureOnly だが午前が通常(prior無し) → 非成立(NORMAL)", () => {
+    const result = evaluateSchoolRule({
+      school,
+      rule: clearedRule(true),
+      activeWarnings: [],
+      dayContext: {},
+    });
+    expect(result.matched).toBe(false);
+    expect(result.result).toBe("NORMAL");
+  });
+
+  it("C3: 解除・afterClosureOnly=false → 午前状態に依らず成立", () => {
+    const result = evaluateSchoolRule({
+      school,
+      rule: clearedRule(false),
+      activeWarnings: [],
+      dayContext: {},
+    });
+    expect(result.matched).toBe(true);
+    expect(result.result).toBe("PM_START");
+  });
+
+  it("C4: 解除条件だが対象警報が active → 非成立(NORMAL)", () => {
+    const result = evaluateSchoolRule({
+      school,
+      rule: clearedRule(true),
+      activeWarnings: [warning({ areaCode: SANDA, warningType: "暴風警報" })],
+      dayContext: { priorResult: "AM_OFF" },
+    });
+    expect(result.matched).toBe(false);
+    expect(result.result).toBe("NORMAL");
+  });
+
+  it("C5: 午前が NORMAL 確定 → afterClosureOnly で非成立", () => {
+    const result = evaluateSchoolRule({
+      school,
+      rule: clearedRule(true),
+      activeWarnings: [],
+      dayContext: { priorResult: "NORMAL" },
+    });
+    expect(result.matched).toBe(false);
+  });
 });
