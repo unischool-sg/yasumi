@@ -289,7 +289,10 @@ M14 [Phase 3] 通数カウンタ／請求運用の型／(後で)Stripe・生徒�
       → [docs/plans/2026-09-10-admin-user-management.md](./docs/plans/2026-09-10-admin-user-management.md)
 - [ ] **デバイスビルド（外部作業）**: Firebase サービスアカウント鍵、APNs 認証キー、Xcode/Android Studio、
       LINE ネイティブログイン channel secret。`native/README.md` 参照。ストア審査。
-- [ ] 学生グロース施策（新入生向けシェア導線＝校内密度を作る撒き餌）※未着手
+- [x] 学生グロース施策（シェア導線＝校内密度を作る撒き餌）: ①判定カードの「友達に教える」
+      （LIFF `shareTargetPicker`→Web Share→クリップボードのフォールバック / `frontend/src/lib/share.ts`）、
+      ②判定通知(LINE)末尾の友達招待リンク（`LIFF_ID` env-gated / `https://liff.line.me/<LIFF_ID>?school=<id>`）、
+      ③`?school=<id>` 着地で購読提案ダイアログ（`App.tsx`）。効果測定は M10 校内密度パネル
 
 **状態**: コードは実装済み・本番稼働。ネイティブの端末ビルドはユーザー側の外部設定待ち。
 
