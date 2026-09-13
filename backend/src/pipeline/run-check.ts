@@ -28,6 +28,8 @@ export interface RunCheckDeps {
   pushProvider?: NotificationProvider;
   /** 運用アラート送信（JMA 取得失敗など）。未設定なら送らない。失敗しても主処理は止めない。 */
   alert?: (message: string) => Promise<void>;
+  /** イベント連動フローの発火（休校判定など）。best-effort。 */
+  emitEvent?: (event: { eventType: "judgment.closure"; schoolId: string }) => void;
   now?: () => Date;
 }
 
@@ -160,6 +162,11 @@ export async function runCheck(
 
     // 通知（NORMAL は通知しない §19）。保存済みの結果(row.result)を採用（確定性）
     const storedResult = row.result as CheckResult;
+
+    // イベント連動フロー（休校などの判定）。新規確定時のみ・休み系のみ発火（同日重複しない）。
+    if (created && isClosureResult(storedResult)) {
+      deps.emitEvent?.({ eventType: "judgment.closure", schoolId: ruleRow.schoolId });
+    }
 
     // 警報連動の休校ドラフト自動生成（プラン有効校のみ・同日1件 / M16）。
     // 先生がダッシュボードで確認→ワンタップで公式送信できる叩き台。

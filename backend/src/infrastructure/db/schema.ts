@@ -85,7 +85,17 @@ export const flowSchedules = pgTable("flow_schedules", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-// フロー実行ログ（手動/定期の両方を記録）。1ヶ月で S3 退避のうえ削除（retention）。
+// フローのイベント連動トリガー（イベント発火時にテンプレを自動実行）。
+export const flowEventTriggers = pgTable("flow_event_triggers", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  templateId: uuid("template_id").notNull(),
+  eventType: varchar("event_type", { length: 40 }).notNull(), // FlowEventType
+  audienceMode: varchar("audience_mode", { length: 40 }).notNull(), // FlowTriggerAudienceMode
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// フロー実行ログ（手動/定期/イベントを記録）。1ヶ月で S3 退避のうえ削除（retention）。
 export const flowRunLogs = pgTable(
   "flow_run_logs",
   {
@@ -93,8 +103,10 @@ export const flowRunLogs = pgTable(
     // テンプレは削除されうるため FK/NOT NULL にしない。名前は実行時点のスナップショットを保持。
     templateId: uuid("template_id"),
     templateName: varchar("template_name", { length: 100 }).notNull(),
-    trigger: varchar("trigger", { length: 20 }).notNull(), // 'manual' | 'schedule'
+    trigger: varchar("trigger", { length: 20 }).notNull(), // 'manual' | 'schedule' | 'event'
     scheduleId: uuid("schedule_id"),
+    eventType: varchar("event_type", { length: 40 }), // trigger='event' のときのイベント種別
+
     audienceCount: integer("audience_count").notNull().default(0),
     results: jsonb("results").notNull(), // FlowRunLogStep[]
     status: varchar("status", { length: 20 }).notNull(), // 'success' | 'error'

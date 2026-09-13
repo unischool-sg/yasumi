@@ -14,8 +14,9 @@ export interface FlowRunLogStep {
 export interface FlowRunLogInput {
   templateId: string | null;
   templateName: string;
-  trigger: "manual" | "schedule";
+  trigger: "manual" | "schedule" | "event";
   scheduleId?: string | null;
+  eventType?: string | null;
   audienceCount: number;
   results: FlowRunLogStep[];
   status: "success" | "error";
@@ -33,6 +34,7 @@ export async function recordFlowRun(db: Db, input: FlowRunLogInput): Promise<Flo
       templateName: input.templateName,
       trigger: input.trigger,
       scheduleId: input.scheduleId ?? null,
+      eventType: input.eventType ?? null,
       audienceCount: input.audienceCount,
       results: input.results,
       status: input.status,

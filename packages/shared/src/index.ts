@@ -249,3 +249,70 @@ export function describeFlowStep(st: FlowStep): string {
   if (st.type === "addFlag") return `フラグ付与: 「${st.flag ?? ""}」`;
   return `フラグ解除: 「${st.flag ?? ""}」`;
 }
+
+// ── フローのイベント連動（イベント発火時に自動実行）──
+
+/** フローを起動するイベント種別（単一情報源）。 */
+export type FlowEventType =
+  | "user.follow" // LINE 友だち追加（初回）
+  | "school.subscribe" // 学校を購読（初回）
+  | "school.register" // 学校を登録
+  | "absence.report" // 欠席連絡が出された
+  | "judgment.closure"; // 休校等の判定が確定
+
+export const FLOW_EVENT_LABEL: Record<FlowEventType, string> = {
+  "user.follow": "友だち追加",
+  "school.subscribe": "学校を購読",
+  "school.register": "学校を登録",
+  "absence.report": "欠席連絡",
+  "judgment.closure": "休校などの判定",
+};
+
+export const FLOW_EVENT_TYPES: FlowEventType[] = [
+  "user.follow",
+  "school.subscribe",
+  "school.register",
+  "absence.report",
+  "judgment.closure",
+];
+
+/** イベントが「トリガーした本人(userId)」を持つか（trigger_user モードの可否）。 */
+export const FLOW_EVENT_HAS_USER: Record<FlowEventType, boolean> = {
+  "user.follow": true,
+  "school.subscribe": true,
+  "school.register": true,
+  "absence.report": true,
+  "judgment.closure": false,
+};
+
+/** イベントが「対象校(schoolId)」を持つか（school_subscribers モードの可否）。 */
+export const FLOW_EVENT_HAS_SCHOOL: Record<FlowEventType, boolean> = {
+  "user.follow": false,
+  "school.subscribe": true,
+  "school.register": true,
+  "absence.report": true,
+  "judgment.closure": true,
+};
+
+/**
+ * トリガー時の対象者の決め方。
+ * - trigger_user: イベントを起こした本人に実行。
+ * - school_subscribers: 対象校の購読者に実行。
+ * - query: テンプレートの対象条件（他の人）で実行。
+ */
+export type FlowTriggerAudienceMode = "trigger_user" | "school_subscribers" | "query";
+
+export const FLOW_TRIGGER_AUDIENCE_LABEL: Record<FlowTriggerAudienceMode, string> = {
+  trigger_user: "本人",
+  school_subscribers: "対象校の購読者",
+  query: "対象条件（他の人）",
+};
+
+/** そのイベントで選べる audienceMode 一覧。 */
+export function availableAudienceModes(event: FlowEventType): FlowTriggerAudienceMode[] {
+  const modes: FlowTriggerAudienceMode[] = [];
+  if (FLOW_EVENT_HAS_USER[event]) modes.push("trigger_user");
+  if (FLOW_EVENT_HAS_SCHOOL[event]) modes.push("school_subscribers");
+  modes.push("query");
+  return modes;
+}

@@ -9,6 +9,8 @@ export interface FlowDefinition {
   allUsers: boolean;
   query: FlowAudienceQuery;
   steps: FlowStep[];
+  /** 明示的な対象者（イベント連動で本人/購読者に実行する用）。指定時は query 解決を行わない。 */
+  audienceIds?: string[];
 }
 
 export interface FlowExecuteDeps extends NotifyDeps {
@@ -28,6 +30,7 @@ export interface FlowRunResult {
 
 /** 対象条件に合致する userId を解決する（allUsers なら全員）。 */
 export async function resolveAudience(db: Db, def: FlowDefinition, nowMs: number): Promise<string[]> {
+  if (def.audienceIds) return [...new Set(def.audienceIds)]; // 明示指定（イベント連動）を最優先
   if (def.allUsers) return usersRepo.listAllUserIds(db);
   const rows = await usersRepo.listUsers(db, { limit: 1000 });
   const ids = rows.map((r) => r.id);
