@@ -33,8 +33,8 @@ interface CacheEntry {
 /**
  * 気象庁防災情報から警報を取得する WarningProvider 実装（backend/JMA_ADAPTER.md）。
  * - 都道府県単位でバッチ取得し TTL キャッシュで学校間共有（§33）
- * - 各県の取得はタイムアウト付き＋短間隔リトライ（更新境界の一時的 5xx を吸収）
- * - リトライ後も失敗した県は例外にせず failedPrefCodes で返す（該当県のみ UNKNOWN / §51）
+ * - 各 office(府県予報区) の取得はタイムアウト付き＋短間隔リトライ（更新境界の一時的 5xx を吸収）
+ * - リトライ後も失敗した office は例外にせず failedOfficeCodes で返す（該当地域のみ UNKNOWN / §51）
  */
 export class JmaWarningProvider implements WarningProvider {
   private readonly fetchFn: FetchFn;
@@ -59,19 +59,19 @@ export class JmaWarningProvider implements WarningProvider {
   }
 
   async getActiveWarnings(areaCodes: string[]): Promise<WarningFetchResult> {
-    const prefCodes = uniquePrefCodes(areaCodes);
+    const officeCodes = uniqueOfficeCodes(areaCodes);
     const requested = [...new Set(areaCodes)];
 
     const warnings: Warning[] = [];
-    const failedPrefCodes: string[] = [];
-    for (const prefCode of prefCodes) {
+    const failedOfficeCodes: string[] = [];
+    for (const officeCode of officeCodes) {
       let json: JmaWarningJson;
       try {
-        json = await this.fetchPrefecture(prefCode);
+        json = await this.fetchPrefecture(officeCode);
       } catch (e) {
-        // リトライ後も失敗 → 例外にせず記録（該当県の学校のみ UNKNOWN）。
-        console.error(`[jma] prefecture ${prefCode} fetch failed:`, describeError(e));
-        failedPrefCodes.push(prefCode);
+        // リトライ後も失敗 → 例外にせず記録（該当 office の学校のみ UNKNOWN）。
+        console.error(`[jma] office ${officeCode} fetch failed:`, describeError(e));
+        failedOfficeCodes.push(officeCode);
         continue;
       }
       const parsed = parseJmaWarnings(json, requested, {
@@ -81,7 +81,7 @@ export class JmaWarningProvider implements WarningProvider {
         if (w.status === "active") warnings.push(w);
       }
     }
-    return { warnings, failedPrefCodes };
+    return { warnings, failedOfficeCodes };
   }
 
   private async fetchPrefecture(prefCode: string): Promise<JmaWarningJson> {
@@ -139,11 +139,29 @@ function describeError(e: unknown): string {
   return String(e);
 }
 
-/** 地域コード（例 280010）→ 都道府県 JSON コード（例 280000）に変換し重複排除。 */
-function uniquePrefCodes(areaCodes: string[]): string[] {
+/**
+ * 気象庁 warning JSON は府県予報区(office)単位のファイル。多くの県は `${pref}0000` だが、
+ * 北海道・鹿児島・沖縄は複数 office に分割され `${pref}0000.json` が存在しない（404）。
+ * 該当県は県内の全 office を対象にする（parse は要求コードのみ一致させるので余分な office は無害）。
+ * office 一覧は気象庁 area.json の offices（府県予報区）から取得（2026-09 時点）。
+ */
+const PREF_OFFICES: Record<string, string[]> = {
+  "01": ["011000", "012000", "013000", "014030", "014100", "015000", "016000", "017000"], // 北海道
+  "46": ["460040", "460100"], // 鹿児島県（奄美地方 / それ以外）
+  "47": ["471000", "472000", "473000", "474000"], // 沖縄県（本島 / 大東島 / 宮古島 / 八重山）
+};
+
+/** 地域コード（例 2820900）→ 対応する office JSON コード群（単一県なら1件）。 */
+export function officeCodesForArea(areaCode: string): string[] {
+  const pref = areaCode.slice(0, 2);
+  return PREF_OFFICES[pref] ?? [`${pref}0000`];
+}
+
+/** 地域コード群 → 取得すべき office JSON コード群（重複排除）。 */
+function uniqueOfficeCodes(areaCodes: string[]): string[] {
   const set = new Set<string>();
   for (const code of areaCodes) {
-    set.add(`${code.slice(0, 2)}0000`);
+    for (const office of officeCodesForArea(code)) set.add(office);
   }
   return [...set];
 }
