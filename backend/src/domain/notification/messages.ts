@@ -7,13 +7,18 @@ export interface NotificationTextInput {
   schoolName: string;
   checkTime: string; // "HH:MM"
   matchedWarnings: Warning[];
+  /**
+   * この学校の判定を友達に共有するためのミニアプリ招待URL（校内密度グロースの撒き餌）。
+   * 未指定なら招待行を付けない（env-gated: MINIAPP_URL 未設定時はドーマント）。
+   */
+  inviteUrl?: string;
 }
 
 /**
  * 判定結果の LINE 通知文面を生成する純粋関数（PRD §18, §52）。
  */
 export function buildNotificationText(input: NotificationTextInput): string {
-  const { result, schoolName, checkTime, matchedWarnings } = input;
+  const { result, schoolName, checkTime, matchedWarnings, inviteUrl } = input;
   const reason = formatReason(matchedWarnings);
 
   if (result === "UNKNOWN") {
@@ -27,6 +32,9 @@ export function buildNotificationText(input: NotificationTextInput): string {
     ].join("\n");
   }
 
+  // 友達への共有を促す招待行（免責の前・警報連動の判定通知にのみ付与）。校内密度の撒き餌。
+  const invite = inviteUrl ? ["", "▼この学校の判定を友達にも教える", inviteUrl] : [];
+
   // 警報解除にもとづく判定（WARNING_CLEARED 条件 / matchedWarnings が空）。
   // 例: 午前休のあと 10:00 に解除 → 午後から登校。「警報発表中」と書くと不適切なので分岐する。
   const clearedBased = matchedWarnings.length === 0;
@@ -39,6 +47,7 @@ export function buildNotificationText(input: NotificationTextInput): string {
       `${checkTime}現在、対象となる気象警報は解除されています。`,
       "",
       `学校規則上、「${CHECK_RESULT_LABEL[result]}」に該当します。`,
+      ...invite,
       DISCLAIMER,
     ]
       .filter(Boolean)
@@ -55,6 +64,7 @@ export function buildNotificationText(input: NotificationTextInput): string {
       reason,
       "",
       `学校規則上、「${CHECK_RESULT_LABEL[result]}」に該当します。`,
+      ...invite,
       DISCLAIMER,
     ]
       .filter(Boolean)
@@ -71,6 +81,7 @@ export function buildNotificationText(input: NotificationTextInput): string {
     reason,
     "",
     `学校規則上、「${CHECK_RESULT_LABEL[result]}」に該当します。`,
+    ...invite,
     DISCLAIMER,
   ]
     .filter(Boolean)

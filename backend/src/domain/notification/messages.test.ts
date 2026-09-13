@@ -52,4 +52,22 @@ describe("buildNotificationText", () => {
     expect(text).toContain("解除");
     expect(text).not.toContain("発表されています");
   });
+
+  it("inviteUrl 指定時: 招待行とURLを免責より前に含む", () => {
+    const url = "https://liff.line.me/2011-x?school=abc";
+    const text = buildNotificationText({ result: "FULL_OFF", schoolName: "三田学園", checkTime: "10:00", matchedWarnings: warnings, inviteUrl: url });
+    expect(text).toContain("友達にも教える");
+    expect(text).toContain(url);
+    expect(text.indexOf(url)).toBeLessThan(text.indexOf("学校公式"));
+  });
+
+  it("inviteUrl 未指定時: 招待行は付かない", () => {
+    const text = buildNotificationText({ result: "FULL_OFF", schoolName: "三田学園", checkTime: "10:00", matchedWarnings: warnings });
+    expect(text).not.toContain("友達にも教える");
+  });
+
+  it("UNKNOWN には inviteUrl があっても招待行を付けない", () => {
+    const text = buildNotificationText({ result: "UNKNOWN", schoolName: "三田学園", checkTime: "08:00", matchedWarnings: [], inviteUrl: "https://x/?school=abc" });
+    expect(text).not.toContain("友達にも教える");
+  });
 });

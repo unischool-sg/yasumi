@@ -57,6 +57,11 @@ export interface AppDeps extends AuthDeps {
   schoolJwtSecret?: string;
   /** API の公開URL（確認リンク生成用。例 https://yasumi-api.unischool.jp）。 */
   apiBaseUrl?: string;
+  /**
+   * ミニアプリの公開URL（例 https://liff.line.me/2011...-xxxx）。設定時、判定通知に
+   * 友達招待リンクを添える（校内密度グロース）。未設定なら添えない（ドーマント）。
+   */
+  miniAppUrl?: string;
   /** LINE 受信メッセージの転送先 Discord Webhook URL（秘密・env 注入）。未設定なら転送しない。 */
   discordWebhookUrl?: string;
   /** 友だち追加・学校購読・学校登録などの活動通知先 Discord Webhook URL（秘密・env 注入）。 */
@@ -264,6 +269,7 @@ export function createApp(deps: AppDeps) {
             }
           : {}),
         emitEvent: ({ eventType, schoolId }) => emitFlowEvent(eventType, { schoolId }),
+        ...(deps.miniAppUrl ? { miniAppUrl: deps.miniAppUrl } : {}),
         ...(deps.now ? { now: deps.now } : {}),
       },
       { triggeredAt },
