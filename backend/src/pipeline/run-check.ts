@@ -30,6 +30,11 @@ export interface RunCheckDeps {
   alert?: (message: string) => Promise<void>;
   /** イベント連動フローの発火（休校判定など）。best-effort。 */
   emitEvent?: (event: { eventType: "judgment.closure"; schoolId: string }) => void;
+  /**
+   * ミニアプリの公開URL（例 https://liff.line.me/2011...-xxxx）。設定時、判定通知に
+   * `?school=<id>` を付けた友達招待リンクを添える（校内密度グロース）。未設定なら添えない。
+   */
+  miniAppUrl?: string;
   now?: () => Date;
 }
 
@@ -190,6 +195,9 @@ export async function runCheck(
       schoolName: school.name,
       checkTime,
       matchedWarnings,
+      ...(deps.miniAppUrl
+        ? { inviteUrl: buildInviteUrl(deps.miniAppUrl, ruleRow.schoolId) }
+        : {}),
     });
 
     for (const sub of subscribers) {
@@ -223,4 +231,10 @@ export async function runCheck(
   }
 
   return summary;
+}
+
+/** 判定通知に添える友達招待リンク（`?school=<id>` で着地時にその学校を購読提案）。 */
+function buildInviteUrl(miniAppUrl: string, schoolId: string): string {
+  const sep = miniAppUrl.includes("?") ? "&" : "?";
+  return `${miniAppUrl}${sep}school=${encodeURIComponent(schoolId)}`;
 }
