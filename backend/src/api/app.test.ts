@@ -204,11 +204,12 @@ suite("API integration", () => {
     expect(got).not.toContain("高潮警報"); // 生徒は管理者限定を追加できない
   });
 
-  it("学校作成時に作成者へ確認通知を送る", async () => {
+  it("学校作成時にハードコードの確認通知は送らない（イベント連動フローに一本化）", async () => {
     const sent: { lineUserId?: string; text: string }[] = [];
     const notifyApp = createApp({
       db: drizzle(sql, { schema }),
       verifyIdToken: async (token) => ({ lineUserId: token }),
+      // internalCronToken 未設定 → イベント emit は無効。ハードコード送信が無いことを確認する。
       notificationProvider: {
         send: async (target, message) => {
           sent.push({ lineUserId: target.lineUserId, text: message.text });
@@ -223,9 +224,7 @@ suite("API integration", () => {
       }),
     );
     expect(res.status).toBe(201);
-    expect(sent).toHaveLength(1);
-    expect(sent[0]?.lineUserId).toBe("Unotify");
-    expect(sent[0]?.text).toContain("登録しました");
+    expect(sent).toHaveLength(0);
   });
 
   it("GET /api/me/schools → 自分が作成した学校のみ返す", async () => {

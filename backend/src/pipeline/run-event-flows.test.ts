@@ -119,6 +119,28 @@ suite("runEventFlows", () => {
     expect(sent).toHaveLength(0);
   });
 
+  it("変数置換: {{school}} が対象校名に置換されて送信される", async () => {
+    const school = await createSchool(db, { name: "変数校", prefecture: "兵庫県" });
+    const { userId } = await findOrCreateByLineUserId(db, "Uevt_var");
+    const tpl = await templatesRepo.createTemplate(db, {
+      name: "購読ありがとう",
+      allUsers: false,
+      query: EMPTY_QUERY,
+      steps: [{ id: "s1", type: "send", text: "{{school}}の購読ありがとうございます！" }],
+    });
+    await triggersRepo.createTrigger(db, {
+      templateId: tpl.id,
+      eventType: "school.subscribe",
+      audienceMode: "trigger_user",
+    });
+    sent.length = 0;
+    await runEventFlows(
+      { db, notificationProvider: notifier },
+      { eventType: "school.subscribe", userId, schoolId: school.id },
+    );
+    expect(sent.find((m) => m.text.includes("変数校の購読ありがとう"))).toBeDefined();
+  });
+
   it("addFlag ステップ: trigger_user 本人にフラグ付与", async () => {
     await flagsRepo.createDef(db, { name: "welcomed" });
     const tpl = await templatesRepo.createTemplate(db, {

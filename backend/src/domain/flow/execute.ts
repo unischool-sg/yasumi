@@ -4,6 +4,7 @@ import * as flagsRepo from "../../infrastructure/db/repositories/flags.ts";
 import * as subsRepo from "../../infrastructure/db/repositories/subscriptions.ts";
 import * as usersRepo from "../../infrastructure/db/repositories/users.ts";
 import { type NotifyDeps, notifyUser } from "../notification/dispatch.ts";
+import { makeMessageRenderer } from "../notification/render.ts";
 
 export interface FlowDefinition {
   allUsers: boolean;
@@ -11,10 +12,15 @@ export interface FlowDefinition {
   steps: FlowStep[];
   /** 明示的な対象者（イベント連動で本人/購読者に実行する用）。指定時は query 解決を行わない。 */
   audienceIds?: string[];
+  /** メッセージ本文の {{school}} に優先採用する学校名（イベント/購読者フローの対象校）。 */
+  schoolName?: string;
 }
 
 export interface FlowExecuteDeps extends NotifyDeps {
   now?: () => Date;
+  /** {{name}} 解決用の LINE アクセストークン（未設定なら name は既定語）。 */
+  lineAccessToken?: string;
+  fetchFn?: (url: string, init?: RequestInit) => Promise<Response>;
 }
 
 export interface FlowStepResult {
@@ -62,6 +68,17 @@ export async function executeFlow(deps: FlowExecuteDeps, def: FlowDefinition): P
     ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
   };
 
+  // 受信者ごとに本文の変数（{{name}} 等）を置換するレンダラ（名前はキャッシュ）。
+  const render = makeMessageRenderer(
+    {
+      db: deps.db,
+      ...(deps.lineAccessToken ? { lineAccessToken: deps.lineAccessToken } : {}),
+      ...(deps.fetchFn ? { fetchFn: deps.fetchFn } : {}),
+      ...(deps.now ? { now: deps.now } : {}),
+    },
+    def.schoolName ? { schoolName: def.schoolName } : {},
+  );
+
   const results: FlowStepResult[] = [];
   for (const step of def.steps) {
     if (step.type === "send") {
@@ -69,7 +86,8 @@ export async function executeFlow(deps: FlowExecuteDeps, def: FlowDefinition): P
       let sent = 0;
       if (text.trim()) {
         for (const uid of audienceIds) {
-          if (await notifyUser(notifyDeps, uid, text)) sent++;
+          const rendered = await render(uid, text);
+          if (await notifyUser(notifyDeps, uid, rendered)) sent++;
         }
       }
       results.push({ step, sent, total: audienceIds.length });

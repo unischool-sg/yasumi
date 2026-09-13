@@ -1,5 +1,5 @@
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, MenuItem, Stack, TextField, Typography } from "@mui/material";
-import type { FlowStep, FlowStepType } from "@yasumi/shared";
+import { Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, MenuItem, Stack, TextField, Tooltip, Typography } from "@mui/material";
+import { MESSAGE_VARIABLES, type FlowStep, type FlowStepType } from "@yasumi/shared";
 import { useState } from "react";
 import type { AdminMessageTemplate } from "../api/client.ts";
 
@@ -78,6 +78,23 @@ export function FlowStepsEditor({
             {templates.map((t) => <MenuItem key={t.id} value={t.id}>{t.title}</MenuItem>)}
           </TextField>
           <TextField fullWidth multiline minRows={5} placeholder="メッセージ本文" value={draft} onChange={(e) => setDraft(e.target.value)} />
+          <Box sx={{ mt: 1.5 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+              変数を挿入（送信時に受信者ごとに置換されます）
+            </Typography>
+            <Stack direction="row" spacing={0.5} sx={{ flexWrap: "wrap", gap: 0.5 }}>
+              {MESSAGE_VARIABLES.map((v) => (
+                <Tooltip key={v.key} title={`${v.hint}（未取得時は「${v.defaultWord || "空"}」）`}>
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    label={`${v.label} {{${v.key}}}`}
+                    onClick={() => setDraft((d) => `${d}{{${v.key}}}`)}
+                  />
+                </Tooltip>
+              ))}
+            </Stack>
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button color="inherit" onClick={() => setEditId(null)}>キャンセル</Button>

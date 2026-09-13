@@ -9,7 +9,6 @@ import { createAdminApp } from "./admin/app.ts";
 import { createSchoolApp } from "./school/app.ts";
 import { type AuthDeps, type AuthEnv, authMiddleware } from "./auth.ts";
 import { checkSchoolEditable } from "./authz.ts";
-import { notifyUser } from "../domain/notification/dispatch.ts";
 import { absenceEnabled, isPlanActive } from "../domain/plan.ts";
 import { postDiscordMessage } from "../infrastructure/discord/notify.ts";
 import { makeErrorReporter } from "../infrastructure/discord/report-error.ts";
@@ -286,6 +285,7 @@ export function createApp(deps: AppDeps) {
         ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
         ...(deps.discordFlowWebhookUrl ? { discordFlowWebhookUrl: deps.discordFlowWebhookUrl } : {}),
         ...(deps.adminBaseUrl ? { adminBaseUrl: deps.adminBaseUrl } : {}),
+        ...(deps.lineChannelAccessToken ? { lineAccessToken: deps.lineChannelAccessToken } : {}),
         ...(deps.fetchFn ? { fetchFn: deps.fetchFn } : {}),
         ...(deps.now ? { now: deps.now } : {}),
       },
@@ -311,6 +311,8 @@ export function createApp(deps: AppDeps) {
         reportError,
         ...(deps.notificationProvider ? { notificationProvider: deps.notificationProvider } : {}),
         ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
+        ...(deps.lineChannelAccessToken ? { lineAccessToken: deps.lineChannelAccessToken } : {}),
+        ...(deps.fetchFn ? { fetchFn: deps.fetchFn } : {}),
         ...(deps.now ? { now: deps.now } : {}),
       },
       {
@@ -476,12 +478,8 @@ export function createApp(deps: AppDeps) {
         );
         await cfg.setWarningTypes(deps.db, school.id, allowed);
       }
-      // 作成者へ確認通知（デバイストークンがあれば FCM、無ければ LINE。失敗しても 201 は返す）
-      await notifyUser(
-        deps,
-        c.get("userId"),
-        `「${school.name}」を登録しました！\n同じ学校のみんなで共有されます。\n\n朝の判定時刻に自動でチェックして、休校などをお知らせします。`,
-      );
+      // 登録確認メッセージはイベント連動フロー（school.register / 対象:本人）に一本化したため、
+      // ここでのハードコード送信は行わない。
       // 活動通知（Discord）
       {
         const adminBase = deps.adminBaseUrl || "https://yasumi-admin.unischool.jp";
