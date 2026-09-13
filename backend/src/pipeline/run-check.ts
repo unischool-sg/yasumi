@@ -3,7 +3,7 @@ import { buildClosureDraftText, isClosureResult } from "../domain/closure-draft.
 import { evaluateSchoolRule } from "../domain/rule/evaluate.ts";
 import { buildNotificationText } from "../domain/notification/messages.ts";
 import type { NotificationProvider } from "../domain/notification/provider.ts";
-import { shouldNotify } from "../domain/notification/provider.ts";
+import { isUndeliverablePushError, shouldNotify } from "../domain/notification/provider.ts";
 import { isPlanActive } from "../domain/plan.ts";
 import type { WarningProvider } from "../domain/warning/provider.ts";
 import { officeCodesForArea } from "../infrastructure/jma/jma-warning-provider.ts";
@@ -47,6 +47,8 @@ export interface RunCheckSummary {
   notificationsSent: number;
   fetchFailed: boolean;
   errors: number;
+  /** 未友だち等で LINE 配信できずスキップした件数（通常エラーとは区別・運用ノイズ低減）。 */
+  skippedUndeliverable: number;
 }
 
 /**
@@ -72,6 +74,7 @@ export async function runCheck(
     notificationsSent: 0,
     fetchFailed: false,
     errors: 0,
+    skippedUndeliverable: 0,
   };
 
   // 1. 現在時刻(HH:MM)に該当するルールを全学校横断で取得
@@ -224,8 +227,10 @@ export async function runCheck(
         }
         await notificationsRepo.markNotificationSent(deps.db, notifRow.id, now());
         summary.notificationsSent++;
-      } catch {
-        summary.errors++;
+      } catch (e) {
+        // 未友だち等で LINE 配信不能な場合は通常エラーと区別（運用アラートを鳴らさない）。
+        if (isUndeliverablePushError(e)) summary.skippedUndeliverable++;
+        else summary.errors++;
       }
     }
   }

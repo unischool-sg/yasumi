@@ -414,12 +414,27 @@ export function createApp(deps: AppDeps) {
   // --- User ---
   api.get("/me", (c) => c.json({ userId: c.get("userId") }));
 
-  // 広告アトリビューション（gclid）を first-touch 保存（Google Ads コンバージョン計測用）。
+  // 流入アトリビューションを first-touch 保存。
+  // `query`（流入時のクエリ一式）を保存しつつ、gclid は従来通り専用カラムに抽出（コンバージョン計測用）。
+  // 後方互換のため単体 `gclid` も受け付ける。
   api.post(
     "/me/attribution",
-    zValidator("json", z.object({ gclid: z.string().min(1).max(200) })),
+    zValidator(
+      "json",
+      z.object({
+        query: z.record(z.string(), z.string()).optional(),
+        gclid: z.string().min(1).max(200).optional(),
+      }),
+    ),
     async (c) => {
-      await usersRepo.setGclidIfAbsent(deps.db, c.get("userId"), c.req.valid("json").gclid, deps.now?.() ?? new Date());
+      const body = c.req.valid("json");
+      const userId = c.get("userId");
+      const now = deps.now?.() ?? new Date();
+      if (body.query && Object.keys(body.query).length > 0) {
+        await usersRepo.setLandingQueryIfAbsent(deps.db, userId, body.query);
+      }
+      const gclid = body.gclid ?? body.query?.gclid;
+      if (gclid) await usersRepo.setGclidIfAbsent(deps.db, userId, gclid.slice(0, 200), now);
       return c.json({ ok: true });
     },
   );

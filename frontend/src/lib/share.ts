@@ -30,6 +30,20 @@ export function buildInviteText(schoolName: string, url: string): string {
   ].join("\n");
 }
 
+/** 公式アカウントの友だち追加ページを開く（LINE内なら LIFF、外なら通常遷移）。 */
+export function openAddFriend(url: string): void {
+  if (!url) return;
+  try {
+    if (liff.isInClient()) {
+      liff.openWindow({ url, external: false });
+      return;
+    }
+  } catch {
+    /* フォールバックへ */
+  }
+  window.open(url, "_blank", "noopener");
+}
+
 export type ShareResult = "shared" | "cancelled" | "copied" | "unavailable";
 
 /**

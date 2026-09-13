@@ -7,8 +7,10 @@ WORKDIR /app
 # Vite の環境変数はビルド時に埋め込まれる（クライアントに露出する公開値）
 ARG VITE_LIFF_ID
 ARG VITE_API_BASE_URL
+ARG VITE_LINE_ADD_FRIEND_URL
 ENV VITE_LIFF_ID=$VITE_LIFF_ID
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_LINE_ADD_FRIEND_URL=$VITE_LINE_ADD_FRIEND_URL
 
 COPY package.json bun.lock bunfig.toml ./
 COPY backend/package.json ./backend/

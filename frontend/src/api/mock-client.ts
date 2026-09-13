@@ -137,7 +137,7 @@ export function createMockClient(): ApiClient {
       }
       return delay(undefined as void);
     },
-    saveAttribution: (_input: { gclid: string }) => delay({ ok: true }),
+    saveAttribution: (_input: { query?: Record<string, string>; gclid?: string }) => delay({ ok: true }),
     // 欠席受付（モック: s1 を premium 対応校として扱う）
     listAbsenceSchools: () => delay(schools.filter((s) => s.id === "s1").map((s) => ({ id: s.id, name: s.name }))),
     listStudentProfiles: () => delay([...studentProfiles]),

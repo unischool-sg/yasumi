@@ -23,6 +23,9 @@ export const users = pgTable("users", {
   gclid: varchar("gclid", { length: 200 }),
   gclidAt: timestamp("gclid_at", { withTimezone: true }),
   gclidConvertedAt: timestamp("gclid_converted_at", { withTimezone: true }),
+  // 流入時のクエリ一式を first-touch で保存（gclid/utm_*/school/ref 等・分析用）。
+  // 友だち追加リダイレクトで URL パラメータが失われても復元できるよう、着地直後に保存する。
+  landingQuery: jsonb("landing_query"),
 });
 
 // 管理画面のアカウント（LINE ユーザーとは別系統・id/password 認証 / admin）。
