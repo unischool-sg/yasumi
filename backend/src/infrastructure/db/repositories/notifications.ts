@@ -1,8 +1,10 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, getTableColumns } from "drizzle-orm";
 import type { Db } from "../client.ts";
-import { notifications } from "../schema.ts";
+import { notifications, schools } from "../schema.ts";
 
 export type NotificationRow = typeof notifications.$inferSelect;
+/** 管理画面向け: 学校名を join した通知行。 */
+export type NotificationWithSchool = NotificationRow & { schoolName: string | null };
 
 export interface NotificationInput {
   userId: string;
@@ -50,11 +52,14 @@ export async function listNotifications(
   db: Db,
   filter: { schoolId?: string; targetDate?: string } = {},
   limit = 100,
-): Promise<NotificationRow[]> {
+): Promise<NotificationWithSchool[]> {
   const conds = [];
   if (filter.schoolId) conds.push(eq(notifications.schoolId, filter.schoolId));
   if (filter.targetDate) conds.push(eq(notifications.targetDate, filter.targetDate));
-  const base = db.select().from(notifications);
+  const base = db
+    .select({ ...getTableColumns(notifications), schoolName: schools.name })
+    .from(notifications)
+    .leftJoin(schools, eq(notifications.schoolId, schools.id));
   const q = conds.length > 0 ? base.where(and(...conds)) : base;
   return q.orderBy(desc(notifications.sentAt)).limit(limit);
 }
