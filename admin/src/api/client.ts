@@ -159,6 +159,7 @@ export interface UserDetail {
 export interface WarningCheck {
   id: string;
   schoolId: string;
+  schoolName: string | null;
   ruleId: string;
   targetDate: string;
   checkedAt: string;
@@ -169,6 +170,7 @@ export interface NotificationRow {
   id: string;
   userId: string;
   schoolId: string;
+  schoolName: string | null;
   targetDate: string;
   status: string;
   sentAt: string | null;

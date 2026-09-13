@@ -76,6 +76,8 @@ const app = createApp({
   ...(process.env.DISCORD_WEBHOOK_URL ? { discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL } : {}),
   ...(process.env.DISCORD_EVENTS_WEBHOOK_URL ? { discordEventsWebhookUrl: process.env.DISCORD_EVENTS_WEBHOOK_URL } : {}),
   ...(process.env.DISCORD_FLOW_WEBHOOK_URL ? { discordFlowWebhookUrl: process.env.DISCORD_FLOW_WEBHOOK_URL } : {}),
+  // 運用アラート（JMA 取得失敗等）の Discord 送信先（秘密・未設定なら送らない）。
+  ...(process.env.DISCORD_ALERT_WEBHOOK_URL ? { discordAlertWebhookUrl: process.env.DISCORD_ALERT_WEBHOOK_URL } : {}),
   adminBaseUrl: process.env.ADMIN_PUBLIC_BASE_URL || "https://yasumi-admin.unischool.jp",
   // ネイティブ LINE ログイン（LIFF と同じチャネル）。secret 未設定なら /api/auth/line/token は 503。
   lineLoginChannelId: channelId,
@@ -90,8 +92,15 @@ const app = createApp({
 });
 
 // 同一プロセス cron を起動（30分ごと・app.fetch 駆動 / backend/CRON.md）。
+// 境界(:00/:30)ちょうどは JMA 更新境界の一時的 5xx を踏みやすいため、既定 60 秒ずらす。
 if (internalCronToken) {
-  const stopCron = startCron(app, { internalCronToken });
+  const offsetSeconds = process.env.CRON_OFFSET_SECONDS
+    ? Number(process.env.CRON_OFFSET_SECONDS)
+    : undefined;
+  const stopCron = startCron(app, {
+    internalCronToken,
+    ...(offsetSeconds !== undefined && Number.isFinite(offsetSeconds) ? { offsetSeconds } : {}),
+  });
   const shutdown = () => {
     stopCron();
     process.exit(0);

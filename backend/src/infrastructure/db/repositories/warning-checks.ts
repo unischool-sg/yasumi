@@ -1,9 +1,11 @@
 import type { CheckResult, Warning } from "@yasumi/shared";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, getTableColumns } from "drizzle-orm";
 import type { Db } from "../client.ts";
-import { warningChecks } from "../schema.ts";
+import { schools, warningChecks } from "../schema.ts";
 
 export type WarningCheckRow = typeof warningChecks.$inferSelect;
+/** 管理画面向け: 学校名を join した判定行。 */
+export type WarningCheckWithSchool = WarningCheckRow & { schoolName: string | null };
 
 /** その日その学校で警報が出ていたか（欠席受付の「休校」正当性の自動タグ用 / M13）。 */
 export async function hasActiveWarningOnDate(db: Db, schoolId: string, date: string): Promise<boolean> {
@@ -115,11 +117,14 @@ export async function listWarningChecks(
   db: Db,
   filter: { schoolId?: string; targetDate?: string } = {},
   limit = 100,
-): Promise<WarningCheckRow[]> {
+): Promise<WarningCheckWithSchool[]> {
   const conds = [];
   if (filter.schoolId) conds.push(eq(warningChecks.schoolId, filter.schoolId));
   if (filter.targetDate) conds.push(eq(warningChecks.targetDate, filter.targetDate));
-  const base = db.select().from(warningChecks);
+  const base = db
+    .select({ ...getTableColumns(warningChecks), schoolName: schools.name })
+    .from(warningChecks)
+    .leftJoin(schools, eq(warningChecks.schoolId, schools.id));
   const q = conds.length > 0 ? base.where(and(...conds)) : base;
   return q.orderBy(desc(warningChecks.checkedAt)).limit(limit);
 }
