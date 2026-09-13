@@ -27,6 +27,11 @@ import {
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import type { ApiClient } from "./api/client.ts";
 import type { SchoolSummary, Subscription } from "./api/types.ts";
+import { getLiffFriendFlag } from "./lib/auth/liff.ts";
+import { openAddFriend } from "./lib/share.ts";
+
+/** 公式アカウントの友だち追加URL（未友だちに通知が届かない対策の導線）。 */
+const ADD_FRIEND_URL = import.meta.env.VITE_LINE_ADD_FRIEND_URL ?? "";
 import { useAuth } from "./hooks/useAuth.ts";
 import { registerPushToken } from "./native/push.ts";
 import { AbsenceReport } from "./pages/AbsenceReport.tsx";
@@ -61,6 +66,8 @@ function Main({ api }: { api: ApiClient }) {
   // 友達招待リンク（?school=<id>）で開かれたときの購読提案（校内密度グロースの着地点）。
   const [joinSchool, setJoinSchool] = useState<SchoolSummary | null>(null);
   const [joining, setJoining] = useState(false);
+  // 公式アカウントの友だち状態（null=不明/非LIFF）。false のとき LINE プッシュが届かないため追加導線を出す。
+  const [isFriend, setIsFriend] = useState<boolean | null>(null);
 
   const reload = useCallback(() => {
     api.listSubscriptions().then(setSubscriptions).catch(() => setSubscriptions([]));
@@ -74,11 +81,17 @@ function Main({ api }: { api: ApiClient }) {
     registerPushToken(api);
   }, [api]);
 
-  // 広告クリックID(gclid)を保存（Google Ads コンバージョン計測）。URL / LIFF state から取得。
+  // 流入クエリ一式（gclid/utm_*/school/ref…）を first-touch 保存。
+  // 友だち追加リダイレクトで URL パラメータが失われる前に着地直後へ保存する（アトリビューション堅牢化）。
   useEffect(() => {
-    const gclid = readGclid();
-    if (gclid) api.saveAttribution({ gclid }).catch(() => {});
+    const query = readAllQueryParams();
+    if (Object.keys(query).length > 0) api.saveAttribution({ query }).catch(() => {});
   }, [api]);
+
+  // 公式アカウントの友だち状態を取得（LIFF のみ）。未友だちなら通知が届かないため追加導線を出す。
+  useEffect(() => {
+    getLiffFriendFlag().then(setIsFriend).catch(() => setIsFriend(null));
+  }, []);
 
   // 友達招待リンク（?school=<id>）で開かれたら、その学校の購読提案ダイアログを出す。
   // 再読込での二重発火を防ぐため、取得後に URL からパラメータを除去する。
@@ -122,6 +135,21 @@ function Main({ api }: { api: ApiClient }) {
           </Typography>
         </Toolbar>
       </AppBar>
+
+      {/* 未友だちは LINE プッシュが届かない（送信側が 400）。友だち追加を促す。 */}
+      {isFriend === false && ADD_FRIEND_URL && (
+        <Alert
+          severity="warning"
+          action={
+            <Button color="inherit" size="small" onClick={() => openAddFriend(ADD_FRIEND_URL)}>
+              追加する
+            </Button>
+          }
+          sx={{ borderRadius: 0 }}
+        >
+          通知を受け取るには公式アカウントの友だち追加が必要です。
+        </Alert>
+      )}
 
       <Container maxWidth="sm" sx={{ pt: 2, pb: isModal ? 4 : 12 }}>
         {view.kind === "register" ? (
@@ -233,27 +261,31 @@ function Main({ api }: { api: ApiClient }) {
 }
 
 /**
- * URL クエリまたは LIFF の liff.state（エンコードされたクエリ）からパラメータを取得。
- * LIFF は元のクエリを liff.state に入れることがある（例: liff.state=%3Fschool%3D...）。
+ * 現在のクエリを { 直接のクエリ ∪ liff.state 内のクエリ } として1つにまとめて返す。
+ * LIFF はログイン/友だち追加リダイレクトで元のクエリを liff.state に入れることがあり、
+ * その形は `?school=..` / `/?school=..` / `school=..` と揺れるため、最初の `?` 以降を取り出す。
  */
-function readQueryParam(name: string): string | null {
+function readAllQueryParams(): Record<string, string> {
+  const out: Record<string, string> = {};
   try {
     const sp = new URLSearchParams(window.location.search);
-    const direct = sp.get(name);
-    if (direct) return direct;
+    for (const [k, v] of sp) {
+      if (k !== "liff.state") out[k] = v;
+    }
     const state = sp.get("liff.state");
     if (state) {
-      const inner = new URLSearchParams(state.startsWith("?") ? state.slice(1) : state);
-      return inner.get(name);
+      const q = state.includes("?") ? state.slice(state.indexOf("?") + 1) : state;
+      for (const [k, v] of new URLSearchParams(q)) out[k] = v;
     }
   } catch {
     /* noop */
   }
-  return null;
+  return out;
 }
 
-function readGclid(): string | null {
-  return readQueryParam("gclid");
+/** 単一パラメータを取得（直接クエリと liff.state の両対応）。 */
+function readQueryParam(name: string): string | null {
+  return readAllQueryParams()[name] ?? null;
 }
 
 /** URL からクエリパラメータを除去（履歴を汚さず replaceState）。再読込での二重処理防止。 */

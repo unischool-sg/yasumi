@@ -80,8 +80,8 @@ export function createApiClient(idToken: string) {
     ) => request<SchoolRule>(`/api/rules/${ruleId}`, { method: "PATCH", body: JSON.stringify(patch) }),
     deleteRule: (ruleId: string) =>
       request<void>(`/api/rules/${ruleId}`, { method: "DELETE" }),
-    /** 広告アトリビューション（gclid）を保存（Google Ads コンバージョン計測）。 */
-    saveAttribution: (input: { gclid: string }) =>
+    /** 流入アトリビューション（クエリ一式）を first-touch 保存。gclid は専用カラムにも抽出される。 */
+    saveAttribution: (input: { query?: Record<string, string>; gclid?: string }) =>
       request<{ ok: boolean }>("/api/me/attribution", { method: "POST", body: JSON.stringify(input) }),
     /** 欠席受付が使える学校（premium・購読中）。 */
     listAbsenceSchools: () => request<AbsenceSchool[]>("/api/me/absence-schools"),

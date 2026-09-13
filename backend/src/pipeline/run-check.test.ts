@@ -5,7 +5,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import type { Sql } from "postgres";
-import type { NotificationProvider } from "../domain/notification/provider.ts";
+import { type NotificationProvider, PushDeliveryError } from "../domain/notification/provider.ts";
 import type { WarningProvider } from "../domain/warning/provider.ts";
 import type { Db } from "../infrastructure/db/client.ts";
 import * as cfg from "../infrastructure/db/repositories/school-config.ts";
@@ -272,5 +272,29 @@ suite("runCheck pipeline", () => {
     expect(pushSent).toHaveLength(1);
     expect(pushSent[0]?.deviceTokens).toEqual(["devtok-1"]);
     expect(sent).toHaveLength(0); // LINE には送らない（FCM 優先）
+  });
+
+  it("未友だちで LINE Push が 400 → errors ではなく skippedUndeliverable に計上", async () => {
+    const s = await createSchool(db, { name: "未友だち校", prefecture: "兵庫県" });
+    await cfg.setAreaCodes(db, s.id, [SANDA]);
+    await cfg.setWarningTypes(db, s.id, ["暴風警報"]);
+    await createRule(db, { schoolId: s.id, checkTime: "11:00", result: "AM_OFF" });
+    const { userId } = await findOrCreateByLineUserId(db, "Ucron_nonfriend");
+    await upsertSubscription(db, { userId, schoolId: s.id });
+
+    const rejecting: NotificationProvider = {
+      send: async () => {
+        throw new PushDeliveryError(400, "LINE push failed (HTTP 400)");
+      },
+    };
+    const at1100 = new Date("2026-09-09T11:00:00+09:00");
+    const summary = await runCheck(
+      { db, warningProvider: providerReturning(activeStorm), notificationProvider: rejecting, now: () => at1100 },
+      { triggeredAt: at1100 },
+    );
+
+    expect(summary.skippedUndeliverable).toBe(1);
+    expect(summary.errors).toBe(0);
+    expect(summary.notificationsSent).toBe(0);
   });
 });

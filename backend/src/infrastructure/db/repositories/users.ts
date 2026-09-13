@@ -61,6 +61,18 @@ export async function setGclidIfAbsent(db: Db, userId: string, gclid: string, no
   await db.update(users).set({ gclid, gclidAt: now }).where(and(eq(users.id, userId), isNull(users.gclid)));
 }
 
+/** 流入クエリ一式を first-touch で保存（既に入っていれば上書きしない）。分析・アトリビューション用。 */
+export async function setLandingQueryIfAbsent(
+  db: Db,
+  userId: string,
+  query: Record<string, string>,
+): Promise<void> {
+  await db
+    .update(users)
+    .set({ landingQuery: query })
+    .where(and(eq(users.id, userId), isNull(users.landingQuery)));
+}
+
 /** コンバージョン判定用に gclid と送信済み時刻を取得。 */
 export async function getAttribution(
   db: Db,
