@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import type { ApiClient } from "../api/client.ts";
 import type { SchoolStatus, Subscription } from "../api/types.ts";
 import { StatusHero } from "../components/StatusHero.tsx";
+import { shareSchool } from "../lib/share.ts";
 import { STATUS_STYLE } from "../lib/status.ts";
 
 interface Props {
@@ -43,6 +44,13 @@ export function Home({ api, subscriptions, onChanged, onGoSearch, onNotify, show
       cancelled = true;
     };
   }, [api, subscriptions]);
+
+  async function share(status: SchoolStatus) {
+    const result = await shareSchool(status.schoolId, status.schoolName);
+    if (result === "shared") onNotify("友達に共有しました");
+    else if (result === "copied") onNotify("招待リンクをコピーしました");
+    else if (result === "unavailable") onNotify("この環境では共有できませんでした");
+  }
 
   async function unsubscribe(schoolId: string) {
     setBusyId(schoolId);
@@ -81,7 +89,7 @@ export function Home({ api, subscriptions, onChanged, onGoSearch, onNotify, show
       {loading && statuses.length === 0 ? (
         <Skeleton variant="rounded" height={168} />
       ) : (
-        hero && <StatusHero status={hero} />
+        hero && <StatusHero status={hero} onShare={() => share(hero)} />
       )}
 
       {showAbsence && onAbsence && (

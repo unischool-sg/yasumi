@@ -10,8 +10,14 @@ import {
   Box,
   BottomNavigation,
   BottomNavigationAction,
+  Button,
   CircularProgress,
   Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Fab,
   Paper,
   Snackbar,
@@ -20,7 +26,7 @@ import {
 } from "@mui/material";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import type { ApiClient } from "./api/client.ts";
-import type { Subscription } from "./api/types.ts";
+import type { SchoolSummary, Subscription } from "./api/types.ts";
 import { useAuth } from "./hooks/useAuth.ts";
 import { registerPushToken } from "./native/push.ts";
 import { AbsenceReport } from "./pages/AbsenceReport.tsx";
@@ -52,6 +58,9 @@ function Main({ api }: { api: ApiClient }) {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [snack, setSnack] = useState<string | null>(null);
   const [hasAbsence, setHasAbsence] = useState(false);
+  // 友達招待リンク（?school=<id>）で開かれたときの購読提案（校内密度グロースの着地点）。
+  const [joinSchool, setJoinSchool] = useState<SchoolSummary | null>(null);
+  const [joining, setJoining] = useState(false);
 
   const reload = useCallback(() => {
     api.listSubscriptions().then(setSubscriptions).catch(() => setSubscriptions([]));
@@ -70,6 +79,31 @@ function Main({ api }: { api: ApiClient }) {
     const gclid = readGclid();
     if (gclid) api.saveAttribution({ gclid }).catch(() => {});
   }, [api]);
+
+  // 友達招待リンク（?school=<id>）で開かれたら、その学校の購読提案ダイアログを出す。
+  // 再読込での二重発火を防ぐため、取得後に URL からパラメータを除去する。
+  useEffect(() => {
+    const schoolId = readQueryParam("school");
+    if (!schoolId) return;
+    clearQueryParam("school");
+    api.getSchool(schoolId).then(setJoinSchool).catch(() => {});
+  }, [api]);
+
+  async function confirmJoin() {
+    if (!joinSchool) return;
+    setJoining(true);
+    try {
+      await api.subscribe(joinSchool.id);
+      reload();
+      setTab("home");
+      setSnack(`${joinSchool.name}の通知をONにしました`);
+      setJoinSchool(null);
+    } catch {
+      setSnack("登録に失敗しました。時間をおいて再度お試しください");
+    } finally {
+      setJoining(false);
+    }
+  }
 
   const subscribedIds = new Set(subscriptions.map((s) => s.schoolId));
   const isModal = view.kind !== "tabs";
@@ -161,6 +195,28 @@ function Main({ api }: { api: ApiClient }) {
         </Paper>
       )}
 
+      {/* 友達招待リンクの着地: その学校の購読を提案（校内密度グロース） */}
+      <Dialog open={joinSchool !== null} onClose={() => !joining && setJoinSchool(null)}>
+        <DialogTitle sx={{ fontWeight: 700 }}>{joinSchool?.name}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {joinSchool && subscribedIds.has(joinSchool.id)
+              ? "この学校はすでに登録済みです。警報ルールに応じて今日の登校可否を通知します。"
+              : "この学校を登録すると、警報ルールに応じて今日の登校可否をLINEで自動通知します。無料です。"}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button color="inherit" onClick={() => setJoinSchool(null)} disabled={joining}>
+            閉じる
+          </Button>
+          {joinSchool && !subscribedIds.has(joinSchool.id) && (
+            <Button variant="contained" onClick={confirmJoin} disabled={joining}>
+              通知を受け取る
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+
       <Snackbar
         open={snack !== null}
         autoHideDuration={3000}
@@ -176,22 +232,40 @@ function Main({ api }: { api: ApiClient }) {
   );
 }
 
-/** gclid を URL クエリまたは LIFF の liff.state（エンコードされたクエリ）から取得。 */
-function readGclid(): string | null {
+/**
+ * URL クエリまたは LIFF の liff.state（エンコードされたクエリ）からパラメータを取得。
+ * LIFF は元のクエリを liff.state に入れることがある（例: liff.state=%3Fschool%3D...）。
+ */
+function readQueryParam(name: string): string | null {
   try {
     const sp = new URLSearchParams(window.location.search);
-    const direct = sp.get("gclid");
+    const direct = sp.get(name);
     if (direct) return direct;
-    // LIFF は元のクエリを liff.state に入れることがある（例: liff.state=%3Fgclid%3D...）。
     const state = sp.get("liff.state");
     if (state) {
       const inner = new URLSearchParams(state.startsWith("?") ? state.slice(1) : state);
-      return inner.get("gclid");
+      return inner.get(name);
     }
   } catch {
     /* noop */
   }
   return null;
+}
+
+function readGclid(): string | null {
+  return readQueryParam("gclid");
+}
+
+/** URL からクエリパラメータを除去（履歴を汚さず replaceState）。再読込での二重処理防止。 */
+function clearQueryParam(name: string): void {
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has(name)) return;
+    url.searchParams.delete(name);
+    window.history.replaceState({}, "", url.toString());
+  } catch {
+    /* noop */
+  }
 }
 
 function Splash({ children, error }: { children: ReactNode; error?: boolean }) {
