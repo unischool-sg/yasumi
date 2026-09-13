@@ -1,17 +1,10 @@
-import AddIcon from "@mui/icons-material/Add";
-import CloseIcon from "@mui/icons-material/Close";
-import type { CheckResult } from "@yasumi/shared";
 import {
   Alert,
   Autocomplete,
   Box,
   Button,
   Chip,
-  FormControl,
-  IconButton,
-  InputLabel,
   MenuItem,
-  Select,
   Stack,
   Step,
   StepLabel,
@@ -23,18 +16,14 @@ import { useEffect, useState } from "react";
 import type { ApiClient } from "../api/client.ts";
 import type { Area } from "../api/types.ts";
 import { AreaBlocksPicker } from "../components/AreaBlocksPicker.tsx";
-import { CHECK_TIME_OPTIONS, PREFECTURES, RESULT_OPTIONS, WARNING_TYPE_OPTIONS } from "../lib/options.ts";
+import { type RuleDraft, RuleListEditor } from "../components/RuleListEditor.tsx";
+import { PREFECTURES, WARNING_TYPE_OPTIONS } from "../lib/options.ts";
 
 interface Props {
   api: ApiClient;
   initialName?: string;
   onDone: (schoolId: string) => void;
   onCancel: () => void;
-}
-
-interface RuleDraft {
-  checkTime: string;
-  result: CheckResult;
 }
 
 const STEPS = ["基本情報", "対象地域", "対象警報", "判定ルール"];
@@ -48,7 +37,9 @@ export function Register({ api, initialName, onDone, onCancel }: Props) {
   const [areas, setAreas] = useState<Area[]>([]);
   const [areaCodes, setAreaCodes] = useState<Set<string>>(new Set());
   const [warningTypes, setWarningTypes] = useState<Set<string>>(new Set(["暴風警報"]));
-  const [rules, setRules] = useState<RuleDraft[]>([{ checkTime: "08:00", result: "AM_OFF" }]);
+  const [rules, setRules] = useState<RuleDraft[]>([
+    { checkTime: "08:00", result: "AM_OFF", condition: { type: "WARNING_ACTIVE" } },
+  ]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,7 +67,9 @@ export function Register({ api, initialName, onDone, onCancel }: Props) {
         areaCodes: [...areaCodes],
         warningTypes: [...warningTypes],
       });
-      for (const r of rules) await api.createRule(school.id, r);
+      for (const r of rules) {
+        await api.createRule(school.id, { checkTime: r.checkTime, result: r.result, condition: r.condition });
+      }
       await api.subscribe(school.id);
       onDone(school.id);
     } catch (e) {
@@ -161,45 +154,9 @@ export function Register({ api, initialName, onDone, onCancel }: Props) {
         {step === 3 && (
           <Stack spacing={1.5}>
             <Typography variant="body2" color="text.secondary">
-              判定時刻ごとの結果（30分刻み）
+              判定時刻ごとの結果（30分刻み）。複雑な条件は「詳細エディタ」をオンにしてください。
             </Typography>
-            {rules.map((r, i) => (
-              <Stack key={i} direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                <FormControl size="small" sx={{ minWidth: 100 }}>
-                  <InputLabel>時刻</InputLabel>
-                  <Select
-                    label="時刻"
-                    value={r.checkTime}
-                    onChange={(e) => setRules(rules.map((x, j) => (j === i ? { ...x, checkTime: e.target.value } : x)))}
-                  >
-                    {CHECK_TIME_OPTIONS.map((t) => (
-                      <MenuItem key={t} value={t}>{t}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <Typography color="text.secondary">→</Typography>
-                <FormControl size="small" fullWidth>
-                  <InputLabel>結果</InputLabel>
-                  <Select
-                    label="結果"
-                    value={r.result}
-                    onChange={(e) => setRules(rules.map((x, j) => (j === i ? { ...x, result: e.target.value as CheckResult } : x)))}
-                  >
-                    {RESULT_OPTIONS.map((o) => (
-                      <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                {rules.length > 1 && (
-                  <IconButton size="small" onClick={() => setRules(rules.filter((_, j) => j !== i))}>
-                    <CloseIcon fontSize="small" />
-                  </IconButton>
-                )}
-              </Stack>
-            ))}
-            <Button startIcon={<AddIcon />} onClick={() => setRules([...rules, { checkTime: "10:00", result: "FULL_OFF" }])} sx={{ alignSelf: "flex-start" }}>
-              判定時刻を追加
-            </Button>
+            <RuleListEditor rules={rules} onChange={setRules} />
           </Stack>
         )}
       </Box>

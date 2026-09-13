@@ -1,4 +1,4 @@
-import { CHECK_RESULT_LABEL, type CheckResult } from "@yasumi/shared";
+import { CHECK_RESULT_LABEL, type CheckResult, SCHOOL_SELECTABLE_WARNING_TYPES } from "@yasumi/shared";
 
 /** 都道府県の選択肢（学校登録 Step1）。 */
 export const PREFECTURES = [
@@ -11,8 +11,8 @@ export const PREFECTURES = [
   "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県",
 ] as const;
 
-/** 学校登録で選べる対象警報（PRD §13 Step3）。 */
-export const WARNING_TYPE_OPTIONS = ["暴風警報", "大雨警報", "洪水警報", "大雪警報"] as const;
+/** 学校登録で選べる対象警報（PRD §13 Step3）。管理者限定を除いた単一情報源（@yasumi/shared）由来。 */
+export const WARNING_TYPE_OPTIONS = SCHOOL_SELECTABLE_WARNING_TYPES;
 
 /** 判定結果の選択肢（UNKNOWN はシステム用のため登録では出さない / PRD §14）。 */
 export const RESULT_OPTIONS: { value: CheckResult; label: string }[] = (

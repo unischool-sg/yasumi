@@ -1,7 +1,4 @@
-import AddIcon from "@mui/icons-material/Add";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
-import type { CheckResult } from "@yasumi/shared";
 import {
   Autocomplete,
   Box,
@@ -9,12 +6,6 @@ import {
   Card,
   CardContent,
   Chip,
-  Divider,
-  FormControl,
-  IconButton,
-  InputLabel,
-  MenuItem,
-  Select,
   Skeleton,
   Stack,
   TextField,
@@ -24,7 +15,8 @@ import { useEffect, useState } from "react";
 import type { ApiClient } from "../api/client.ts";
 import type { Area, SchoolDetail } from "../api/types.ts";
 import { AreaBlocksPicker } from "../components/AreaBlocksPicker.tsx";
-import { CHECK_TIME_OPTIONS, PREFECTURES, RESULT_OPTIONS, WARNING_TYPE_OPTIONS } from "../lib/options.ts";
+import { type RuleDraft, RuleListEditor } from "../components/RuleListEditor.tsx";
+import { PREFECTURES, WARNING_TYPE_OPTIONS } from "../lib/options.ts";
 
 interface Props {
   api: ApiClient;
@@ -32,8 +24,6 @@ interface Props {
   onBack: () => void;
   onNotify: (message: string) => void;
 }
-
-const RESULT_LABEL = Object.fromEntries(RESULT_OPTIONS.map((o) => [o.value, o.label]));
 
 /** 自分が登録した学校の後編集（基本情報・対象地域・対象警報・判定ルール）。 */
 export function EditSchool({ api, schoolId, onBack, onNotify }: Props) {
@@ -45,7 +35,7 @@ export function EditSchool({ api, schoolId, onBack, onNotify }: Props) {
   const [warningTypes, setWarningTypes] = useState<Set<string>>(new Set());
   const [cityOptions, setCityOptions] = useState<Area[]>([]);
   const [saving, setSaving] = useState(false);
-  const [newRule, setNewRule] = useState<{ checkTime: string; result: CheckResult }>({ checkTime: "08:00", result: "AM_OFF" });
+  const [rules, setRules] = useState<RuleDraft[]>([]);
   const [busy, setBusy] = useState(false);
 
   function apply(d: SchoolDetail) {
@@ -55,6 +45,9 @@ export function EditSchool({ api, schoolId, onBack, onNotify }: Props) {
     setWebsiteUrl(d.websiteUrl ?? "");
     setAreaCodes(new Set(d.areaCodes));
     setWarningTypes(new Set(d.warningTypes));
+    setRules(
+      d.rules.map((r) => ({ id: r.id, checkTime: r.checkTime, result: r.result, condition: r.condition })),
+    );
   }
 
   useEffect(() => {
@@ -102,27 +95,36 @@ export function EditSchool({ api, schoolId, onBack, onNotify }: Props) {
     }
   }
 
-  async function addRule() {
+  /** 編集中の rules をサーバーへ反映（既存と差分を取り、作成/更新/削除）。 */
+  async function saveRules() {
     setBusy(true);
     try {
-      await api.createRule(schoolId, newRule);
+      const existing = detail?.rules ?? [];
+      const keepIds = new Set(rules.filter((r) => r.id).map((r) => r.id));
+      // 削除: 既存にあってドラフトに無い
+      for (const ex of existing) {
+        if (!keepIds.has(ex.id)) await api.deleteRule(ex.id);
+      }
+      // 作成/更新
+      for (const r of rules) {
+        if (!r.id) {
+          await api.createRule(schoolId, { checkTime: r.checkTime, result: r.result, condition: r.condition });
+          continue;
+        }
+        const ex = existing.find((e) => e.id === r.id);
+        const changed =
+          !ex ||
+          ex.checkTime !== r.checkTime ||
+          ex.result !== r.result ||
+          JSON.stringify(ex.condition) !== JSON.stringify(r.condition);
+        if (changed) {
+          await api.updateRule(r.id, { checkTime: r.checkTime, result: r.result, condition: r.condition });
+        }
+      }
       await reload();
-      onNotify("判定ルールを追加しました");
+      onNotify("判定ルールを保存しました");
     } catch (e) {
-      onNotify(`追加に失敗しました: ${(e as Error).message}`);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function removeRule(ruleId: string) {
-    setBusy(true);
-    try {
-      await api.deleteRule(ruleId);
-      await reload();
-      onNotify("判定ルールを削除しました");
-    } catch (e) {
-      onNotify(`削除に失敗しました: ${(e as Error).message}`);
+      onNotify(`保存に失敗しました: ${(e as Error).message}`);
     } finally {
       setBusy(false);
     }
@@ -201,52 +203,10 @@ export function EditSchool({ api, schoolId, onBack, onNotify }: Props) {
           <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
             判定ルール（30分刻み）
           </Typography>
-          <Stack spacing={1} sx={{ mb: 2 }}>
-            {detail.rules.map((r) => (
-              <Stack key={r.id} direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-                <Typography sx={{ fontWeight: 700, width: 56 }}>{r.checkTime}</Typography>
-                <Typography variant="body2">→ {RESULT_LABEL[r.result] ?? r.result}</Typography>
-                <Box sx={{ flex: 1 }} />
-                <IconButton size="small" color="error" disabled={busy} onClick={() => removeRule(r.id)} aria-label="ルール削除">
-                  <DeleteOutlineIcon fontSize="small" />
-                </IconButton>
-              </Stack>
-            ))}
-            {detail.rules.length === 0 && (
-              <Typography variant="body2" color="text.secondary">
-                ルールがありません
-              </Typography>
-            )}
-          </Stack>
-
-          <Divider sx={{ my: 2 }} />
-
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-            <FormControl size="small" sx={{ minWidth: 100 }}>
-              <InputLabel>時刻</InputLabel>
-              <Select label="時刻" value={newRule.checkTime} onChange={(e) => setNewRule({ ...newRule, checkTime: e.target.value })}>
-                {CHECK_TIME_OPTIONS.map((t) => (
-                  <MenuItem key={t} value={t}>
-                    {t}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <Typography color="text.secondary">→</Typography>
-            <FormControl size="small" fullWidth>
-              <InputLabel>結果</InputLabel>
-              <Select label="結果" value={newRule.result} onChange={(e) => setNewRule({ ...newRule, result: e.target.value as CheckResult })}>
-                {RESULT_OPTIONS.map((o) => (
-                  <MenuItem key={o.value} value={o.value}>
-                    {o.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <Button startIcon={<AddIcon />} onClick={addRule} disabled={busy} sx={{ flexShrink: 0 }}>
-              追加
-            </Button>
-          </Stack>
+          <RuleListEditor rules={rules} onChange={setRules} />
+          <Button variant="contained" onClick={saveRules} disabled={busy} sx={{ mt: 2 }}>
+            {busy ? "保存中…" : "判定ルールを保存"}
+          </Button>
         </CardContent>
       </Card>
     </Stack>

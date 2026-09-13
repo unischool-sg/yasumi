@@ -1,13 +1,12 @@
-import { Autocomplete, Box, Button, Card, CardContent, Chip, Divider, MenuItem, Stack, Switch, TextField, Typography } from "@mui/material";
+import { Autocomplete, Box, Button, Card, CardContent, Chip, Divider, MenuItem, Stack, Switch, TextField, Tooltip, Typography } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { WARNING_TYPE_OPTIONS } from "@yasumi/shared";
 import { api } from "../api/client.ts";
 import { AreaBlocksPicker } from "../components/AreaBlocksPicker.tsx";
 import { useToast } from "../components/Toast.tsx";
 import { PREFECTURES } from "../lib/prefectures.ts";
-
-const WARNING_TYPES = ["暴風警報", "大雨警報", "洪水警報", "大雪警報", "暴風雪警報", "高潮警報", "波浪警報"];
 const RESULTS = [
   ["NORMAL", "通常登校"],
   ["WAIT", "自宅待機"],
@@ -236,15 +235,25 @@ export function SchoolDetail({ id }: { id: string }) {
           </Box>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>対象警報</Typography>
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2 }}>
-            {WARNING_TYPES.map((w) => (
-              <Chip
-                key={w}
-                label={w}
-                color={warnings.has(w) ? "primary" : "default"}
-                variant={warnings.has(w) ? "filled" : "outlined"}
-                onClick={() => toggle(warnings, w, setWarnings)}
-              />
-            ))}
+            {WARNING_TYPE_OPTIONS.map((w) => {
+              const on = warnings.has(w.name);
+              const chip = (
+                <Chip
+                  key={w.name}
+                  label={w.adminOnly ? `${w.name}（管理者のみ）` : w.name}
+                  color={on ? "primary" : "default"}
+                  variant={on ? "filled" : "outlined"}
+                  onClick={() => toggle(warnings, w.name, setWarnings)}
+                />
+              );
+              return w.adminOnly ? (
+                <Tooltip key={w.name} title="この警報は管理画面からのみ有効化できます（生徒側では選べません）">
+                  {chip}
+                </Tooltip>
+              ) : (
+                chip
+              );
+            })}
           </Box>
           <Button variant="contained" onClick={() => save.mutate()} disabled={save.isPending}>
             保存
