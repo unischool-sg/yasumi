@@ -266,6 +266,8 @@ export const schoolRules = pgTable("school_rules", {
   schoolId: uuid("school_id").notNull(),
   checkTime: time("check_time").notNull(),
   result: varchar("result", { length: 50 }).notNull(),
+  // 成立条件（RuleCondition）。null は従来互換で WARNING_ACTIVE 扱い（詳細エディタで拡張）。
+  condition: jsonb("condition"),
   message: text("message"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

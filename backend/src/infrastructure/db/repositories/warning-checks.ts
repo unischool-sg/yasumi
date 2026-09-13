@@ -1,7 +1,7 @@
 import type { CheckResult, Warning } from "@yasumi/shared";
-import { and, desc, eq, getTableColumns } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, inArray, lt } from "drizzle-orm";
 import type { Db } from "../client.ts";
-import { schools, warningChecks } from "../schema.ts";
+import { schoolRules, schools, warningChecks } from "../schema.ts";
 
 export type WarningCheckRow = typeof warningChecks.$inferSelect;
 /** 管理画面向け: 学校名を join した判定行。 */
@@ -63,6 +63,40 @@ export async function upsertWarningCheck(
   const existing = await findWarningCheck(db, input.schoolId, input.ruleId, input.targetDate);
   if (!existing) throw new Error("warning_check upsert failed");
   return { row: existing, created: false };
+}
+
+/**
+ * その日の「より早い checkTime」で確定済みの判定を school ごとに返す（最新のものを採用）。
+ * WARNING_CLEARED 条件の afterClosureOnly 判定（午前が休みだったか）に使う。
+ * warning_checks を school_rules に join して checkTime を得る（同テーブルに checkTime 列は無いため）。
+ */
+export async function listPriorResultsBySchool(
+  db: Db,
+  schoolIds: string[],
+  targetDate: string,
+  beforeHhmm: string,
+): Promise<Map<string, CheckResult>> {
+  const map = new Map<string, CheckResult>();
+  if (schoolIds.length === 0) return map;
+  const rows = await db
+    .select({
+      schoolId: warningChecks.schoolId,
+      checkTime: schoolRules.checkTime,
+      result: warningChecks.result,
+    })
+    .from(warningChecks)
+    .innerJoin(schoolRules, eq(warningChecks.ruleId, schoolRules.id))
+    .where(
+      and(
+        inArray(warningChecks.schoolId, schoolIds),
+        eq(warningChecks.targetDate, targetDate),
+        lt(schoolRules.checkTime, `${beforeHhmm}:00`),
+      ),
+    )
+    .orderBy(asc(schoolRules.checkTime));
+  // checkTime 昇順なので最後に書いたものが最新 = 直前の確定結果。
+  for (const r of rows) map.set(r.schoolId, r.result as CheckResult);
+  return map;
 }
 
 export async function findWarningCheck(

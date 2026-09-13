@@ -27,6 +27,24 @@ export function buildNotificationText(input: NotificationTextInput): string {
     ].join("\n");
   }
 
+  // 警報解除にもとづく判定（WARNING_CLEARED 条件 / matchedWarnings が空）。
+  // 例: 午前休のあと 10:00 に解除 → 午後から登校。「警報発表中」と書くと不適切なので分岐する。
+  const clearedBased = matchedWarnings.length === 0;
+  if (clearedBased) {
+    return [
+      "🚨 やすみ？ 判定",
+      "",
+      schoolName,
+      "",
+      `${checkTime}現在、対象となる気象警報は解除されています。`,
+      "",
+      `学校規則上、「${CHECK_RESULT_LABEL[result]}」に該当します。`,
+      DISCLAIMER,
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
   if (result === "FULL_OFF") {
     return [
       "🎉 本日は休校です",
@@ -43,7 +61,7 @@ export function buildNotificationText(input: NotificationTextInput): string {
       .join("\n");
   }
 
-  // WAIT / AM_OFF / PM_START
+  // WAIT / AM_OFF / PM_START（警報発表中）
   return [
     "🚨 やすみ？ 判定",
     "",

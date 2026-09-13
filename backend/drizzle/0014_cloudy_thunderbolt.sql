@@ -1,0 +1,1 @@
+ALTER TABLE "school_rules" ADD COLUMN "condition" jsonb;

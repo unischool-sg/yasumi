@@ -106,6 +106,15 @@ export async function runCheck(
     }
   }
 
+  // 3.5 その日の「より早い checkTime」で確定済みの判定を school ごとに取得
+  //     （WARNING_CLEARED 条件の afterClosureOnly=「午前が休みだったか」判定に使う）。
+  const priorResults = await warningChecksRepo.listPriorResultsBySchool(
+    deps.db,
+    schoolIds,
+    targetDate,
+    checkTime,
+  );
+
   // 4. ルールごとに評価 → 保存 → 通知
   for (const ruleRow of rules) {
     summary.rulesProcessed++;
@@ -126,7 +135,12 @@ export async function runCheck(
       matched = false;
       matchedWarnings = [];
     } else {
-      const ev = evaluateSchoolRule({ school, rule, activeWarnings: warnings });
+      const ev = evaluateSchoolRule({
+        school,
+        rule,
+        activeWarnings: warnings,
+        dayContext: { priorResult: priorResults.get(ruleRow.schoolId) },
+      });
       result = ev.result;
       matched = ev.matched;
       matchedWarnings = ev.matchedWarnings;
