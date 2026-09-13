@@ -1,12 +1,14 @@
-import { Box, Card, CardContent, Chip, Typography } from "@mui/material";
+import IosShareIcon from "@mui/icons-material/IosShare";
+import { Box, Button, Card, CardContent, Chip, Typography } from "@mui/material";
 import type { SchoolStatus } from "../api/types.ts";
 import { STATUS_STYLE, timeLabel } from "../lib/status.ts";
 
 /**
  * ホームの「今日どう？」表示（PRD §15〜§17）。
  * マテリアル You 風のトーナル（淡色地）カードで判定結果を主役に。
+ * onShare を渡すと「同じ学校の友達に教える」導線を出す（校内密度グロース）。
  */
-export function StatusHero({ status }: { status: SchoolStatus }) {
+export function StatusHero({ status, onShare }: { status: SchoolStatus; onShare?: () => void }) {
   const latest = status.latest;
 
   if (!latest) {
@@ -54,9 +56,21 @@ export function StatusHero({ status }: { status: SchoolStatus }) {
           </Typography>
         )}
 
-        <Typography variant="caption" sx={{ mt: 2, display: "block", color: "rgba(0,0,0,0.5)" }}>
-          {timeLabel(latest.checkedAt)} 判定
-        </Typography>
+        <Box sx={{ mt: 2, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Typography variant="caption" sx={{ color: "rgba(0,0,0,0.5)" }}>
+            {timeLabel(latest.checkedAt)} 判定
+          </Typography>
+          {onShare && (
+            <Button
+              size="small"
+              startIcon={<IosShareIcon sx={{ fontSize: 18 }} />}
+              onClick={onShare}
+              sx={{ color: s.color, fontWeight: 700 }}
+            >
+              友達に教える
+            </Button>
+          )}
+        </Box>
       </CardContent>
     </Card>
   );

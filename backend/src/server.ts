@@ -72,6 +72,9 @@ const app = createApp({
   ...(process.env.SCHOOL_JWT_SECRET ? { schoolJwtSecret: process.env.SCHOOL_JWT_SECRET } : {}),
   // 確認リンク（/c/:token）の絶対URL生成用。既定は本番APIドメイン。
   apiBaseUrl: process.env.API_PUBLIC_BASE_URL || "https://yasumi-api.unischool.jp",
+  // LIFF ID（VITE_LIFF_ID / PUBLIC_LIFF_ID と同じ値）。設定時、判定通知に友達招待リンク
+  // https://liff.line.me/<LIFF_ID> を添える（校内密度グロース）。未設定ならドーマント。
+  ...(process.env.LIFF_ID ? { miniAppUrl: `https://liff.line.me/${process.env.LIFF_ID}` } : {}),
   // LINE 受信メッセージの Discord 転送（秘密・未設定なら転送しない）。
   ...(process.env.DISCORD_WEBHOOK_URL ? { discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL } : {}),
   ...(process.env.DISCORD_EVENTS_WEBHOOK_URL ? { discordEventsWebhookUrl: process.env.DISCORD_EVENTS_WEBHOOK_URL } : {}),
