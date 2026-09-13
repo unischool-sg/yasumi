@@ -6,6 +6,7 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import type { Sql } from "postgres";
 import * as schema from "../infrastructure/db/schema.ts";
+import * as cfg from "../infrastructure/db/repositories/school-config.ts";
 import { createSchool } from "../infrastructure/db/repositories/schools.ts";
 import { upsertAreas } from "../infrastructure/db/repositories/areas.ts";
 import { createApp } from "./app.ts";
@@ -154,6 +155,53 @@ suite("API integration", () => {
     const detail = await (await req(`/api/schools/${created.id}`, { headers: auth("Uowner") })).json();
     expect((detail as { areaCodes: string[] }).areaCodes).toContain("2834100");
     expect((detail as { warningTypes: string[] }).warningTypes).toContain("暴風警報");
+  });
+
+  it("公開API: 管理者限定の警報(波浪/高潮/暴風雪)は生徒側で有効化できない（作成時に除外）", async () => {
+    const res = await req("/api/schools", {
+      method: "POST",
+      headers: { ...auth("Uowner2"), "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "強制テスト校",
+        prefecture: "兵庫県",
+        areaCodes: ["2834100"],
+        warningTypes: ["暴風警報", "波浪警報", "高潮警報"],
+      }),
+    });
+    expect(res.status).toBe(201);
+    const created = (await res.json()) as { id: string };
+    const detail = (await (await req(`/api/schools/${created.id}`, { headers: auth("Uowner2") })).json()) as {
+      warningTypes: string[];
+    };
+    expect(detail.warningTypes).toContain("暴風警報");
+    expect(detail.warningTypes).not.toContain("波浪警報");
+    expect(detail.warningTypes).not.toContain("高潮警報");
+  });
+
+  it("公開API: PATCH は管理者が有効化した警報を保持し、生徒は追加できない", async () => {
+    // 作成（生徒側 → 暴風警報のみ）
+    const created = (await (
+      await req("/api/schools", {
+        method: "POST",
+        headers: { ...auth("Uowner3"), "content-type": "application/json" },
+        body: JSON.stringify({ name: "保持テスト校", prefecture: "兵庫県", warningTypes: ["暴風警報"] }),
+      })
+    ).json()) as { id: string };
+    // 管理者が波浪警報を有効化（repo 直呼びで管理者操作を再現）
+    const db = drizzle(sql, { schema });
+    await cfg.setWarningTypes(db, created.id, ["暴風警報", "波浪警報"]);
+    // 生徒が PATCH（波浪を外し高潮を足そうとする）→ 波浪は保持、高潮は無視
+    const patch = await req(`/api/schools/${created.id}`, {
+      method: "PATCH",
+      headers: { ...auth("Uowner3"), "content-type": "application/json" },
+      body: JSON.stringify({ warningTypes: ["暴風警報", "大雨警報", "高潮警報"] }),
+    });
+    expect(patch.status).toBe(200);
+    const got = await cfg.getWarningTypes(db, created.id);
+    expect(got).toContain("暴風警報");
+    expect(got).toContain("大雨警報");
+    expect(got).toContain("波浪警報"); // 管理者設定は保持
+    expect(got).not.toContain("高潮警報"); // 生徒は管理者限定を追加できない
   });
 
   it("学校作成時に作成者へ確認通知を送る", async () => {

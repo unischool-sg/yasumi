@@ -1,4 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
+import { ALL_WARNING_TYPES } from "@yasumi/shared";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Db } from "../../infrastructure/db/client.ts";
@@ -170,7 +171,9 @@ export function createAdminApp(deps: AdminAppDeps) {
         createdBy: null,
       });
       if (b.areaCodes) await cfg.setAreaCodes(db, school.id, b.areaCodes);
-      if (b.warningTypes) await cfg.setWarningTypes(db, school.id, b.warningTypes);
+      // 管理画面は全7種（管理者限定含む）を設定可。未知種別のみ除外（防御）。
+      if (b.warningTypes)
+        await cfg.setWarningTypes(db, school.id, b.warningTypes.filter((t) => ALL_WARNING_TYPES.includes(t)));
       if (deps.discordEventsWebhookUrl) {
         const adminBase = deps.adminBaseUrl || "https://yasumi-admin.unischool.jp";
         await postDiscordMessage(
@@ -205,7 +208,8 @@ export function createAdminApp(deps: AdminAppDeps) {
       };
       if (Object.keys(patch).length > 0) await schoolsRepo.updateSchool(db, id, patch);
       if (areaCodes) await cfg.setAreaCodes(db, id, areaCodes);
-      if (warningTypes) await cfg.setWarningTypes(db, id, warningTypes);
+      if (warningTypes)
+        await cfg.setWarningTypes(db, id, warningTypes.filter((t) => ALL_WARNING_TYPES.includes(t)));
       return c.json(await schoolsRepo.findSchoolById(db, id));
     },
   );
