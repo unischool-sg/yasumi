@@ -1,10 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { JmaWarningProvider } from "./jma-warning-provider.ts";
+import { JmaWarningProvider, officeCodesForArea } from "./jma-warning-provider.ts";
 import type { JmaWarningJson } from "./parse.ts";
 
-const SANDA = "280010";
-const KOBE = "280020";
-const OSAKA = "270000"; // 別都道府県
+const SANDA = "2820900"; // 兵庫県三田市（7桁市区町村コード）
+const KOBE = "2810000"; // 兵庫県神戸市
+const OSAKA = "2710000"; // 別都道府県（大阪市）
+const NAHA = "4720100"; // 沖縄県那覇市（office は 471000）
+const SAPPORO = "0110000"; // 北海道札幌市（office は 016000）
 
 function response(json: JmaWarningJson): Response {
   return new Response(JSON.stringify(json), { status: 200 });
@@ -31,10 +33,10 @@ describe("JmaWarningProvider", () => {
         );
       },
     });
-    const { warnings, failedPrefCodes } = await provider.getActiveWarnings([SANDA, KOBE]);
+    const { warnings, failedOfficeCodes } = await provider.getActiveWarnings([SANDA, KOBE]);
     expect(calls).toBe(1);
     expect(warnings).toHaveLength(2);
-    expect(failedPrefCodes).toHaveLength(0);
+    expect(failedOfficeCodes).toHaveLength(0);
   });
 
   it("V1b: 異なる都道府県 → 都道府県ぶん取得", async () => {
@@ -51,7 +53,7 @@ describe("JmaWarningProvider", () => {
     expect(urls.some((u) => u.includes("270000.json"))).toBe(true);
   });
 
-  it("V2: HTTP エラー → リトライ後も失敗した県は failedPrefCodes（例外にしない / §51）", async () => {
+  it("V2: HTTP エラー → リトライ後も失敗した県は failedOfficeCodes（例外にしない / §51）", async () => {
     let calls = 0;
     const provider = new JmaWarningProvider({
       fetchFn: async () => {
@@ -61,13 +63,13 @@ describe("JmaWarningProvider", () => {
       maxRetries: 2,
       sleep: noSleep,
     });
-    const { warnings, failedPrefCodes } = await provider.getActiveWarnings([SANDA]);
+    const { warnings, failedOfficeCodes } = await provider.getActiveWarnings([SANDA]);
     expect(warnings).toHaveLength(0);
-    expect(failedPrefCodes).toEqual(["280000"]);
+    expect(failedOfficeCodes).toEqual(["280000"]);
     expect(calls).toBe(3); // 初回 + リトライ2
   });
 
-  it("V2b: fetch reject → リトライ後も失敗した県は failedPrefCodes（§51）", async () => {
+  it("V2b: fetch reject → リトライ後も失敗した県は failedOfficeCodes（§51）", async () => {
     const provider = new JmaWarningProvider({
       fetchFn: async () => {
         throw new Error("network down");
@@ -75,8 +77,8 @@ describe("JmaWarningProvider", () => {
       maxRetries: 1,
       sleep: noSleep,
     });
-    const { failedPrefCodes } = await provider.getActiveWarnings([SANDA]);
-    expect(failedPrefCodes).toEqual(["280000"]);
+    const { failedOfficeCodes } = await provider.getActiveWarnings([SANDA]);
+    expect(failedOfficeCodes).toEqual(["280000"]);
   });
 
   it("V2c: 一時的失敗 → リトライで回復（取りこぼさない）", async () => {
@@ -90,10 +92,10 @@ describe("JmaWarningProvider", () => {
       maxRetries: 2,
       sleep: noSleep,
     });
-    const { warnings, failedPrefCodes } = await provider.getActiveWarnings([SANDA]);
+    const { warnings, failedOfficeCodes } = await provider.getActiveWarnings([SANDA]);
     expect(calls).toBe(2);
     expect(warnings).toHaveLength(1);
-    expect(failedPrefCodes).toHaveLength(0);
+    expect(failedOfficeCodes).toHaveLength(0);
   });
 
   it("V2d: 一部県のみ失敗 → 成功県の警報は返しつつ失敗県を記録", async () => {
@@ -105,10 +107,34 @@ describe("JmaWarningProvider", () => {
       maxRetries: 0,
       sleep: noSleep,
     });
-    const { warnings, failedPrefCodes } = await provider.getActiveWarnings([SANDA, OSAKA]);
+    const { warnings, failedOfficeCodes } = await provider.getActiveWarnings([SANDA, OSAKA]);
     expect(warnings).toHaveLength(1);
     expect(warnings[0]?.areaCode).toBe(OSAKA);
-    expect(failedPrefCodes).toEqual(["280000"]);
+    expect(failedOfficeCodes).toEqual(["280000"]);
+  });
+
+  it("V2e: 沖縄/北海道は複数 office を取得（`${pref}0000` を使わない / 404回避）", async () => {
+    const urls: string[] = [];
+    const provider = new JmaWarningProvider({
+      fetchFn: async (url) => {
+        urls.push(url);
+        return response(jmaJson([{ code: NAHA, warnings: [{ code: "05", status: "発表" }] }]));
+      },
+    });
+    const { warnings } = await provider.getActiveWarnings([NAHA]);
+    // 存在しない 470000.json ではなく、沖縄の 4 office を取得する。
+    expect(urls.some((u) => u.includes("470000.json"))).toBe(false);
+    expect(urls.some((u) => u.includes("471000.json"))).toBe(true);
+    expect(urls.some((u) => u.includes("474000.json"))).toBe(true);
+    // 那覇の警報がいずれかの office JSON から拾える。
+    expect(warnings.some((w) => w.areaCode === NAHA)).toBe(true);
+  });
+
+  it("officeCodesForArea: 単一県は1件、沖縄/北海道は分割 office", () => {
+    expect(officeCodesForArea(SANDA)).toEqual(["280000"]);
+    expect(officeCodesForArea(NAHA)).toEqual(["471000", "472000", "473000", "474000"]);
+    expect(officeCodesForArea(SAPPORO)).toContain("016000");
+    expect(officeCodesForArea(SAPPORO)).not.toContain("010000");
   });
 
   it("V3: active のみ返す（cancelled は除外）", async () => {

@@ -6,6 +6,7 @@ import type { NotificationProvider } from "../domain/notification/provider.ts";
 import { shouldNotify } from "../domain/notification/provider.ts";
 import { isPlanActive } from "../domain/plan.ts";
 import type { WarningProvider } from "../domain/warning/provider.ts";
+import { officeCodesForArea } from "../infrastructure/jma/jma-warning-provider.ts";
 import type { Db } from "../infrastructure/db/client.ts";
 import * as closureDraftsRepo from "../infrastructure/db/repositories/closure-drafts.ts";
 import * as schoolsRepo from "../infrastructure/db/repositories/schools.ts";
@@ -80,27 +81,27 @@ export async function runCheck(
     for (const code of school?.areaCodes ?? []) allAreaCodes.add(code);
   }
 
-  // 3. 警報を一括取得（キャッシュ/バッチ §33）。取得失敗した都道府県の学校のみ UNKNOWN に倒す（§51）
+  // 3. 警報を一括取得（キャッシュ/バッチ §33）。取得失敗した office の学校のみ UNKNOWN に倒す（§51）
   let warnings: Warning[] = [];
-  const failedPrefCodes = new Set<string>();
+  const failedOfficeCodes = new Set<string>();
   try {
     const res = await deps.warningProvider.getActiveWarnings([...allAreaCodes]);
     warnings = res.warnings;
-    for (const code of res.failedPrefCodes) failedPrefCodes.add(code);
+    for (const code of res.failedOfficeCodes) failedOfficeCodes.add(code);
   } catch (e) {
-    // 想定外（provider が例外を投げた）→ 安全側に倒し、全対象県を失敗扱い。
+    // 想定外（provider が例外を投げた）→ 安全側に倒し、全対象 office を失敗扱い。
     console.error("[run-check] warning fetch threw unexpectedly:", e);
-    for (const code of allAreaCodes) failedPrefCodes.add(prefCodeOf(code));
+    for (const code of allAreaCodes) for (const o of officeCodesForArea(code)) failedOfficeCodes.add(o);
   }
-  if (failedPrefCodes.size > 0) {
+  if (failedOfficeCodes.size > 0) {
     summary.fetchFailed = true;
-    const prefList = [...failedPrefCodes].join(", ");
-    console.warn(`[run-check] JMA fetch failed for prefectures: ${prefList} (該当県の学校のみ UNKNOWN)`);
+    const officeList = [...failedOfficeCodes].join(", ");
+    console.warn(`[run-check] JMA fetch failed for offices: ${officeList} (該当地域の学校のみ UNKNOWN)`);
     if (deps.alert) {
       const msg =
         `⚠️ JMA警報取得に失敗（${checkTime} / ${targetDate}）\n` +
-        `失敗した都道府県コード: ${prefList}\n` +
-        `→ 該当県の学校のみ UNKNOWN 判定になります（他県は通常判定）。`;
+        `失敗した気象予報区(office)コード: ${officeList}\n` +
+        `→ 該当地域の学校のみ UNKNOWN 判定になります（他地域は通常判定）。`;
       await deps.alert(msg).catch((e) => console.error("[run-check] alert failed:", e));
     }
   }
@@ -116,9 +117,9 @@ export async function runCheck(
     let matched: boolean;
     let matchedWarnings: Warning[];
 
-    // この学校が属する都道府県のいずれかが取得失敗なら UNKNOWN（他県は通常判定を継続）。
+    // この学校が属する office のいずれかが取得失敗なら UNKNOWN（他地域は通常判定を継続）。
     const schoolFetchFailed = (school.areaCodes ?? []).some((code) =>
-      failedPrefCodes.has(prefCodeOf(code)),
+      officeCodesForArea(code).some((o) => failedOfficeCodes.has(o)),
     );
     if (schoolFetchFailed) {
       result = "UNKNOWN";
@@ -201,9 +202,4 @@ export async function runCheck(
   }
 
   return summary;
-}
-
-/** 地域コード（例 280010）→ 都道府県 JSON コード（例 280000）。 */
-function prefCodeOf(areaCode: string): string {
-  return `${areaCode.slice(0, 2)}0000`;
 }

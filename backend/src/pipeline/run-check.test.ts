@@ -29,11 +29,11 @@ const activeStorm: Warning[] = [
 ];
 
 function providerReturning(warnings: Warning[]): WarningProvider {
-  return { getActiveWarnings: async () => ({ warnings, failedPrefCodes: [] }) };
+  return { getActiveWarnings: async () => ({ warnings, failedOfficeCodes: [] }) };
 }
 // 兵庫(280000)の取得に失敗した状態を再現（部分失敗）。
 const providerFailing: WarningProvider = {
-  getActiveWarnings: async () => ({ warnings: [], failedPrefCodes: ["280000"] }),
+  getActiveWarnings: async () => ({ warnings: [], failedOfficeCodes: ["280000"] }),
 };
 // provider 自体が例外を投げる異常系（呼び出し側の防御 catch を検証）。
 const providerThrowing: WarningProvider = {
@@ -150,7 +150,7 @@ suite("runCheck pipeline", () => {
         warnings: [
           { areaCode: OSAKA, areaName: "大阪市", warningType: "暴風警報", status: "active", issuedAt: at0815 },
         ],
-        failedPrefCodes: ["280000"], // 兵庫のみ失敗
+        failedOfficeCodes: ["280000"], // 兵庫のみ失敗
       }),
     };
 
