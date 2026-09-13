@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { ALL_WARNING_TYPES, isAdminOnlyWarningType } from "@yasumi/shared";
+import { ALL_WARNING_TYPES, type FlowEventType, isAdminOnlyWarningType } from "@yasumi/shared";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { verify } from "hono/jwt";
@@ -12,6 +12,7 @@ import { checkSchoolEditable } from "./authz.ts";
 import { notifyUser } from "../domain/notification/dispatch.ts";
 import { absenceEnabled, isPlanActive } from "../domain/plan.ts";
 import { postDiscordMessage } from "../infrastructure/discord/notify.ts";
+import { makeErrorReporter } from "../infrastructure/discord/report-error.ts";
 import type { AdsConversionProvider } from "../infrastructure/google-ads/conversion.ts";
 import { getLineProfile } from "../infrastructure/line/line-api.ts";
 import { type Storage, mimeFromKey } from "../infrastructure/storage/s3.ts";
@@ -33,6 +34,7 @@ import * as usersRepo from "../infrastructure/db/repositories/users.ts";
 import * as warningChecksRepo from "../infrastructure/db/repositories/warning-checks.ts";
 import { runCheck } from "../pipeline/run-check.ts";
 import { runFlowLogRetention } from "../pipeline/flow-log-retention.ts";
+import { runEventFlows } from "../pipeline/run-event-flows.ts";
 import { runFlows } from "../pipeline/run-flows.ts";
 import { jstDateString } from "../shared/jst.ts";
 
@@ -64,6 +66,8 @@ export interface AppDeps extends AuthDeps {
   discordFlowWebhookUrl?: string;
   /** 運用アラート（JMA 取得失敗等）の送信先 Discord Webhook URL（秘密・env 注入）。未設定なら送らない。 */
   discordAlertWebhookUrl?: string;
+  /** 握りつぶすエラーの通知先 Discord Webhook URL（秘密・env 注入）。未設定なら console.error のみ。 */
+  discordErrorWebhookUrl?: string;
   /** 管理画面の公開URL（Discord 転送に載せる連絡リンク用。例 https://yasumi-admin.unischool.jp）。 */
   adminBaseUrl?: string;
   /** ロゴ等のオブジェクトストレージ（RustFS/S3）。未設定ならロゴ機能はドーマント。 */
@@ -162,6 +166,23 @@ async function forwardLineMessageToDiscord(deps: AppDeps, ev: LineWebhookEvent):
 export function createApp(deps: AppDeps) {
   const app = new Hono<AuthEnv>();
 
+  // 握りつぶすエラーの通知口（console.error＋Discord）。
+  const reportError = makeErrorReporter(deps.discordErrorWebhookUrl, deps.fetchFn);
+
+  // イベント発火時に、内部エンドポイント経由でイベント連動フローを起動する（best-effort・応答をブロックしない）。
+  const emitFlowEvent = (eventType: FlowEventType, ctx: { userId?: string; schoolId?: string } = {}): void => {
+    if (!deps.internalCronToken) return; // 内部トークン未設定なら無効
+    void Promise.resolve(
+      app.fetch(
+        new Request("http://internal/api/internal/run-event-flows", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-internal-token": deps.internalCronToken },
+          body: JSON.stringify({ eventType, ...ctx }),
+        }),
+      ),
+    ).catch((e) => reportError(`emitFlowEvent(${eventType})`, e));
+  };
+
   // 学校ロゴ配信（認証不要・別オリジンの <img> 埋め込み用）。
   // secureHeaders より前に登録し、CORP(same-origin) を適用させない（クロスオリジン埋め込みを許可）。
   app.get("/public/school-logo/:id", async (c) => {
@@ -198,18 +219,21 @@ export function createApp(deps: AppDeps) {
     if (!verifySignature(rawBody, signature, secret)) {
       return c.json({ error: "invalid signature" }, 401);
     }
-    // 受信イベントを Discord に通知（message→転送 / follow→活動通知）。失敗しても 200 は返す。
-    if (deps.discordWebhookUrl || deps.discordEventsWebhookUrl) {
-      try {
-        const body = JSON.parse(rawBody) as { events?: LineWebhookEvent[] };
-        for (const ev of body.events ?? []) {
-          if (!ev.source?.userId) continue;
-          if (ev.type === "message" && deps.discordWebhookUrl) await forwardLineMessageToDiscord(deps, ev);
-          else if (ev.type === "follow") await forwardFollowToDiscord(deps, ev);
+    // 受信イベント処理: Discord 転送（設定時）＋ イベント連動フロー（友だち追加）。失敗しても 200 は返す。
+    try {
+      const body = JSON.parse(rawBody) as { events?: LineWebhookEvent[] };
+      for (const ev of body.events ?? []) {
+        if (!ev.source?.userId) continue;
+        if (ev.type === "message" && deps.discordWebhookUrl) await forwardLineMessageToDiscord(deps, ev);
+        else if (ev.type === "follow") {
+          if (deps.discordEventsWebhookUrl) await forwardFollowToDiscord(deps, ev);
+          // イベント連動フロー（友だち追加）。内部 userId を解決して発火。
+          const { userId } = await usersRepo.findOrCreateByLineUserId(deps.db, ev.source.userId);
+          emitFlowEvent("user.follow", { userId });
         }
-      } catch {
-        // 転送失敗は無視（LINE への 200 を優先）
       }
+    } catch {
+      // 受信処理の失敗は無視（LINE への 200 を優先）
     }
     return c.json({ ok: true });
   });
@@ -240,6 +264,7 @@ export function createApp(deps: AppDeps) {
                 ).then(() => undefined),
             }
           : {}),
+        emitEvent: ({ eventType, schoolId }) => emitFlowEvent(eventType, { schoolId }),
         ...(deps.now ? { now: deps.now } : {}),
       },
       { triggeredAt },
@@ -265,6 +290,34 @@ export function createApp(deps: AppDeps) {
         ...(deps.now ? { now: deps.now } : {}),
       },
       { triggeredAt },
+    );
+    return c.json(summary);
+  });
+
+  // 内部エンドポイント: イベント連動フロー実行（各イベント点から app.fetch で叩く）。
+  app.post("/api/internal/run-event-flows", async (c) => {
+    if (!deps.internalCronToken || c.req.header("x-internal-token") !== deps.internalCronToken) {
+      return c.json({ error: "unauthorized" }, 401);
+    }
+    const body = (await c.req.json().catch(() => ({}))) as {
+      eventType?: FlowEventType;
+      userId?: string;
+      schoolId?: string;
+    };
+    if (!body.eventType) return c.json({ error: "eventType required" }, 400);
+    const summary = await runEventFlows(
+      {
+        db: deps.db,
+        reportError,
+        ...(deps.notificationProvider ? { notificationProvider: deps.notificationProvider } : {}),
+        ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
+        ...(deps.now ? { now: deps.now } : {}),
+      },
+      {
+        eventType: body.eventType,
+        ...(body.userId ? { userId: body.userId } : {}),
+        ...(body.schoolId ? { schoolId: body.schoolId } : {}),
+      },
     );
     return c.json(summary);
   });
@@ -443,6 +496,8 @@ export function createApp(deps: AppDeps) {
           ].join("\n"),
         );
       }
+      // イベント連動フロー（学校を登録）。
+      emitFlowEvent("school.register", { userId: c.get("userId"), schoolId: school.id });
       return c.json(school, 201);
     },
   );
@@ -618,6 +673,8 @@ export function createApp(deps: AppDeps) {
             if (ok) await usersRepo.markGclidConverted(deps.db, c.get("userId"), at);
           }
         }
+        // イベント連動フロー（学校を購読・初回のみ）。
+        emitFlowEvent("school.subscribe", { userId: c.get("userId"), schoolId: body.schoolId });
       }
       return c.json(row, 201);
     },
@@ -734,6 +791,8 @@ export function createApp(deps: AppDeps) {
         note: b.note ?? null,
         warningActive,
       });
+      // イベント連動フロー（欠席連絡）。
+      emitFlowEvent("absence.report", { userId, schoolId: b.schoolId });
       return c.json(row, 201);
     },
   );

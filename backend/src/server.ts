@@ -78,6 +78,8 @@ const app = createApp({
   ...(process.env.DISCORD_FLOW_WEBHOOK_URL ? { discordFlowWebhookUrl: process.env.DISCORD_FLOW_WEBHOOK_URL } : {}),
   // 運用アラート（JMA 取得失敗等）の Discord 送信先（秘密・未設定なら送らない）。
   ...(process.env.DISCORD_ALERT_WEBHOOK_URL ? { discordAlertWebhookUrl: process.env.DISCORD_ALERT_WEBHOOK_URL } : {}),
+  // 握りつぶすエラーの Discord 送信先（秘密・未設定なら console.error のみ）。
+  ...(process.env.DISCORD_ERROR_WEBHOOK_URL ? { discordErrorWebhookUrl: process.env.DISCORD_ERROR_WEBHOOK_URL } : {}),
   adminBaseUrl: process.env.ADMIN_PUBLIC_BASE_URL || "https://yasumi-admin.unischool.jp",
   // ネイティブ LINE ログイン（LIFF と同じチャネル）。secret 未設定なら /api/auth/line/token は 503。
   lineLoginChannelId: channelId,
