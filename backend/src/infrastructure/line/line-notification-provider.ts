@@ -1,7 +1,8 @@
-import type {
-  NotificationMessage,
-  NotificationProvider,
-  NotificationTarget,
+import {
+  type NotificationMessage,
+  type NotificationProvider,
+  type NotificationTarget,
+  PushDeliveryError,
 } from "../../domain/notification/provider.ts";
 
 type FetchFn = (url: string, init: RequestInit) => Promise<Response>;
@@ -58,7 +59,8 @@ export class LineNotificationProvider implements NotificationProvider {
       body: JSON.stringify({ to: target.lineUserId, messages: [line] }),
     });
     if (!res.ok) {
-      throw new Error(`LINE push failed (HTTP ${res.status})`);
+      // 400 は多くの場合「未友だち／ブロック」。呼び出し側が区別できるよう status を載せる。
+      throw new PushDeliveryError(res.status, `LINE push failed (HTTP ${res.status})`);
     }
   }
 }
