@@ -60,6 +60,8 @@ export interface AppDeps extends AuthDeps {
   discordEventsWebhookUrl?: string;
   /** フロー定期実行のログ送信先 Discord Webhook URL（秘密・env 注入）。未設定なら送らない。 */
   discordFlowWebhookUrl?: string;
+  /** 運用アラート（JMA 取得失敗等）の送信先 Discord Webhook URL（秘密・env 注入）。未設定なら送らない。 */
+  discordAlertWebhookUrl?: string;
   /** 管理画面の公開URL（Discord 転送に載せる連絡リンク用。例 https://yasumi-admin.unischool.jp）。 */
   adminBaseUrl?: string;
   /** ロゴ等のオブジェクトストレージ（RustFS/S3）。未設定ならロゴ機能はドーマント。 */
@@ -221,6 +223,16 @@ export function createApp(deps: AppDeps) {
         warningProvider: deps.warningProvider,
         notificationProvider: deps.notificationProvider,
         ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
+        ...(deps.discordAlertWebhookUrl
+          ? {
+              alert: (message: string) =>
+                postDiscordMessage(
+                  deps.discordAlertWebhookUrl!,
+                  message,
+                  deps.fetchFn ? { fetchFn: deps.fetchFn } : {},
+                ).then(() => undefined),
+            }
+          : {}),
         ...(deps.now ? { now: deps.now } : {}),
       },
       { triggeredAt },
