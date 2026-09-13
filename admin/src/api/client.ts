@@ -136,6 +136,18 @@ export interface FlowRunResult {
   audienceCount: number;
   results: { type: FlowStep["type"]; flag?: string; sent?: number; total?: number }[];
 }
+export interface FlowRunLog {
+  id: string;
+  templateId: string | null;
+  templateName: string;
+  trigger: "manual" | "schedule";
+  scheduleId: string | null;
+  audienceCount: number;
+  results: { type: FlowStep["type"]; flag?: string | null; sent?: number | null; total?: number | null }[];
+  status: "success" | "error";
+  error: string | null;
+  createdAt: string;
+}
 export interface SchoolSubscriber {
   userId: string;
   lineUserId: string | null;
@@ -249,6 +261,8 @@ export const api = {
   updateFlowTemplate: (id: string, b: FlowTemplateInput) => request<FlowTemplate>(`/flow-templates/${id}`, { method: "PATCH", body: JSON.stringify(b) }),
   deleteFlowTemplate: (id: string) => request<void>(`/flow-templates/${id}`, { method: "DELETE" }),
   runFlowTemplate: (id: string) => request<FlowRunResult>(`/flow-templates/${id}/run`, { method: "POST" }),
+  getFlowRunLogs: (templateId?: string) =>
+    request<FlowRunLog[]>(`/flow-run-logs${templateId ? `?templateId=${templateId}` : ""}`),
   // フロー定期実行スケジュール
   getFlowSchedules: (templateId?: string) => request<FlowSchedule[]>(`/flow-schedules${templateId ? `?templateId=${templateId}` : ""}`),
   createFlowSchedule: (b: { templateId: string; time: string; daysOfWeek: number[]; enabled?: boolean }) =>
