@@ -361,6 +361,38 @@ export function createApp(deps: AppDeps) {
     );
   });
 
+  // 公開: 学校ごとの詳細（対象地域・対象警報・判定ルール / landing の学校SEOページ用・認証不要・PII なし）。
+  app.get("/public/schools/:id", async (c) => {
+    const now = deps.now?.() ?? new Date();
+    const base = deps.apiBaseUrl ?? "";
+    const id = c.req.param("id");
+    const school = await schoolsRepo.findSchoolById(deps.db, id);
+    if (!school) return c.json({ error: "not found" }, 404);
+    const [areaCodes, warningTypes, rules] = await Promise.all([
+      cfg.getAreaCodes(deps.db, id),
+      cfg.getWarningTypes(deps.db, id),
+      rulesRepo.listRulesBySchool(deps.db, id),
+    ]);
+    const areaRows = await areasRepo.listAreasByCodes(deps.db, areaCodes);
+    return c.json({
+      id: school.id,
+      name: school.name,
+      prefecture: school.prefecture,
+      city: school.city,
+      websiteUrl: school.websiteUrl,
+      logoUrl: school.logoKey ? `${base}/public/school-logo/${school.id}` : null,
+      verified: isPlanActive(school, now),
+      areas: areaRows.map((a) => a.name),
+      // 管理者限定の警報種別は公開しない。
+      warningTypes: warningTypes.filter((t) => !isAdminOnlyWarningType(t)),
+      rules: rules.map(rulesRepo.toSchoolRule).map((r) => ({
+        checkTime: r.checkTime,
+        result: r.result,
+        condition: r.condition,
+      })),
+    });
+  });
+
   // 公式メッセージの「確認しました」リンク（認証不要・署名トークンで本人特定 / M15）。
   app.get("/c/:token", async (c) => {
     const html = (msg: string) =>
