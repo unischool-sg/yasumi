@@ -114,15 +114,11 @@ const breadcrumbJsonLd = {
 
   const norm = (s: string) => s.toLowerCase().normalize("NFKC");
 
-  // http(s) のみ許可（javascript: 等を弾く）。
-  function safeUrl(url: string | null): string | null {
-    if (!url) return null;
-    return /^https?:\/\//i.test(url) ? url : null;
-  }
-
   function schoolCard(s: PublicSchool): HTMLElement {
-    const card = document.createElement("div");
+    // カード全体を学校ページ（SSG・SEO）へのリンクにする。
+    const card = document.createElement("a");
     card.className = "sc-card";
+    card.href = `/schools/${s.id}`;
 
     const avatar = document.createElement("div");
     avatar.className = "sc-avatar";
@@ -167,16 +163,13 @@ const breadcrumbJsonLd = {
 
     card.appendChild(body);
 
-    const url = safeUrl(s.websiteUrl);
-    if (url) {
-      const link = document.createElement("a");
-      link.className = "sc-site";
-      link.href = url;
-      link.target = "_blank";
-      link.rel = "noopener";
-      link.textContent = "公式サイト →";
-      card.appendChild(link);
-    }
+    // 学校ページへ誘導するシェブロン。
+    const chev = document.createElement("span");
+    chev.className = "sc-chev";
+    chev.setAttribute("aria-hidden", "true");
+    chev.textContent = "›";
+    card.appendChild(chev);
+
     return card;
   }
 
@@ -347,6 +340,8 @@ const breadcrumbJsonLd = {
     border-radius: var(--radius);
     padding: 16px 18px;
     transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    text-decoration: none;
+    color: inherit;
   }
   .sc-card:hover {
     transform: translateY(-2px);
@@ -396,15 +391,16 @@ const breadcrumbJsonLd = {
     font-size: 13px;
     margin-top: 3px;
   }
-  .sc-site {
+  .sc-chev {
     flex-shrink: 0;
-    color: var(--blue);
-    font-weight: 600;
-    font-size: 13px;
-    white-space: nowrap;
+    color: var(--muted);
+    font-size: 22px;
+    line-height: 1;
+    transition: transform 0.2s ease, color 0.2s ease;
   }
-  .sc-site:hover {
-    text-decoration: underline;
+  .sc-card:hover .sc-chev {
+    color: var(--blue);
+    transform: translateX(3px);
   }
 
   /* CTA（index と共通の見た目） */

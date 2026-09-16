@@ -8,6 +8,8 @@ interface Props {
   type?: string;
   /** クロール拒否したいページで true。 */
   noindex?: boolean;
+  /** meta keywords（ページ固有で上書き可能。未指定はサイト共通）。 */
+  keywords?: string;
 }
 const {
   title = "やすみ？ | 今日、学校ある？を自動で。",
@@ -16,6 +18,7 @@ const {
   ogImageAlt = "今日、学校ある？を、自動で。やすみ？",
   type = "website",
   noindex = false,
+  keywords = "やすみ？,休校,午前休,学校,LINE通知,天気,気象警報",
 } = Astro.props;
 const site = Astro.site ?? Astro.url.origin;
 const canonicalUrl = new URL(Astro.url.pathname, site).toString();
@@ -69,7 +72,7 @@ const jsonLd = [
     <link rel="canonical" href={canonicalUrl} />
     <meta name="robots" content={noindex ? "noindex,nofollow" : "index,follow"} />
 
-    <meta name="keywords" content="やすみ？,休校,午前休,学校,LINE通知,天気,気象警報" />
+    <meta name="keywords" content={keywords} />
 
     <!-- Favicon -->
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
