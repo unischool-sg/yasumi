@@ -8,6 +8,7 @@ import type { Sql } from "postgres";
 import * as schema from "../infrastructure/db/schema.ts";
 import * as cfg from "../infrastructure/db/repositories/school-config.ts";
 import { createSchool } from "../infrastructure/db/repositories/schools.ts";
+import { createRule } from "../infrastructure/db/repositories/rules.ts";
 import { upsertAreas } from "../infrastructure/db/repositories/areas.ts";
 import { createApp } from "./app.ts";
 
@@ -75,6 +76,30 @@ suite("API integration", () => {
     const body = (await res.json()) as { areaCodes: string[]; warningTypes: string[]; rules: unknown[] };
     expect(Array.isArray(body.areaCodes)).toBe(true);
     expect(Array.isArray(body.rules)).toBe(true);
+  });
+
+  it("GET /public/schools/:id → 地域名/対象警報(admin-only除外)/ルール、未知idは404", async () => {
+    const db = drizzle(sql, { schema });
+    await upsertAreas(db, [{ code: "2834100", name: "三田市", prefecture: "兵庫県" }]);
+    const s = await createSchool(db, { name: "公開詳細校", prefecture: "兵庫県", city: "三田市" });
+    await cfg.setAreaCodes(db, s.id, ["2834100"]);
+    await cfg.setWarningTypes(db, s.id, ["暴風警報", "波浪警報"]); // 波浪=admin-only
+    await createRule(db, { schoolId: s.id, checkTime: "08:00", result: "AM_OFF" });
+
+    const res = await req(`/public/schools/${s.id}`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      areas: string[];
+      warningTypes: string[];
+      rules: { checkTime: string; result: string }[];
+    };
+    expect(body.areas).toContain("三田市");
+    expect(body.warningTypes).toContain("暴風警報");
+    expect(body.warningTypes).not.toContain("波浪警報"); // 管理者限定は公開しない
+    expect(body.rules.some((r) => r.checkTime === "08:00" && r.result === "AM_OFF")).toBe(true);
+
+    const nf = await req("/public/schools/00000000-0000-0000-0000-000000000000");
+    expect(nf.status).toBe(404);
   });
 
   it("GET /api/areas?prefecture= → 一覧", async () => {

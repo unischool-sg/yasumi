@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "../client.ts";
 import { areas } from "../schema.ts";
 
@@ -6,6 +6,12 @@ export type AreaRow = typeof areas.$inferSelect;
 
 export async function listAreas(db: Db): Promise<AreaRow[]> {
   return db.select().from(areas);
+}
+
+/** 指定コードの地域を取得（公開学校ページの対象地域名の表示用）。 */
+export async function listAreasByCodes(db: Db, codes: string[]): Promise<AreaRow[]> {
+  if (codes.length === 0) return [];
+  return db.select().from(areas).where(inArray(areas.code, codes));
 }
 
 export async function listAreasByPrefecture(db: Db, prefecture: string): Promise<AreaRow[]> {
