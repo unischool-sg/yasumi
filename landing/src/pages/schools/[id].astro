@@ -36,6 +36,19 @@ const area = school.city ? `${school.prefecture}${school.city}` : school.prefect
 
 const title = `${school.name}は今日休校？｜気象警報の登校判定を自動化 やすみ？`;
 const description = `${school.name}（${area}）で気象警報（暴風・大雨など）が出たら休校・午前休か、やすみ？が学校のルールに沿って自動判定しLINEで無料通知。朝、学校へ行くべきか迷わない。`;
+// 学校固有の検索語（校名×休校/警報/午前休、地域×休校）を先頭に。
+const keywords = [
+  school.name,
+  `${school.name} 休校`,
+  `${school.name} 今日 休校`,
+  `${school.name} 警報`,
+  `${school.name} 午前休`,
+  `${school.prefecture} 休校`,
+  "休校",
+  "午前休",
+  "気象警報",
+  "LINE通知",
+].join(",");
 
 // CTA は招待ディープリンクを再利用。開いた瞬間この学校の購読提案が出る（LIFF_ID 未設定時は友だち追加へ）。
 const ctaUrl = LIFF_ID ? `https://liff.line.me/${LIFF_ID}?school=${school.id}` : LINE_URL;
@@ -77,7 +90,7 @@ const faqJsonLd = {
 };
 ---
 
-<Layout title={title} description={description}>
+<Layout title={title} description={description} keywords={keywords}>
   <script slot="head" type="application/ld+json" set:html={JSON.stringify(breadcrumbJsonLd)} />
   <script slot="head" type="application/ld+json" set:html={JSON.stringify(faqJsonLd)} />
 
