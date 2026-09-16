@@ -1,0 +1,280 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import Header from "../../components/Header.astro";
+import Footer from "../../components/Footer.astro";
+import { API_BASE, LIFF_ID, LINE_URL } from "../../consts";
+
+type PublicSchool = {
+  id: string;
+  name: string;
+  prefecture: string;
+  city: string | null;
+  websiteUrl: string | null;
+  logoUrl: string | null;
+  verified: boolean;
+};
+
+// 学校ごとの静的ページを build 時に生成（SSG）。
+// 「○○高校 休校 / 警報」の検索需要（＝警報の朝みんながググる）を自然流入で獲る。
+// API 未到達時は空配列を返してビルドを壊さない（次回デプロイで再生成される）。
+export async function getStaticPaths() {
+  try {
+    const res = await fetch(`${API_BASE}/public/schools`, { headers: { accept: "application/json" } });
+    if (!res.ok) return [];
+    const schools = (await res.json()) as PublicSchool[];
+    return schools.map((s) => ({ params: { id: s.id }, props: { school: s } }));
+  } catch {
+    return [];
+  }
+}
+
+interface Props {
+  school: PublicSchool;
+}
+const { school } = Astro.props;
+const area = school.city ? `${school.prefecture}${school.city}` : school.prefecture;
+
+const title = `${school.name}は今日休校？｜気象警報の登校判定を自動化 やすみ？`;
+const description = `${school.name}（${area}）で気象警報（暴風・大雨など）が出たら休校・午前休か、やすみ？が学校のルールに沿って自動判定しLINEで無料通知。朝、学校へ行くべきか迷わない。`;
+
+// CTA は招待ディープリンクを再利用。開いた瞬間この学校の購読提案が出る（LIFF_ID 未設定時は友だち追加へ）。
+const ctaUrl = LIFF_ID ? `https://liff.line.me/${LIFF_ID}?school=${school.id}` : LINE_URL;
+
+const site = Astro.site ?? Astro.url.origin;
+const officialSite = school.websiteUrl && /^https?:\/\//i.test(school.websiteUrl) ? school.websiteUrl : null;
+
+const breadcrumbJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "ホーム", item: new URL("/", site).toString() },
+    { "@type": "ListItem", position: 2, name: "登録されている学校", item: new URL("/schools", site).toString() },
+    { "@type": "ListItem", position: 3, name: school.name, item: new URL(`/schools/${school.id}`, site).toString() },
+  ],
+};
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    {
+      "@type": "Question",
+      name: `${school.name}は警報が出たら休校になりますか？`,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: `暴風警報や大雨警報などが発表されると、学校の規則により休校・午前休などになる場合があります。やすみ？に${school.name}を登録しておくと、気象庁の警報を自動でチェックし、学校のルールに沿って判定してLINEで通知します。最終的な登校判断は学校公式の連絡をご確認ください。`,
+      },
+    },
+    {
+      "@type": "Question",
+      name: `${school.name}が今日休校かどうかを自動で知る方法は？`,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: `無料のLINEミニアプリ「やすみ？」に${school.name}を登録すると、警報の発表状況を自動で確認し、休校・午前休・午後から登校などを判定してLINEに通知します。登録は無料です。`,
+      },
+    },
+  ],
+};
+---
+
+<Layout title={title} description={description}>
+  <script slot="head" type="application/ld+json" set:html={JSON.stringify(breadcrumbJsonLd)} />
+  <script slot="head" type="application/ld+json" set:html={JSON.stringify(faqJsonLd)} />
+
+  <Header />
+
+  <!-- Hero -->
+  <section class="ss-hero">
+    <div class="container">
+      <nav class="ss-crumb" aria-label="パンくず">
+        <a href="/schools">登録されている学校</a> <span>›</span> <span>{school.name}</span>
+      </nav>
+      <p class="eyebrow">{area}{school.verified ? " ・ 公式連携" : ""}</p>
+      <h1>{school.name}は今日、学校ある？</h1>
+      <p class="ss-lead">
+        {school.name}に気象警報（暴風・大雨など）が出たとき、休校・午前休になるかを
+        <strong>やすみ？</strong>が学校のルールに沿って自動判定し、LINEで無料通知します。
+        朝、学校へ行くべきか迷わなくなります。
+      </p>
+      <div class="ss-cta-row">
+        <a href={ctaUrl} target="_blank" rel="noopener" class="btn btn-line">LINEで{school.name}を登録</a>
+        {officialSite && (
+          <a href={officialSite} target="_blank" rel="noopener" class="btn btn-ghost">学校公式サイト →</a>
+        )}
+      </div>
+      <p class="ss-note">※学校公式のサービスではありません。最終的な登校判断は学校からの公式連絡をご確認ください。</p>
+    </div>
+  </section>
+
+  <!-- How -->
+  <section class="ss-how">
+    <div class="container">
+      <h2>{school.name}での使い方</h2>
+      <ol class="ss-steps">
+        <li>
+          <span class="ss-num">1</span>
+          <div>
+            <b>LINEで登録</b>
+            <p>{school.name}を選ぶだけ。対象地域・警報・判定時刻はみんなで共有されます。</p>
+          </div>
+        </li>
+        <li>
+          <span class="ss-num">2</span>
+          <div>
+            <b>警報を自動チェック</b>
+            <p>気象庁の警報を判定時刻ごとに自動確認。あなたは何もしなくてOK。</p>
+          </div>
+        </li>
+        <li>
+          <span class="ss-num">3</span>
+          <div>
+            <b>LINEに通知</b>
+            <p>休校・午前休・午後から登校などを、その日の朝にLINEでお知らせします。</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta">
+    <div class="container">
+      <div class="cta-card">
+        <h2>{school.name}の「今日どう？」を自動で。</h2>
+        <p>同じ学校のみんなで使うほど便利。まずはLINEで登録。</p>
+        <a href={ctaUrl} target="_blank" rel="noopener" class="btn btn-line">LINEで{school.name}を登録</a>
+      </div>
+    </div>
+  </section>
+
+  <Footer />
+</Layout>
+
+<style>
+  .ss-hero {
+    padding: 56px 0 24px;
+  }
+  .ss-crumb {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .ss-crumb a {
+    color: var(--blue);
+    font-weight: 600;
+  }
+  .ss-crumb span {
+    margin: 0 4px;
+  }
+  .ss-hero h1 {
+    font-size: clamp(28px, 5vw, 44px);
+    font-weight: 700;
+    margin: 6px 0 14px;
+  }
+  .ss-lead {
+    color: var(--muted);
+    font-size: 17px;
+    max-width: 40em;
+    margin: 0;
+    line-height: 1.7;
+  }
+  .ss-lead strong {
+    color: var(--ink);
+  }
+  .ss-cta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 26px;
+  }
+  .btn-ghost {
+    background: #fff;
+    color: var(--blue);
+    border: 1px solid #c6dafc;
+  }
+  .btn-ghost:hover {
+    background: var(--blue-soft);
+  }
+  .ss-note {
+    margin-top: 16px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .ss-how {
+    padding: 32px 0;
+  }
+  .ss-how h2 {
+    font-size: clamp(22px, 3.5vw, 30px);
+    font-weight: 700;
+    margin: 0 0 24px;
+  }
+  .ss-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 16px;
+    max-width: 640px;
+  }
+  .ss-steps li {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .ss-num {
+    flex-shrink: 0;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--blue-soft);
+    color: var(--blue);
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+  }
+  .ss-steps b {
+    font-size: 16px;
+  }
+  .ss-steps p {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .cta {
+    padding: 40px 0 88px;
+  }
+  .cta-card {
+    background: linear-gradient(120deg, #1a73e8, #00b4d8, #1a73e8);
+    background-size: 200% auto;
+    animation: gradientShift 9s ease infinite;
+    color: #fff;
+    text-align: center;
+    border-radius: var(--radius-lg);
+    padding: 56px 32px;
+  }
+  .cta-card h2 {
+    font-size: clamp(24px, 4vw, 36px);
+    font-weight: 700;
+  }
+  .cta-card p {
+    opacity: 0.92;
+    font-size: 17px;
+    margin: 12px 0 28px;
+  }
+  .btn-line {
+    background: #06c755;
+    color: #fff;
+  }
+  .btn-line:hover {
+    background: #05b34c;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(6, 199, 85, 0.35);
+  }
+</style>
