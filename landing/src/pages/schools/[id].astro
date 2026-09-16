@@ -28,14 +28,45 @@ export async function getStaticPaths() {
   }
 }
 
+// 判定結果・条件の表示ラベル（表示専用メタなので landing 側に持つ / CLAUDE.md 方針）。
+type CheckResult = "NORMAL" | "WAIT" | "AM_OFF" | "PM_START" | "FULL_OFF" | "UNKNOWN";
+const RESULT_LABEL: Record<CheckResult, string> = {
+  NORMAL: "通常登校",
+  WAIT: "自宅待機",
+  AM_OFF: "午前休",
+  PM_START: "午後から登校",
+  FULL_OFF: "休校",
+  UNKNOWN: "判定不能",
+};
+const CONDITION_LABEL = { WARNING_ACTIVE: "警報が出ていると", WARNING_CLEARED: "警報が解除されると" };
+
+type SchoolDetail = PublicSchool & {
+  areas: string[];
+  warningTypes: string[];
+  rules: { checkTime: string; result: CheckResult; condition: { type: "WARNING_ACTIVE" | "WARNING_CLEARED" } }[];
+};
+
 interface Props {
   school: PublicSchool;
 }
 const { school } = Astro.props;
 const area = school.city ? `${school.prefecture}${school.city}` : school.prefecture;
 
+// この学校の詳細（対象地域・対象警報・ルール）を build 時に取得。失敗時は基本情報のみで描画。
+let detail: SchoolDetail | null = null;
+try {
+  const res = await fetch(`${API_BASE}/public/schools/${school.id}`, { headers: { accept: "application/json" } });
+  if (res.ok) detail = (await res.json()) as SchoolDetail;
+} catch {
+  detail = null;
+}
+const warningTypes = detail?.warningTypes ?? [];
+const areas = detail?.areas ?? [];
+const rules = detail?.rules ?? [];
+const warnPhrase = warningTypes.length > 0 ? warningTypes.join("・") : "暴風・大雨などの気象警報";
+
 const title = `${school.name}は今日休校？｜気象警報の登校判定を自動化 やすみ？`;
-const description = `${school.name}（${area}）で気象警報（暴風・大雨など）が出たら休校・午前休か、やすみ？が学校のルールに沿って自動判定しLINEで無料通知。朝、学校へ行くべきか迷わない。`;
+const description = `${school.name}（${area}）で${warnPhrase}が出たら休校・午前休か、やすみ？が学校のルールに沿って自動判定しLINEで無料通知。朝、学校へ行くべきか迷わない。`;
 // 学校固有の検索語（校名×休校/警報/午前休、地域×休校）を先頭に。
 const keywords = [
   school.name,
@@ -75,7 +106,7 @@ const faqJsonLd = {
       name: `${school.name}は警報が出たら休校になりますか？`,
       acceptedAnswer: {
         "@type": "Answer",
-        text: `暴風警報や大雨警報などが発表されると、学校の規則により休校・午前休などになる場合があります。やすみ？に${school.name}を登録しておくと、気象庁の警報を自動でチェックし、学校のルールに沿って判定してLINEで通知します。最終的な登校判断は学校公式の連絡をご確認ください。`,
+        text: `${warnPhrase}が発表されると、学校の規則により休校・午前休などになる場合があります。やすみ？に${school.name}を登録しておくと、気象庁の警報を自動でチェックし、学校のルールに沿って判定してLINEで通知します。最終的な登校判断は学校公式の連絡をご確認ください。`,
       },
     },
     {
@@ -148,6 +179,41 @@ const faqJsonLd = {
       </ol>
     </div>
   </section>
+
+  <!-- この学校の判定設定（対象地域・警報・ルール） -->
+  {(areas.length > 0 || warningTypes.length > 0 || rules.length > 0) && (
+    <section class="ss-rules">
+      <div class="container">
+        <h2>{school.name}の判定設定</h2>
+        <p class="ss-rules-note">やすみ？が休校・午前休を判定するために、この学校で登録されている条件です。</p>
+        <div class="ss-facts">
+          {areas.length > 0 && (
+            <div class="ss-fact">
+              <span class="ss-fact-k">対象地域</span>
+              <span class="ss-fact-v">{areas.join("・")}</span>
+            </div>
+          )}
+          {warningTypes.length > 0 && (
+            <div class="ss-fact">
+              <span class="ss-fact-k">対象の警報</span>
+              <span class="ss-fact-v">{warningTypes.join("・")}</span>
+            </div>
+          )}
+        </div>
+        {rules.length > 0 && (
+          <ul class="ss-rulelist">
+            {rules.map((r) => (
+              <li>
+                <span class="ss-time">{r.checkTime}</span>
+                <span>時点で{CONDITION_LABEL[r.condition.type]}<b>「{RESULT_LABEL[r.result]}」</b>と判定</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p class="ss-disclaimer">※設定はこの学校を登録したユーザーによるもので、学校公式のものではありません。</p>
+      </div>
+    </section>
+  )}
 
   <!-- CTA -->
   <section class="cta">
@@ -258,6 +324,71 @@ const faqJsonLd = {
     color: var(--muted);
     font-size: 14px;
     line-height: 1.6;
+  }
+
+  .ss-rules {
+    padding: 24px 0 8px;
+  }
+  .ss-rules h2 {
+    font-size: clamp(22px, 3.5vw, 30px);
+    font-weight: 700;
+    margin: 0 0 8px;
+  }
+  .ss-rules-note {
+    color: var(--muted);
+    font-size: 15px;
+    margin: 0 0 20px;
+  }
+  .ss-facts {
+    display: grid;
+    gap: 10px;
+    max-width: 640px;
+    margin-bottom: 18px;
+  }
+  .ss-fact {
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+  }
+  .ss-fact-k {
+    flex-shrink: 0;
+    width: 88px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--blue);
+  }
+  .ss-fact-v {
+    font-size: 15px;
+    overflow-wrap: anywhere;
+  }
+  .ss-rulelist {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 10px;
+    max-width: 640px;
+  }
+  .ss-rulelist li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    font-size: 15px;
+  }
+  .ss-time {
+    flex-shrink: 0;
+    font-weight: 700;
+    color: var(--blue);
+    font-variant-numeric: tabular-nums;
+  }
+  .ss-disclaimer {
+    margin-top: 16px;
+    font-size: 12px;
+    color: var(--muted);
   }
 
   .cta {
