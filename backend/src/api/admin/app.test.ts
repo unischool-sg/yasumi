@@ -372,6 +372,18 @@ suite("Admin API", () => {
     const detail = (await (await req(`/api/admin/users/${userId}`, { headers: bearer(suT) })).json()) as { flags: string[] };
     expect(detail.flags).toContain("flowdone");
 
+    // userIds 指定の個別実行: 対象条件(flowtarget)に該当しないユーザーにも実行される（ユーザー詳細から）
+    const { userId: otherId } = (await (await req("/api/me", { headers: bearer("Uflowoverride") })).json()) as { userId: string };
+    const runOne = await req(`/api/admin/flow-templates/${tpl.id}/run`, {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify({ userIds: [otherId] }),
+    });
+    expect(runOne.status).toBe(200);
+    expect(((await runOne.json()) as { audienceCount: number }).audienceCount).toBe(1);
+    const otherDetail = (await (await req(`/api/admin/users/${otherId}`, { headers: bearer(suT) })).json()) as { flags: string[] };
+    expect(otherDetail.flags).toContain("flowdone"); // query 非該当でも userIds 指定で実行された
+
     // 更新
     const upd = await req(`/api/admin/flow-templates/${tpl.id}`, { method: "PATCH", headers: jsonHeaders, body: JSON.stringify({ ...tplBody, name: "更新後フロー" }) });
     expect(((await upd.json()) as { name: string }).name).toBe("更新後フロー");
