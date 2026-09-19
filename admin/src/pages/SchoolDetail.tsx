@@ -166,7 +166,7 @@ export function SchoolDetail({ id }: { id: string }) {
       <Card variant="outlined" sx={{ mb: 2 }}>
         <CardContent>
           <Typography variant="subtitle2" sx={{ mb: 1.5 }}>基本情報</Typography>
-          <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+          <Stack direction="row" useFlexGap spacing={2} sx={{ mb: 2, flexWrap: "wrap" }}>
             <TextField size="small" label="学校名" value={name} onChange={(e) => setName(e.target.value)} />
             <Autocomplete
               size="small"
@@ -177,7 +177,7 @@ export function SchoolDetail({ id }: { id: string }) {
               renderInput={(params) => <TextField {...params} label="市区町村" />}
             />
           </Stack>
-          <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+          <Stack direction="row" useFlexGap spacing={2} sx={{ mb: 2, flexWrap: "wrap" }}>
             <TextField
               size="small"
               fullWidth
@@ -197,7 +197,7 @@ export function SchoolDetail({ id }: { id: string }) {
               sx={{ width: 200, flexShrink: 0 }}
             />
           </Stack>
-          <Stack direction="row" spacing={2} sx={{ mb: 2, alignItems: "center" }}>
+          <Stack direction="row" useFlexGap spacing={2} sx={{ mb: 2, alignItems: "center", flexWrap: "wrap" }}>
             <Box
               sx={{
                 width: 56, height: 56, borderRadius: 2, border: "1px solid", borderColor: "divider",
@@ -264,7 +264,7 @@ export function SchoolDetail({ id }: { id: string }) {
       <Card variant="outlined" sx={{ mb: 2 }}>
         <CardContent>
           <Typography variant="subtitle2" sx={{ mb: 1.5 }}>有料プラン（学校向けSaaS）</Typography>
-          <Stack direction="row" spacing={2} sx={{ mb: 2, alignItems: "center" }}>
+          <Stack direction="row" useFlexGap spacing={2} sx={{ mb: 2, alignItems: "center", flexWrap: "wrap" }}>
             <TextField size="small" select label="プラン" value={plan} onChange={(e) => setPlan(e.target.value)} sx={{ width: 200 }}>
               <MenuItem value="">未契約（無料）</MenuItem>
               <MenuItem value="basic">ベーシック</MenuItem>
