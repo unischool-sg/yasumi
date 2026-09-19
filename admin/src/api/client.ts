@@ -269,7 +269,12 @@ export const api = {
   createFlowTemplate: (b: FlowTemplateInput) => request<FlowTemplate>("/flow-templates", { method: "POST", body: JSON.stringify(b) }),
   updateFlowTemplate: (id: string, b: FlowTemplateInput) => request<FlowTemplate>(`/flow-templates/${id}`, { method: "PATCH", body: JSON.stringify(b) }),
   deleteFlowTemplate: (id: string) => request<void>(`/flow-templates/${id}`, { method: "DELETE" }),
-  runFlowTemplate: (id: string) => request<FlowRunResult>(`/flow-templates/${id}/run`, { method: "POST" }),
+  // userIds 指定時は対象条件を無視してそのユーザーにのみ実行（ユーザー詳細からの個別実行）。
+  runFlowTemplate: (id: string, opts?: { userIds?: string[] }) =>
+    request<FlowRunResult>(`/flow-templates/${id}/run`, {
+      method: "POST",
+      ...(opts?.userIds ? { body: JSON.stringify({ userIds: opts.userIds }) } : {}),
+    }),
   getFlowRunLogs: (templateId?: string) =>
     request<FlowRunLog[]>(`/flow-run-logs${templateId ? `?templateId=${templateId}` : ""}`),
   // フロー定期実行スケジュール

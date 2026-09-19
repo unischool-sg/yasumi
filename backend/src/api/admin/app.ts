@@ -467,9 +467,14 @@ export function createAdminApp(deps: AdminAppDeps) {
     return c.body(null, 204);
   });
   // テンプレートを手動実行（cron と同じ executeFlow を使用）。実行結果はログに記録する。
+  // body.userIds を指定すると対象条件を無視してそのユーザーにのみ実行（ユーザー詳細からの個別実行）。
   app.post("/flow-templates/:id/run", async (c) => {
     const t = await flowTemplatesRepo.getTemplate(db, c.req.param("id"));
     if (!t) return c.json({ error: "template not found" }, 404);
+    const body = (await c.req.json().catch(() => ({}))) as { userIds?: unknown };
+    const userIds = Array.isArray(body.userIds)
+      ? body.userIds.filter((v): v is string => typeof v === "string")
+      : undefined;
     try {
       const run = await executeFlow(
         {
@@ -479,7 +484,12 @@ export function createAdminApp(deps: AdminAppDeps) {
           ...(deps.lineAccessToken ? { lineAccessToken: deps.lineAccessToken } : {}),
           ...(deps.now ? { now: deps.now } : {}),
         },
-        { allUsers: t.allUsers, query: t.query, steps: t.steps },
+        {
+          allUsers: t.allUsers,
+          query: t.query,
+          steps: t.steps,
+          ...(userIds && userIds.length > 0 ? { audienceIds: userIds } : {}),
+        },
       );
       await flowRunLogsRepo
         .recordFlowRun(db, {

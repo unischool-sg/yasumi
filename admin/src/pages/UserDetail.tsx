@@ -8,16 +8,31 @@ import {
   Chip,
   Divider,
   IconButton,
+  MenuItem,
   Stack,
   Switch,
   TextField,
   Typography,
 } from "@mui/material";
+import { describeFlowStep } from "@yasumi/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { type School, api } from "../api/client.ts";
+import { type FlowRunResult, type School, api } from "../api/client.ts";
 import { useToast } from "../components/Toast.tsx";
+
+/** フロー実行結果を「送信 1/1 / フラグ付与「X」」形式に整形。 */
+function summarizeRun(r: FlowRunResult): string {
+  return r.results
+    .map((s) =>
+      s.type === "send"
+        ? `送信 ${s.sent ?? 0}/${s.total ?? 0}`
+        : s.type === "addFlag"
+          ? `フラグ付与「${s.flag}」`
+          : `フラグ解除「${s.flag}」`,
+    )
+    .join(" / ");
+}
 
 export function UserDetail({ id }: { id: string }) {
   const qc = useQueryClient();
@@ -69,6 +84,26 @@ export function UserDetail({ id }: { id: string }) {
     onSuccess: () => { invalidate(); qc.invalidateQueries({ queryKey: ["users"] }); toast.success("フラグを解除しました"); },
     onError,
   });
+
+  // テンプレート（フロー）をこのユーザーに個別実行。
+  const [templateId, setTemplateId] = useState("");
+  const { data: flowTemplates = [] } = useQuery({ queryKey: ["flow-templates"], queryFn: api.getFlowTemplates });
+  const runTemplate = useMutation({
+    mutationFn: (tid: string) => api.runFlowTemplate(tid, { userIds: [id] }),
+    onSuccess: (r) => {
+      invalidate();
+      qc.invalidateQueries({ queryKey: ["users"] });
+      toast.success(`実行しました：${summarizeRun(r)}`);
+    },
+    onError,
+  });
+  const selectedTemplate = flowTemplates.find((t) => t.id === templateId);
+  function runSelectedTemplate() {
+    if (!selectedTemplate) return;
+    const lines = selectedTemplate.steps.map((s, i) => `${i + 1}. ${describeFlowStep(s)}`);
+    if (!window.confirm(`「${selectedTemplate.name}」をこのユーザーに実行します。よろしいですか？\n\n${lines.join("\n")}`)) return;
+    runTemplate.mutate(selectedTemplate.id);
+  }
 
   if (!data) return <Typography>読み込み中…</Typography>;
 
@@ -147,6 +182,53 @@ export function UserDetail({ id }: { id: string }) {
               送信
             </Button>
           </Stack>
+        </CardContent>
+      </Card>
+
+      {/* テンプレート実行 */}
+      <Card variant="outlined" sx={{ mb: 2 }}>
+        <CardContent>
+          <Typography variant="subtitle2" sx={{ mb: 1.5 }}>テンプレートを実行</Typography>
+          {flowTemplates.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              フローテンプレートがありません（「フロー」タブで作成してください）。
+            </Typography>
+          ) : (
+            <Stack spacing={1.5}>
+              <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+                <TextField
+                  select
+                  size="small"
+                  label="フローテンプレート"
+                  value={templateId}
+                  onChange={(e) => setTemplateId(e.target.value)}
+                  sx={{ flex: 1 }}
+                >
+                  {flowTemplates.map((t) => (
+                    <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>
+                  ))}
+                </TextField>
+                <Button
+                  variant="contained"
+                  disabled={!templateId || runTemplate.isPending}
+                  onClick={runSelectedTemplate}
+                  sx={{ flexShrink: 0 }}
+                >
+                  このユーザーに実行
+                </Button>
+              </Stack>
+              {selectedTemplate && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary">実行内容（上から順に）：</Typography>
+                  <Stack component="ol" sx={{ pl: 3, m: 0.5 }}>
+                    {selectedTemplate.steps.map((s, i) => (
+                      <Typography key={i} component="li" variant="body2">{describeFlowStep(s)}</Typography>
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+            </Stack>
+          )}
         </CardContent>
       </Card>
 
