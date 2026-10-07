@@ -240,6 +240,15 @@ export const api = {
   createRule: (schoolId: string, b: { checkTime: string; result: string }) =>
     request(`/schools/${schoolId}/rules`, { method: "POST", body: JSON.stringify(b) }),
   deleteRule: (id: string) => request<void>(`/rules/${id}`, { method: "DELETE" }),
+  // テスト送信（検証用）: 実 cron と同じ経路で判定通知を手動送信し、履歴に記録する。
+  testNotifySchool: (
+    schoolId: string,
+    body: { result: string; target: { type: "subscribers" } | { type: "lineUser"; lineUserId: string } },
+  ) =>
+    request<{ total: number; sent: number; skippedUndeliverable: number; errors: number; result: string; targetDate: string; text: string }>(
+      `/schools/${schoolId}/test-notify`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
   // areas
   listAreas: (prefecture?: string) => request<Area[]>(`/areas${prefecture ? `?prefecture=${encodeURIComponent(prefecture)}` : ""}`),
   createArea: (b: Area) => request<Area>("/areas", { method: "POST", body: JSON.stringify(b) }),
