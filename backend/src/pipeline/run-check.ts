@@ -3,7 +3,8 @@ import { buildClosureDraftText, isClosureResult } from "../domain/closure-draft.
 import { evaluateSchoolRule } from "../domain/rule/evaluate.ts";
 import { buildNotificationText } from "../domain/notification/messages.ts";
 import type { NotificationProvider } from "../domain/notification/provider.ts";
-import { isUndeliverablePushError, shouldNotify } from "../domain/notification/provider.ts";
+import { shouldNotify } from "../domain/notification/provider.ts";
+import { deliverNotification } from "../domain/notification/send.ts";
 import { isPlanActive } from "../domain/plan.ts";
 import type { WarningProvider } from "../domain/warning/provider.ts";
 import { officeCodesForArea } from "../infrastructure/jma/jma-warning-provider.ts";
@@ -11,11 +12,8 @@ import type { Db } from "../infrastructure/db/client.ts";
 import * as closureDraftsRepo from "../infrastructure/db/repositories/closure-drafts.ts";
 import * as schoolsRepo from "../infrastructure/db/repositories/schools.ts";
 import * as cfg from "../infrastructure/db/repositories/school-config.ts";
-import * as deviceTokensRepo from "../infrastructure/db/repositories/device-tokens.ts";
-import * as notificationsRepo from "../infrastructure/db/repositories/notifications.ts";
 import * as rulesRepo from "../infrastructure/db/repositories/rules.ts";
 import * as subscriptionsRepo from "../infrastructure/db/repositories/subscriptions.ts";
-import * as usersRepo from "../infrastructure/db/repositories/users.ts";
 import * as warningChecksRepo from "../infrastructure/db/repositories/warning-checks.ts";
 import { jstDateString, jstHhmm } from "../shared/jst.ts";
 
@@ -203,48 +201,26 @@ export async function runCheck(
         : {}),
     });
 
+    const deliverDeps = {
+      db: deps.db,
+      notificationProvider: deps.notificationProvider,
+      ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
+      now,
+    };
     for (const sub of subscribers) {
-      // 二重通知防止（§36）。既に通知行があればスキップ
-      const { created: notifCreated, row: notifRow } = await notificationsRepo.createNotificationIfAbsent(deps.db, {
+      // cron とテスト送信で共有する単一の送信経路（本文・経路・エラーログを記録）。
+      const outcome = await deliverNotification(deliverDeps, {
         userId: sub.userId,
         schoolId: ruleRow.schoolId,
         ruleId: ruleRow.id,
         targetDate,
         status: storedResult,
-        messageText: text,
+        text,
       });
-      if (!notifCreated || !notifRow) continue;
-
-      // 通知先の解決: デバイストークンがあれば FCM(無料)、無ければ LINE プッシュ(フォールバック)
-      const deviceTokens = await deviceTokensRepo.listTokensByUser(deps.db, sub.userId);
-      const push = deps.pushProvider;
-      const channel = deviceTokens.length > 0 && push ? "fcm" : "line";
-      try {
-        if (channel === "fcm" && push) {
-          await push.send({ deviceTokens }, { text });
-        } else {
-          const lineUserId = await usersRepo.getLineUserId(deps.db, sub.userId);
-          if (!lineUserId) {
-            // LINE 連携が無く FCM も無い → 配信手段なし。原因が追えるよう記録して次へ。
-            await notificationsRepo.markNotificationFailed(deps.db, notifRow.id, {
-              channel,
-              error: "配信先なし: LINEユーザーID未登録（LINE未連携）かつデバイストークン無し",
-            });
-            summary.skippedUndeliverable++;
-            continue;
-          }
-          await deps.notificationProvider.send({ lineUserId }, { text });
-        }
-        await notificationsRepo.markNotificationSent(deps.db, notifRow.id, now(), channel);
-        summary.notificationsSent++;
-      } catch (e) {
-        // 失敗の原因（APIレスポンス等）を履歴に残す（管理画面の詳細モーダルで確認）。
-        const error = e instanceof Error ? (e.stack ?? e.message) : String(e);
-        await notificationsRepo.markNotificationFailed(deps.db, notifRow.id, { channel, error });
-        // 未友だち等で LINE 配信不能な場合は通常エラーと区別（運用アラートを鳴らさない）。
-        if (isUndeliverablePushError(e)) summary.skippedUndeliverable++;
-        else summary.errors++;
-      }
+      if (outcome === "sent") summary.notificationsSent++;
+      else if (outcome === "undeliverable") summary.skippedUndeliverable++;
+      else if (outcome === "error") summary.errors++;
+      // duplicate → 既通知。何もしない。
     }
   }
 
