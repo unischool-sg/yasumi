@@ -195,6 +195,14 @@ export interface NotificationRow {
   targetDate: string;
   status: string;
   sentAt: string | null;
+  channel: string | null;
+  messageText: string | null;
+  error: string | null;
+}
+export interface NotificationDetail extends NotificationRow {
+  ruleId: string;
+  lineUserId: string | null;
+  profile: { displayName: string; pictureUrl?: string; statusMessage?: string } | null;
 }
 
 export const api = {
@@ -300,4 +308,5 @@ export const api = {
   // read
   listWarningChecks: (date?: string) => request<WarningCheck[]>(`/warning-checks${date ? `?date=${date}` : ""}`),
   listNotifications: (date?: string) => request<NotificationRow[]>(`/notifications${date ? `?date=${date}` : ""}`),
+  getNotification: (id: string) => request<NotificationDetail>(`/notifications/${id}`),
 };

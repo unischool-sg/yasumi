@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>やすみ？ × 三田市 — 移住・子育て支援へのご提案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Google brand palette */
+  --blue:#4285F4;   --blue-d:#1A73E8;
+  --red:#EA4335;    --red-d:#D93025;
+  --yellow:#FBBC04; --yellow-d:#F9AB00;
+  --green:#34A853;  --green-d:#188038;
+  /* Google greys */
+  --ink:#202124;
+  --body:#3C4043;
+  --muted:#5F6368;
+  --line:#DADCE0;
+  --surface:#F1F3F4;
+  --surface-2:#F8F9FA;
+  --bg:#FFFFFF;
+  /* Material elevation */
+  --shadow:0 1px 2px 0 rgba(60,64,67,.30), 0 2px 6px 2px rgba(60,64,67,.15);
+  --shadow-sm:0 1px 2px 0 rgba(60,64,67,.30), 0 1px 3px 1px rgba(60,64,67,.12);
+  --round:16px;
+  --font:"Roboto","Noto Sans JP",-apple-system,"Hiragino Sans","Yu Gothic",sans-serif;
+  --disp:"Google Sans","Roboto","Noto Sans JP",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--font);
+  color:var(--body);
+  background:var(--surface-2);
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ---------- Stage / scaling ---------- */
+#viewport{position:fixed;inset:0;overflow:hidden}
+#stage{position:absolute;top:50%;left:50%;width:1280px;height:720px;transform-origin:center center;}
+.slide{
+  position:absolute;inset:0;
+  padding:66px 80px;
+  display:flex;flex-direction:column;
+  opacity:0;visibility:hidden;
+  transform:translateY(10px);
+  transition:opacity .45s ease, transform .45s ease, visibility .45s;
+  background:var(--bg);
+}
+.slide.active{opacity:1;visibility:visible;transform:none;z-index:2}
+
+/* ---------- shared ---------- */
+.kicker{
+  display:inline-flex;align-items:center;gap:10px;
+  font-family:var(--disp);font-weight:500;
+  font-size:15px;letter-spacing:.02em;color:var(--blue-d);
+  background:#E8F0FE;
+  padding:8px 16px;border-radius:999px;width:fit-content;
+}
+.kicker::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--blue)}
+h1,h2{font-family:var(--disp);color:var(--ink);font-weight:700;line-height:1.22;letter-spacing:.005em}
+h2{font-size:42px}
+.lead{font-size:22px;line-height:1.75;color:var(--body);font-weight:400}
+.muted{color:var(--muted)}
+b,strong{color:var(--ink);font-weight:700}
+.blue{color:var(--blue-d)} .red{color:var(--red-d)} .green{color:var(--green-d)} .yellow{color:var(--yellow-d)}
+.slide-head{margin-bottom:34px}
+.slide-head h2{margin-top:16px}
+/* Google 4-color bar */
+.rule{height:6px;width:88px;border-radius:99px;margin-top:16px;
+  background:linear-gradient(90deg,var(--blue) 0 25%,var(--red) 25% 50%,var(--yellow) 50% 75%,var(--green) 75% 100%);}
+
+/* ---------- cards / grids ---------- */
+.grid{display:grid;gap:22px}
+.g2{grid-template-columns:1fr 1fr}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}
+.card{
+  background:var(--bg);border-radius:var(--round);
+  padding:28px 26px;box-shadow:var(--shadow-sm);
+  border:1px solid var(--line);
+  display:flex;flex-direction:column;gap:12px;
+}
+.card .num{font-family:var(--disp);font-weight:700;font-size:22px;
+  width:52px;height:52px;border-radius:50%;display:grid;place-items:center;
+  color:#fff;background:var(--blue)}
+.card h3{font-family:var(--disp);font-weight:700;color:var(--ink);font-size:23px;line-height:1.3}
+.card p{font-size:16.5px;line-height:1.7;color:var(--body)}
+/* color variants */
+.card.red .num{background:var(--red)}
+.card.green .num{background:var(--green)}
+.card.yellow .num{background:var(--yellow);color:#3c4043}
+.card.blue .num{background:var(--blue)}
+
+/* status chips (natural Google 4-color) */
+.chips{display:flex;gap:16px;flex-wrap:wrap}
+.chip{
+  font-family:var(--disp);font-weight:500;font-size:20px;
+  padding:14px 26px;border-radius:999px;
+  display:flex;align-items:center;gap:11px;border:1px solid transparent;
+}
+.chip .dot{width:12px;height:12px;border-radius:50%}
+.chip.normal{background:#E6F4EA;color:var(--green-d)} .chip.normal .dot{background:var(--green)}
+.chip.am{background:#FEF7E0;color:#B06000} .chip.am .dot{background:var(--yellow-d)}
+.chip.wait{background:#E8F0FE;color:var(--blue-d)} .chip.wait .dot{background:var(--blue)}
+.chip.off{background:#FCE8E6;color:var(--red-d)} .chip.off .dot{background:var(--red)}
+
+/* stat */
+.stat{display:flex;flex-direction:column;gap:4px}
+.stat .big{font-family:var(--disp);font-weight:700;color:var(--blue-d);font-size:54px;line-height:1}
+.stat .big.red{color:var(--red-d)} .stat .big.green{color:var(--green-d)}
+.stat .lbl{font-size:15px;color:var(--muted);font-weight:400}
+
+/* flow steps */
+.flow{display:flex;align-items:stretch;gap:0}
+.step{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:14px;
+  padding:20px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:8px}
+.step .s-n{font-family:var(--disp);font-weight:500;color:var(--blue-d);font-size:14px}
+.step .s-t{font-family:var(--disp);font-weight:700;color:var(--ink);font-size:18px;line-height:1.35}
+.step .s-d{font-size:13.5px;color:var(--muted);line-height:1.55}
+.arrow{align-self:center;color:var(--muted);font-size:24px;padding:0 8px}
+
+/* bullet list — Material check */
+ul.check{list-style:none;display:flex;flex-direction:column;gap:18px}
+ul.check li{position:relative;padding-left:42px;font-size:20px;line-height:1.6;color:var(--body)}
+ul.check li::before{content:"";position:absolute;left:0;top:2px;width:28px;height:28px;border-radius:50%;
+  background:#E8F0FE;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231A73E8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  background-size:17px;background-repeat:no-repeat;background-position:center;}
+
+.pill{display:inline-block;font-family:var(--disp);font-weight:500;font-size:14px;
+  padding:5px 14px;border-radius:999px;background:#FEF7E0;color:#B06000;}
+
+/* quote box */
+.quote{background:var(--surface-2);border-left:4px solid var(--blue);border-radius:0 12px 12px 0;
+  padding:26px 30px;font-size:22px;line-height:1.75;color:var(--ink);font-weight:400}
+.quote .src{display:block;margin-top:12px;font-size:13px;color:var(--muted)}
+
+/* ---------- title slide (Google-style, white) ---------- */
+#s-title{justify-content:center;padding-left:88px}
+#s-title .dots{display:flex;gap:12px;margin-bottom:30px}
+#s-title .dots i{width:16px;height:16px;border-radius:50%}
+.d-b{background:var(--blue)} .d-r{background:var(--red)} .d-y{background:var(--yellow)} .d-g{background:var(--green)}
+#s-title .brand{font-family:var(--disp);font-weight:700;font-size:108px;line-height:1;letter-spacing:.01em}
+#s-title .brand .c1{color:var(--blue)} #s-title .brand .c2{color:var(--red)}
+#s-title .brand .c3{color:var(--yellow-d)} #s-title .brand .c4{color:var(--green)}
+#s-title .tag{font-family:var(--disp);font-weight:500;font-size:36px;margin-top:24px;color:var(--ink)}
+#s-title .sub{font-size:20px;margin-top:26px;color:var(--muted);line-height:1.75;max-width:780px}
+#s-title .to{margin-top:44px;display:flex;align-items:center;gap:14px;font-size:16px;color:var(--muted)}
+#s-title .to .badge{font-family:var(--disp);font-weight:500;background:var(--surface);
+  border:1px solid var(--line);padding:10px 18px;border-radius:999px;color:var(--ink)}
+
+/* closing (white, colored heading) */
+#s-close{justify-content:center}
+#s-close h2{font-size:50px}
+.contact{margin-top:36px;display:flex;gap:16px;flex-wrap:wrap}
+.contact .c{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:18px 22px;min-width:220px}
+.contact .c .k{font-size:13px;color:var(--muted);font-weight:500}
+.contact .c .v{font-family:var(--disp);font-weight:700;font-size:19px;color:var(--ink);margin-top:4px}
+
+/* chrome */
+.foot{position:absolute;left:80px;right:80px;bottom:30px;display:flex;justify-content:space-between;
+  align-items:center;font-size:13px;color:var(--muted)}
+.foot .fbrand{font-family:var(--disp);font-weight:700;color:var(--ink)}
+.foot .fbrand em{font-style:normal;color:var(--blue)}
+
+#progress{position:fixed;left:0;top:0;height:4px;z-index:50;
+  background:linear-gradient(90deg,var(--blue),var(--red),var(--yellow),var(--green));transition:width .4s ease}
+#counter{position:fixed;right:20px;bottom:16px;z-index:50;font-family:var(--disp);font-weight:500;font-size:14px;
+  color:var(--muted);background:#fff;padding:6px 13px;border-radius:999px;border:1px solid var(--line);box-shadow:var(--shadow-sm)}
+#hint{position:fixed;left:20px;bottom:16px;z-index:50;font-size:12px;color:var(--muted);opacity:.85}
+#hint kbd{font-family:var(--disp);font-weight:500;background:#fff;border:1px solid var(--line);
+  border-bottom-width:2px;border-radius:6px;padding:1px 7px;font-size:11px;color:var(--ink)}
+
+/* speaker notes */
+#notes{position:fixed;left:0;right:0;bottom:0;z-index:60;
+  background:#202124;color:#E8EAED;padding:20px 30px 22px;
+  box-shadow:0 -8px 30px -8px rgba(0,0,0,.4);transform:translateY(105%);
+  transition:transform .35s ease;max-height:42vh;overflow:auto}
+#notes.show{transform:none}
+#notes .nt{font-family:var(--disp);font-weight:500;color:#8AB4F8;font-size:13px;letter-spacing:.06em;margin-bottom:8px}
+#notes .nc{font-size:15.5px;line-height:1.8}
+#notes .nc b{color:#fff}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div id="viewport"><div id="stage">
+
+  <!-- 1. TITLE -->
+  <section class="slide" id="s-title">
+    <div class="dots"><i class="d-b"></i><i class="d-r"></i><i class="d-y"></i><i class="d-g"></i></div>
+    <div class="brand"><span class="c1">や</span><span class="c2">す</span><span class="c3">み</span><span class="c4">？</span></div>
+    <div class="tag">「今日、学校ある？」に、自動で答える。</div>
+    <div class="sub">気象警報と学校ごとの休校ルールから、登校の要否を自動で判定してLINEでお知らせする無料サービス。<br>三田市の子育て支援・移住定住プロモーションへの活用のご提案です。</div>
+    <div class="to">
+      <span class="badge">三田市 総合政策部 移住定住促進課 御中</span>
+      <span>UniSchool「やすみ？」チーム</span>
+    </div>
+    <div class="notes" hidden><b>つかみ：</b>本日は「やすみ？」という無料サービスを、三田市さんの移住・子育て支援のPR材料として一緒に使えないか、というご相談で伺いました。売り込みではなく、市の子育て世帯にプラスになる無料の道具の紹介です、と最初に安心してもらう。</div>
+  </section>
+
+  <!-- 2. SUMMARY / ASK -->
+  <section class="slide">
+    <div class="slide-head">
+      <span class="kicker">本日のご提案（サマリー）</span>
+      <h2>無料のLINEサービスを、<span class="blue">三田市の子育て支援・移住PR</span>の一つに</h2>
+      <div class="rule"></div>
+    </div>
+    <div class="grid g3" style="flex:1;align-content:center">
+      <div class="card blue"><div class="num">1</div><h3>市に予算負担なし</h3><p>開発・運営は私たちが負担。生徒・保護者は完全無料でお使いいただけます。</p></div>
+      <div class="card red"><div class="num">2</div><h3>三田市と相性が抜群</h3><p>「午前7時・市に警報→自動休校」という三田市の統一ルールを、そのまま自動再現できます。</p></div>
+      <div class="card green"><div class="num">3</div><h3>移住の訴求材料になる</h3><p>「子育てしやすい街」を語る具体的な安心材料として、移住ポータルやSNSで紹介いただけます。</p></div>
+    </div>
+    <p class="lead" style="margin-top:26px">お願いしたいこと：<b>「さんだうぇるかむサイト」やInstagram等での紹介・後押し</b>と、<b>学校・教育委員会への橋渡し</b>です。</p>
+    <div class="notes" hidden>ここで結論を先に言い切る。<b>「予算はいりません／三田のルールにピタッと合います／移住PRの具体材料になります」</b>の3点。詳細はこの後、と道筋を示す。お願いは"紹介と橋渡し"の2つだけ、と負担の軽さを強調。</div>
+    <div class="foot"><span class="fbrand">やすみ<em>？</em></span><span>三田市 移住定住促進課 御中</span></div>
+  </section>
+
+  <!-- 3. PROBLEM -->
+  <section class="slide">
+    <div class="slide-head">
+      <span class="kicker">こんな朝、ありませんか</span>
+      <h2>台風・大雪の朝の「今日、学校ある？」問題</h2>
+      <div class="rule"></div>
+    </div>
+    <div style="display:flex;gap:40px;flex:1;align-items:center">
+      <div style="flex:1.1">
+        <ul class="check">
+          <li>荒天の朝、保護者と子どもが<b>それぞれスマホで気象情報を確認</b>してソワソワ。</li>
+          <li>「三田市に警報は出ている？」「うちの学校のルールでは休み？」を毎回自力で照合。</li>
+          <li>判断を誤ると<b>荒天の中を登校させてしまう</b>／逆に<b>行けたのに休ませてしまう</b>。</li>
+          <li>共働き世帯ほど、朝の数分の判断が<b>出勤・在宅の段取りを直撃</b>する。</li>
+        </ul>
+      </div>
+      <div style="flex:.9">
+        <div class="quote">毎年、台風や大雪のたびに繰り返される<b>「小さな、でも確実なストレス」</b>。<br>子育て世帯の“朝の安心”に、直接効く課題です。</div>
+      </div>
+    </div>
+    <div class="notes" hidden>共感パート。相手（移住定住促進課）は子育て世帯を呼び込みたい人たち。だから「子育て世帯の朝の負担」という切り口で刺す。特に<b>共働き・移住してきたばかりで土地勘がない家庭</b>ほど、この判断が難しい、という点を口頭で足すと移住文脈につながる。</div>
+    <div class="foot"><span class="fbrand">やすみ<em>？</em></span><span>課題</span></div>
+  </section>
+
+  <!-- 4. SANDA RULE -->
+  <section class="slide">
+    <div class="slide-head">
+      <span class="kicker">三田市のルール</span>
+      <h2>三田市には、明快な<span class="blue">統一休校ルール</span>があります</h2>
+      <div class="rule"></div>
+    </div>
+    <div style="display:flex;gap:36px;flex:1;align-items:center">
+      <div style="flex:1.2">
+        <div class="quote">
+          午前<b>7時</b>の時点で<b>「三田市」に気象警報</b>（暴風・大雨・洪水・大雪・特別警報等）が発表されている場合、<br><b>学校からの連絡なしに、自動的に臨時休校</b>。<br>（波浪・高潮警報は対象外）
+          <span class="src">出典：三田市 学校ページ「気象警報発表時の対応について」／各市立中学校の緊急対応ページ</span>
+        </div>
+      </div>
+      <div style="flex:.85">
+        <p class="lead" style="margin-bottom:16px">つまり保護者は、毎回自分で<br><b class="red">「7時・三田市・警報の種類」</b><br>を確認するしかない。</p>
+        <p class="lead">この確認を<b>自動化</b>するのが「やすみ？」です。</p>
+      </div>
+    </div>
+    <div class="notes" hidden>ここが商談の肝。<b>三田市は"連絡なしで自動休校"</b>＝つまり判断が完全に保護者任せ。だからこそ自動でお知らせする価値が大きい。しかもルールが市統一なので、私たちは<b>たった1つのルール登録で三田市内すべての学校をカバーできる</b>（次スライドで数字化）。この明快さは全国的にも珍しく、三田市は"やすみ？"がハマる理想的な街だと伝える。</div>
+    <div class="foot"><span class="fbrand">やすみ<em>？</em></span><span>三田市のルール</span></div>
+  </section>
+
+  <!-- 5. 6 STEPS -->
+  <section class="slide">
+    <div class="slide-head">
+      <span class="kicker">保護者の手間</span>
+      <h2>その判断、実は毎回この<span class="blue">6ステップ</span></h2>
+      <div class="rule"></div>
+    </div>
+    <div class="flow">
+      <div class="step"><div class="s-n">STEP 1</div><div class="s-t">気象情報を確認</div><div class="s-d">気象庁・TV・アプリを見る</div></div>
+      <div class="arrow">›</div>
+      <div class="step"><div class="s-n">STEP 2</div><div class="s-t">対象地域を確認</div><div class="s-d">三田市に出ているか</div></div>
+      <div class="arrow">›</div>
+      <div class="step"><div class="s-n">STEP 3</div><div class="s-t">警報の種類を確認</div><div class="s-d">暴風・大雨…／波浪は対象外</div></div>
+      <div class="arrow">›</div>
+      <div class="step"><div class="s-n">STEP 4</div><div class="s-t">学校ルールと照合</div><div class="s-d">7時基準・自動休校か</div></div>
+    </div>
+    <div class="flow" style="margin-top:18px">
+      <div class="step"><div class="s-n">STEP 5</div><div class="s-t">現在時刻と照合</div><div class="s-d">7時を過ぎたか、継続か</div></div>
+      <div class="arrow">›</div>
+      <div class="step"><div class="s-n">STEP 6</div><div class="s-t">登校要否を判断</div><div class="s-d">休校か、通常登校か</div></div>
+      <div class="arrow" style="opacity:0">›</div>
+      <div class="step" style="background:var(--blue);border:none">
+        <div class="s-n" style="color:#D2E3FC">やすみ？なら</div>
+        <div class="s-t" style="color:#fff">全部、自動。</div>
+        <div class="s-d" style="color:#D2E3FC">結果だけLINEに届く</div>
+      </div>
+    </div>
+    <div class="notes" hidden>PRD由来の6ステップ。荒天で気が動転している朝に、これを毎回やるのは大変、と体感で伝える。最後の青いカードで"やすみ？なら全部自動"と落とす。ここはテンポよく、指で1→2→3と追いながら話すと伝わる。</div>
+    <div class="foot"><span class="fbrand">やすみ<em>？</em></span><span>保護者の手間</span></div>
+  </section>
+
+  <!-- 6. WHAT IS IT -->
+  <section class="slide">
+    <div class="slide-head">
+      <span class="kicker">やすみ？とは</span>
+      <h2>警報 × 学校ルールを、<span class="blue">結果</span>に変えてお知らせ</h2>
+      <div class="rule"></div>
+    </div>
+    <p class="lead" style="margin-bottom:28px">「今どんな警報が出ているか」ではなく、知りたいのは<b>「今日、学校あるの？」</b>。<br>やすみ？は気象庁の公式データと学校のルールを突き合わせ、<b>答えそのもの</b>をLINEに届けます。</p>
+    <div class="chips">
+      <div class="chip normal"><span class="dot"></span>通常登校</div>
+      <div class="chip am"><span class="dot"></span>午前休</div>
+      <div class="chip wait"><span class="dot"></span>自宅待機</div>
+      <div class="chip off"><span class="dot"></span>休校</div>
+    </div>
+    <p class="lead" style="margin-top:28px"><span class="pill">三田市の場合</span> 統一ルールに沿って、実質<b>「休校」か「通常登校」か</b>を自動でお知らせします。</p>
+    <div class="notes" hidden>プロダクトの中心価値＝"警報通知"ではなく"今日学校ある？への答え"。4つの状態は他地域の学校ルールにも対応できる汎用性の証明。ただし三田市は2択で明快、と地元に寄せて締める。気象庁の"公式データ"を使う点は信頼性の担保として必ず言う。</div>
+    <div class="foot"><span class="fbrand">やすみ<em>？</em></span><span>サービス概要</span></div>
+  </section>
+
+  <!-- 7. HOW TO USE -->
+  <section class="slide">
+    <div class="slide-head">
+      <span class="kicker">使い方</span>
+      <h2>準備は<span class="blue">3ステップ</span>・アプリのDLは不要</h2>
+      <div class="rule"></div>
+    </div>
+    <div class="grid g3" style="flex:1;align-content:center">
+      <div class="card blue"><div class="num">1</div><h3>友だち追加</h3><p>LINE公式アカウントを友だち追加するだけ。新しいアプリのインストールは不要です。</p></div>
+      <div class="card red"><div class="num">2</div><h3>学校を登録</h3><p>お子さんの通う学校（三田市立◯◯小学校 など）を選んで登録します。</p></div>
+      <div class="card green"><div class="num">3</div><h3>あとは待つだけ</h3><p>休校などに該当したら、朝、自動でLINEに通知。毎回の確認はもう不要です。</p></div>
+    </div>
+    <p class="lead muted" style="margin-top:26px">※ 普段使っているLINEの中で完結。スマホが苦手な方でも迷いにくい導線です。</p>
+    <div class="notes" hidden>移住してきたばかりのご家庭でも、LINEなら誰でも持っている＝導入障壁ゼロ、を強調。"アプリDL不要・LINEだけ"は行政の人にも刺さるポイント（配布・案内がしやすい）。</div>
+    <div class="foot"><span class="fbrand">やすみ<em>？</em></span><span>使い方</span></div>
+  </section>
+
+  <!-- 8. THREE FEATURES -->
+  <section class="slide">
+    <div class="slide-head">
+      <span class="kicker">3つの特長</span>
+      <h2>だから、<span class="blue">安心して配れる</span></h2>
+      <div class="rule"></div>
+    </div>
+    <div class="grid g3" style="flex:1;align-content:center">
+      <div class="card blue"><div class="num">📱</div><h3>アプリ不要</h3><p>LINEだけで完結。誰もが持っている基盤の上で動くので、案内・配布がしやすい。</p></div>
+      <div class="card green"><div class="num">¥0</div><h3>完全無料</h3><p>生徒・保護者の利用は無料。市にも費用負担は発生しません。</p></div>
+      <div class="card red"><div class="num">🔒</div><h3>個人情報は最小</h3><p><b>本名・住所・電話番号・GPS位置情報は一切保存しません。</b>安心してご紹介いただけます。</p></div>
+    </div>
+    <div class="notes" hidden>行政が一番気にするのは"個人情報"と"お金"。だから3枚目のPII最小は強めに。<b>本名・住所・電話・GPSを保存しない</b>（PRD準拠）＝万一の情報事故リスクが構造的に低い、と説明。無料も"市の予算執行が不要＝紹介のハードルが低い"に翻訳して話す。</div>
+    <div class="foot"><span class="fbrand">やすみ<em>？</em></span><span>特長</span></div>
+  </section>
+
+  <!-- 9. WHY GREAT FIT -->
+  <section class="slide">
+    <div class="slide-head">
+      <span class="kicker">三田市との相性</span>
+      <h2>三田市は、やすみ？が<span class="blue">最もハマる街</span></h2>
+      <div class="rule"></div>
+    </div>
+    <div style="display:flex;gap:40px;flex:1;align-items:center">
+      <div style="flex:1">
+        <ul class="check">
+          <li><b>市統一ルール</b>だから、<b>たった1つのルール登録で市内をまるごとカバー</b>できる。</li>
+          <li>「午前7時・三田市に警報」という判定を、システムがそのまま自動再現。</li>
+          <li>「波浪・高潮は対象外」といった細かい条件もルールに反映可能。</li>
+          <li>“連絡なしで自動休校”＝保護者任せの判断を、通知が肩代わりする。</li>
+        </ul>
+      </div>
+      <div style="flex:.8;display:flex;flex-direction:column;gap:28px;align-items:center">
+        <div class="stat" style="text-align:center"><div class="big">20 / 8 / 1</div><div class="lbl">市立の 小学校 / 中学校 / 特別支援学校</div></div>
+        <div class="stat" style="text-align:center"><div class="big red">1</div><div class="lbl">これらを1ルールでカバー可能</div></div>
+      </div>
+    </div>
+    <div class="notes" hidden>技術的な"効く理由"を数字で。全国だと学校ごとにルールがバラバラで登録が大変だが、<b>三田は市統一なので1ルールで全28校＋特支をカバー</b>＝私たちの運用コストも極小＝だから無料で回せる、と論理をつなぐ。学校数の出典は三田市立学校一覧。</div>
+    <div class="foot"><span class="fbrand">やすみ<em>？</em></span><span>相性</span></div>
+  </section>
+
+  <!-- 10. CONTEXT -->
+  <section class="slide">
+    <div class="slide-head">
+      <span class="kicker">三田市の文脈</span>
+      <h2>“子世代の確保”は、三田市の<span class="blue">最重要テーマ</span></h2>
+      <div class="rule"></div>
+    </div>
+    <div class="grid g3" style="margin-bottom:22px">
+      <div class="card"><div class="stat"><div class="big">115,061</div><div class="lbl">人口ピーク（2011年9月）</div></div></div>
+      <div class="card"><div class="stat"><div class="big red">107,603</div><div class="lbl">2023年6月末（減少局面へ）</div></div></div>
+      <div class="card"><div class="stat"><div class="big green">↑ 高齢化率</div><div class="lbl">ニュータウンの一斉高齢化が進行</div></div></div>
+    </div>
+    <p class="lead">かつて全国トップ級の人口増を誇ったニュータウンの街も、いま<b>「オールドタウン化」と子世代の転出超過</b>が課題。<br>だからこそ<b class="blue">子育て世帯に選ばれること</b>が、移住定住施策の核心になります。</p>
+    <p class="muted" style="margin-top:12px;font-size:14px">出典：神戸新聞（2021・2023）／三田市 人口ビジョン・フラワータウン再生ビジョン</p>
+    <div class="notes" hidden>相手の"仕事のゴール"に寄り添うパート。移住定住促進課のミッション＝子世代・ファミリーの確保。人口ピーク2011年→減少、オールドタウン化という三田自身の課題を正確に踏まえた上で、"やすみ？は子育て世帯の満足度・定着に効く小さな一手"と位置づける。数字は出典付きで正確に。</div>
+    <div class="foot"><span class="fbrand">やすみ<em>？</em></span><span>三田市の文脈</span></div>
+  </section>
+
+  <!-- 11. MIGRATION WEAPON -->
+  <section class="slide">
+    <div class="slide-head">
+      <span class="kicker">移住・子育て支援の武器に</span>
+      <h2>“子育てしやすい街”を、<span class="blue">具体で語れる</span></h2>
+      <div class="rule"></div>
+    </div>
+    <div style="display:flex;gap:40px;flex:1;align-items:center">
+      <div style="flex:1">
+        <ul class="check">
+          <li>移住検討者は「補助金」だけでなく<b>日々の暮らしやすさ・安心</b>を重視する。</li>
+          <li>やすみ？は<b>ゼロ予算で追加できる“子育て支援メニュー”</b>。すぐ始められる。</li>
+          <li>「三田市はこんな細やかな支援まである」という<b>ストーリーの具体例</b>になる。</li>
+          <li>移住してきた家庭ほど土地勘がなく、<b>荒天時の学校判断で助かる</b>実利がある。</li>
+        </ul>
+      </div>
+      <div style="flex:.85">
+        <div class="quote"><b>「補助金の街」</b>から<br><b>「暮らしの安心まで行き届く街」</b>へ。<br><br>やすみ？は、その一行を<br>裏づける小さな証拠になります。</div>
+      </div>
+    </div>
+    <div class="notes" hidden>ここで"移住PR"に完全に接続。補助金は他市も横並びで差がつきにくい。差がつくのは"暮らしの手触り"。やすみ？のような細やかな支援の積み重ねが「子育てしやすい街」の説得力になる、という論。移住者ほど実利があるのも忘れず。</div>
+    <div class="foot"><span class="fbrand">やすみ<em>？</em></span><span>移住の武器</span></div>
+  </section>
+
+  <!-- 12. VALUE -->
+  <section class="slide">
+    <div class="slide-head">
+      <span class="kicker">三田市にとっての価値</span>
+      <h2>市の負担ゼロで、<span class="blue">4つのプラス</span></h2>
+      <div class="rule"></div>
+    </div>
+    <div class="grid g4" style="flex:1;align-content:center">
+      <div class="card blue"><div class="num">💰</div><h3>予算ほぼ不要</h3><p>紹介・案内にご協力いただくだけ。運営費の負担はありません。</p></div>
+      <div class="card red"><div class="num">🌱</div><h3>支援メニュー+1</h3><p>子育て支援の選択肢を、すぐに一つ増やせます。</p></div>
+      <div class="card yellow"><div class="num">📣</div><h3>PR材料になる</h3><p>移住ポータル・SNSで語れる具体的な安心の事例に。</p></div>
+      <div class="card green"><div class="num">☀️</div><h3>朝の負担軽減</h3><p>市民（子育て世帯）の“荒天の朝”の手間とストレスを減らせます。</p></div>
+    </div>
+    <div class="notes" hidden>ここは"相手にとってのメリット"の総括。4枚を「予算いらない／メニュー増える／PRで使える／市民が助かる」とテンポよく。とくに移住定住促進課の評価軸（PRに使える・子育て支援の充実）にヒットするよう2枚目3枚目を厚めに話す。</div>
+    <div class="foot"><span class="fbrand">やすみ<em>？</em></span><span>市の価値</span></div>
+  </section>
+
+  <!-- 13. THE ASK -->
+  <section class="slide">
+    <div class="slide-head">
+      <span class="kicker">ご一緒したいこと</span>
+      <h2>お願いしたいのは、<span class="blue">この3つ</span></h2>
+      <div class="rule"></div>
+    </div>
+    <div class="grid g3" style="flex:1;align-content:center">
+      <div class="card blue"><div class="num">1</div><h3>移住・子育て情報で紹介</h3><p>「さんだうぇるかむサイト」や子育て情報のページで、暮らしの支援の一つとしてご掲載を。</p></div>
+      <div class="card red"><div class="num">2</div><h3>SNSでの発信</h3><p>Instagram <b>@sanda_welcome_</b> 等で、移住・子育て世帯へ届けていただく。</p></div>
+      <div class="card green"><div class="num">3</div><h3>学校・教委への橋渡し</h3><p>正式な連絡手段への発展も見据え、教育委員会・学校とお話しする機会を。</p></div>
+    </div>
+    <p class="lead" style="margin-top:26px">まずは<b>小さく紹介</b>から。効果を見ながら、無理なく広げていければと考えています。</p>
+    <div class="notes" hidden>お願いは具体的に、かつ"軽い"順で。1紹介、2SNS、3橋渡し。相手が実際に持っているチャネル（さんだうぇるかむサイト／@sanda_welcome_）を名指しすると"ちゃんと調べてきた感"が出て信頼される。最後は"まず小さく"で心理的ハードルを下げる。</div>
+    <div class="foot"><span class="fbrand">やすみ<em>？</em></span><span>お願い</span></div>
+  </section>
+
+  <!-- 14. TRUST -->
+  <section class="slide">
+    <div class="slide-head">
+      <span class="kicker">安心してご紹介いただける理由</span>
+      <h2>行政のみなさまが気にする点に、<span class="blue">先回り</span></h2>
+      <div class="rule"></div>
+    </div>
+    <div class="grid g2" style="flex:1;align-content:center">
+      <div class="card"><h3>🛰 気象庁の公式データを使用</h3><p>判定の根拠は気象庁の防災情報。独自の“予測”で煽ることはしません。</p></div>
+      <div class="card"><h3>🔒 個人情報は最小限</h3><p>本名・住所・電話番号・GPSは保存しません。LINE基盤上で安全に運用。</p></div>
+      <div class="card"><h3>💬 既存通知の代替ではない</h3><p>学校公式連絡を置き換えるものではなく、あくまで“補助的なお知らせ”です。</p></div>
+      <div class="card"><h3>🏫 学生・保護者はずっと無料</h3><p>利用者に課金しません。市民に金銭負担が生じることはありません。</p></div>
+    </div>
+    <div class="notes" hidden>反論・懸念の先回り。想定される不安は「勝手に休校を判断して混乱しないか」「個人情報」「学校の公式連絡と競合しないか」「お金」。それぞれに一言で答える。特に"公式連絡の代替ではなく補助"は、教委への橋渡しをお願いする上で重要な線引き。</div>
+    <div class="foot"><span class="fbrand">やすみ<em>？</em></span><span>安心材料</span></div>
+  </section>
+
+  <!-- 15. FUTURE -->
+  <section class="slide">
+    <div class="slide-head">
+      <span class="kicker">将来像（ご参考）</span>
+      <h2>“今日学校ある？”から、<span class="blue">地域の安心</span>へ</h2>
+      <div class="rule"></div>
+    </div>
+    <div class="flow">
+      <div class="step"><div class="s-n">STEP 1 ・ 今</div><div class="s-t">保護者が使う無料通知</div><div class="s-d">警報×ルールで登校要否を自動お知らせ</div></div>
+      <div class="arrow">›</div>
+      <div class="step"><div class="s-n">STEP 2</div><div class="s-t">学校が“公式発信元”に</div><div class="s-d">学校からの確実な休校連絡（任意・有料SaaS）</div></div>
+      <div class="arrow">›</div>
+      <div class="step"><div class="s-n">STEP 3</div><div class="s-t">地域の防災通知へ</div><div class="s-d">子育て世帯向けの地域お知らせ基盤に拡張</div></div>
+    </div>
+    <p class="lead" style="margin-top:26px">まずは無料の保護者向け通知から。将来的に、学校・地域と連携した<b>安心のインフラ</b>へ育てたいと考えています。</p>
+    <div class="notes" hidden>ビジョンを軽く見せて"一過性の思いつきではない"ことを示す。ただし今日のお願い（無料の保護者向け紹介）から離れすぎないよう、Step2以降は"将来的に・任意で"と明確にトーンを落とす。有料SaaSの話は今日は深追いしない。</div>
+    <div class="foot"><span class="fbrand">やすみ<em>？</em></span><span>将来像</span></div>
+  </section>
+
+  <!-- 16. CLOSING -->
+  <section class="slide" id="s-close">
+    <span class="kicker">ありがとうございました</span>
+    <h2 style="margin-top:18px">三田市の子育て世帯の<br><span class="blue">“朝</span><span class="red">の</span><span class="yellow">安</span><span class="green">心”</span>を、一緒に。</h2>
+    <p class="lead" style="margin-top:18px">無料で、市の負担なく、すぐに始められます。<br>まずは「小さく紹介」から、ぜひご一緒させてください。</p>
+    <div class="contact">
+      <div class="c"><div class="k">サービス</div><div class="v">やすみ？（LINEミニアプリ）</div></div>
+      <div class="c"><div class="k">提供</div><div class="v">UniSchool</div></div>
+      <div class="c"><div class="k">お問い合わせ</div><div class="v">（担当・連絡先を記入）</div></div>
+    </div>
+    <div class="notes" hidden>クロージング。感謝→"朝の安心を一緒に"の一言でエモーショナルに締める。連絡先スライドは実物に置き換える（QRコード＝LINE友だち追加リンクをここに貼ると、その場で試してもらえて強い）。デモできるなら、この後スマホで実機を見せるのがベスト。</div>
+    <div class="foot"><span class="fbrand">やすみ<em>？</em></span><span>Thank you</span></div>
+  </section>
+
+</div></div>
+
+<div id="counter">1 / 16</div>
+<div id="hint"><kbd>←</kbd> <kbd>→</kbd> でめくる ・ <kbd>S</kbd> でスピーカーノート ・ <kbd>F</kbd> で全画面</div>
+<div id="notes"><div class="nt">SPEAKER NOTES / トークスクリプト</div><div class="nc" id="notes-body"></div></div>
+
+<script>
+(function(){
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var total = slides.length;
+  var i = 0;
+  var counter = document.getElementById('counter');
+  var progress = document.getElementById('progress');
+  var notesPanel = document.getElementById('notes');
+  var notesBody = document.getElementById('notes-body');
+  var notesOn = false;
+
+  var h = parseInt((location.hash||'').replace('#',''),10);
+  if(!isNaN(h) && h>=1 && h<=total) i = h-1;
+
+  function render(){
+    slides.forEach(function(s,n){ s.classList.toggle('active', n===i); });
+    counter.textContent = (i+1)+' / '+total;
+    progress.style.width = ((i+1)/total*100)+'%';
+    location.hash = (i+1);
+    var note = slides[i].querySelector('.notes');
+    notesBody.innerHTML = note ? note.innerHTML : '<i>（このスライドのノートはありません）</i>';
+  }
+  function go(n){ i = Math.max(0, Math.min(total-1, n)); render(); }
+  function next(){ go(i+1); }
+  function prev(){ go(i-1); }
+
+  document.addEventListener('keydown', function(e){
+    switch(e.key){
+      case 'ArrowRight': case 'PageDown': case ' ': next(); e.preventDefault(); break;
+      case 'ArrowLeft': case 'PageUp': prev(); e.preventDefault(); break;
+      case 'Home': go(0); break;
+      case 'End': go(total-1); break;
+      case 's': case 'S': notesOn=!notesOn; notesPanel.classList.toggle('show', notesOn); break;
+      case 'f': case 'F':
+        if(!document.fullscreenElement){ document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen(); }
+        else { document.exitFullscreen&&document.exitFullscreen(); }
+        break;
+    }
+  });
+
+  document.getElementById('viewport').addEventListener('click', function(e){
+    var x = e.clientX / window.innerWidth;
+    if(x < 0.28) prev(); else next();
+  });
+
+  var tx=null;
+  document.addEventListener('touchstart', function(e){ tx = e.touches[0].clientX; }, {passive:true});
+  document.addEventListener('touchend', function(e){
+    if(tx===null) return; var dx = e.changedTouches[0].clientX - tx;
+    if(Math.abs(dx)>50){ dx<0 ? next() : prev(); } tx=null;
+  }, {passive:true});
+
+  var stage = document.getElementById('stage');
+  function fit(){
+    var s = Math.min(window.innerWidth/1280, window.innerHeight/720);
+    stage.style.transform = 'translate(-50%,-50%) scale('+s+')';
+  }
+  window.addEventListener('resize', fit);
+  window.addEventListener('hashchange', function(){
+    var hh = parseInt((location.hash||'').replace('#',''),10);
+    if(!isNaN(hh) && (hh-1)!==i){ go(hh-1); }
+  });
+
+  fit(); render();
+})();
+</script>
+</body>
+</html>

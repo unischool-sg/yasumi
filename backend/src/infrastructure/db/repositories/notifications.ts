@@ -13,6 +13,8 @@ export interface NotificationInput {
   targetDate: string; // "YYYY-MM-DD"
   status: string; // 判定結果 (CheckResult) など
   sentAt?: Date | null;
+  /** 送ろうとした本文（診断用）。 */
+  messageText?: string | null;
 }
 
 /**
@@ -32,6 +34,7 @@ export async function createNotificationIfAbsent(
       targetDate: input.targetDate,
       status: input.status,
       sentAt: input.sentAt ?? null,
+      messageText: input.messageText ?? null,
     })
     .onConflictDoNothing({
       target: [notifications.userId, notifications.schoolId, notifications.ruleId, notifications.targetDate],
@@ -42,9 +45,35 @@ export async function createNotificationIfAbsent(
   return row ? { created: true, row } : { created: false };
 }
 
-/** 送信完了時刻を記録。 */
-export async function markNotificationSent(db: Db, id: string, sentAt: Date): Promise<void> {
-  await db.update(notifications).set({ sentAt }).where(eq(notifications.id, id));
+/** 送信完了時刻（と経路）を記録。成功時に error をクリアする。 */
+export async function markNotificationSent(db: Db, id: string, sentAt: Date, channel?: string): Promise<void> {
+  await db
+    .update(notifications)
+    .set({ sentAt, error: null, ...(channel ? { channel } : {}) })
+    .where(eq(notifications.id, id));
+}
+
+/** 送信失敗を記録（sentAt は null のまま）。原因究明のためエラーログと経路を残す。 */
+export async function markNotificationFailed(
+  db: Db,
+  id: string,
+  opts: { channel?: string; error: string },
+): Promise<void> {
+  await db
+    .update(notifications)
+    .set({ error: opts.error.slice(0, 2000), ...(opts.channel ? { channel: opts.channel } : {}) })
+    .where(eq(notifications.id, id));
+}
+
+/** 管理画面: 通知1件を学校名付きで取得（詳細モーダル用）。 */
+export async function findNotificationById(db: Db, id: string): Promise<NotificationWithSchool | undefined> {
+  const rows = await db
+    .select({ ...getTableColumns(notifications), schoolName: schools.name })
+    .from(notifications)
+    .leftJoin(schools, eq(notifications.schoolId, schools.id))
+    .where(eq(notifications.id, id))
+    .limit(1);
+  return rows[0];
 }
 
 /** 管理画面: 通知一覧（任意で school/date フィルタ・新しい順）。 */
