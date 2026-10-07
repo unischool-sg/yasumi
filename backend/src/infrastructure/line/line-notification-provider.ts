@@ -59,8 +59,15 @@ export class LineNotificationProvider implements NotificationProvider {
       body: JSON.stringify({ to: target.lineUserId, messages: [line] }),
     });
     if (!res.ok) {
+      // 原因究明のため LINE API のレスポンス本文（message/details）を取り込む。
+      let body = "";
+      try {
+        body = (await res.text()).slice(0, 1000);
+      } catch {
+        // 本文が読めなくても status だけで続行。
+      }
       // 400 は多くの場合「未友だち／ブロック」。呼び出し側が区別できるよう status を載せる。
-      throw new PushDeliveryError(res.status, `LINE push failed (HTTP ${res.status})`);
+      throw new PushDeliveryError(res.status, `LINE push failed (HTTP ${res.status})${body ? `: ${body}` : ""}`);
     }
   }
 }

@@ -323,6 +323,12 @@ export const notifications = pgTable(
     targetDate: date("target_date").notNull(),
     status: varchar("status", { length: 50 }).notNull(),
     sentAt: timestamp("sent_at", { withTimezone: true }),
+    // 送信チャネル（"fcm" | "line"）。詳細モーダルで経路を示す。送信試行時に確定。
+    channel: varchar("channel", { length: 10 }),
+    // 実際に送ろうとした本文（診断用）。作成時に保存。
+    messageText: text("message_text"),
+    // 送信失敗時のエラーログ（未友だち/APIエラー等）。成功時は null。
+    error: text("error"),
   },
   (t) => [unique("notifications_unique").on(t.userId, t.schoolId, t.ruleId, t.targetDate)],
 );

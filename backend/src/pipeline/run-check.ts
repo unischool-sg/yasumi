@@ -211,23 +211,36 @@ export async function runCheck(
         ruleId: ruleRow.id,
         targetDate,
         status: storedResult,
+        messageText: text,
       });
       if (!notifCreated || !notifRow) continue;
 
       // 通知先の解決: デバイストークンがあれば FCM(無料)、無ければ LINE プッシュ(フォールバック)
       const deviceTokens = await deviceTokensRepo.listTokensByUser(deps.db, sub.userId);
       const push = deps.pushProvider;
+      const channel = deviceTokens.length > 0 && push ? "fcm" : "line";
       try {
-        if (deviceTokens.length > 0 && push) {
+        if (channel === "fcm" && push) {
           await push.send({ deviceTokens }, { text });
         } else {
           const lineUserId = await usersRepo.getLineUserId(deps.db, sub.userId);
-          if (!lineUserId) continue;
+          if (!lineUserId) {
+            // LINE 連携が無く FCM も無い → 配信手段なし。原因が追えるよう記録して次へ。
+            await notificationsRepo.markNotificationFailed(deps.db, notifRow.id, {
+              channel,
+              error: "配信先なし: LINEユーザーID未登録（LINE未連携）かつデバイストークン無し",
+            });
+            summary.skippedUndeliverable++;
+            continue;
+          }
           await deps.notificationProvider.send({ lineUserId }, { text });
         }
-        await notificationsRepo.markNotificationSent(deps.db, notifRow.id, now());
+        await notificationsRepo.markNotificationSent(deps.db, notifRow.id, now(), channel);
         summary.notificationsSent++;
       } catch (e) {
+        // 失敗の原因（APIレスポンス等）を履歴に残す（管理画面の詳細モーダルで確認）。
+        const error = e instanceof Error ? (e.stack ?? e.message) : String(e);
+        await notificationsRepo.markNotificationFailed(deps.db, notifRow.id, { channel, error });
         // 未友だち等で LINE 配信不能な場合は通常エラーと区別（運用アラートを鳴らさない）。
         if (isUndeliverablePushError(e)) summary.skippedUndeliverable++;
         else summary.errors++;

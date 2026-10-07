@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import type { Warning } from "@yasumi/shared";
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
@@ -296,5 +297,33 @@ suite("runCheck pipeline", () => {
     expect(summary.skippedUndeliverable).toBe(1);
     expect(summary.errors).toBe(0);
     expect(summary.notificationsSent).toBe(0);
+
+    // 失敗でも通知行は残り、原因究明用に本文・経路・エラーログが保存される。
+    const [row] = await db.select().from(schema.notifications).where(eq(schema.notifications.userId, userId));
+    expect(row?.sentAt).toBeNull();
+    expect(row?.channel).toBe("line");
+    expect(row?.messageText).toContain("午前");
+    expect(row?.error).toContain("HTTP 400");
+  });
+
+  it("送信成功時は channel を記録し error は null", async () => {
+    const s = await createSchool(db, { name: "成功校", prefecture: "兵庫県" });
+    await cfg.setAreaCodes(db, s.id, [SANDA]);
+    await cfg.setWarningTypes(db, s.id, ["暴風警報"]);
+    await createRule(db, { schoolId: s.id, checkTime: "12:00", result: "FULL_OFF" });
+    const { userId } = await findOrCreateByLineUserId(db, "Ucron_ok");
+    await upsertSubscription(db, { userId, schoolId: s.id });
+
+    const at1200 = new Date("2026-09-09T12:00:00+09:00");
+    const summary = await runCheck(
+      { db, warningProvider: providerReturning(activeStorm), notificationProvider: notifier, now: () => at1200 },
+      { triggeredAt: at1200 },
+    );
+
+    expect(summary.notificationsSent).toBe(1);
+    const [row] = await db.select().from(schema.notifications).where(eq(schema.notifications.userId, userId));
+    expect(row?.sentAt).not.toBeNull();
+    expect(row?.channel).toBe("line");
+    expect(row?.error).toBeNull();
   });
 });
