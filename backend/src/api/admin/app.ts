@@ -5,6 +5,8 @@ import { z } from "zod";
 import type { Db } from "../../infrastructure/db/client.ts";
 import type { NotificationProvider } from "../../domain/notification/provider.ts";
 import { notifyUser } from "../../domain/notification/dispatch.ts";
+import { buildNotificationText } from "../../domain/notification/messages.ts";
+import { deliverNotification } from "../../domain/notification/send.ts";
 import { makeMessageRenderer } from "../../domain/notification/render.ts";
 import { prepareLogo } from "../../domain/logo.ts";
 import { postDiscordMessage } from "../../infrastructure/discord/notify.ts";
@@ -31,7 +33,7 @@ import * as subsRepo from "../../infrastructure/db/repositories/subscriptions.ts
 import * as teachersRepo from "../../infrastructure/db/repositories/teachers.ts";
 import * as usersRepo from "../../infrastructure/db/repositories/users.ts";
 import * as wcRepo from "../../infrastructure/db/repositories/warning-checks.ts";
-import { jstDateString } from "../../shared/jst.ts";
+import { jstDateString, jstHhmm } from "../../shared/jst.ts";
 
 export interface AdminAppDeps {
   db: Db;
@@ -698,6 +700,56 @@ export function createAdminApp(deps: AdminAppDeps) {
     const profile = lineUserId && deps.lineAccessToken ? await getLineProfile(deps.lineAccessToken, lineUserId) : null;
     return c.json({ ...row, lineUserId: lineUserId ?? null, profile });
   });
+
+  // テスト送信（検証用）: 実際の cron と同じ送信・ログ経路で判定通知を手動送信する。
+  // 本番の判定を待たずに「送られた時どうなるか」「ログ詳細」「トリガー経路」を確認できる。
+  // 毎回ランダムな ruleId を使うため二重通知防止に当たらず、何度でも再送・履歴確認できる。
+  app.post(
+    "/schools/:id/test-notify",
+    zValidator(
+      "json",
+      z.object({
+        result: checkResultSchema,
+        target: z.discriminatedUnion("type", [
+          z.object({ type: z.literal("subscribers") }), // この学校の通知ONの購読者全員
+          z.object({ type: z.literal("lineUser"), lineUserId: z.string().min(1).max(255) }), // 指定LINEユーザーのみ（自分宛で安全に検証）
+        ]),
+      }),
+    ),
+    async (c) => {
+      if (!deps.notificationProvider) return c.json({ error: "notificationProvider が未設定です（LINE未配線）" }, 400);
+      const schoolId = c.req.param("id");
+      const { result, target } = c.req.valid("json");
+      const school = await schoolsRepo.findSchoolById(db, schoolId);
+      if (!school) return c.json({ error: "not found" }, 404);
+
+      const now = deps.now ?? (() => new Date());
+      const targetDate = jstDateString(now());
+      const checkTime = jstHhmm(now());
+      const text = buildNotificationText({ result, schoolName: school.name, checkTime, matchedWarnings: [] });
+      const ruleId = crypto.randomUUID(); // テスト毎に一意 → 再送可能・履歴が重複しない
+
+      const userIds =
+        target.type === "subscribers"
+          ? (await subsRepo.listEnabledSubscribersBySchool(db, schoolId)).map((s) => s.userId)
+          : [(await usersRepo.findOrCreateByLineUserId(db, target.lineUserId)).userId];
+
+      const deliverDeps = {
+        db,
+        notificationProvider: deps.notificationProvider,
+        ...(deps.pushProvider ? { pushProvider: deps.pushProvider } : {}),
+        now,
+      };
+      const summary = { total: userIds.length, sent: 0, skippedUndeliverable: 0, errors: 0 };
+      for (const userId of userIds) {
+        const outcome = await deliverNotification(deliverDeps, { userId, schoolId, ruleId, targetDate, status: result, text });
+        if (outcome === "sent") summary.sent++;
+        else if (outcome === "undeliverable") summary.skippedUndeliverable++;
+        else if (outcome === "error") summary.errors++;
+      }
+      return c.json({ ...summary, result, targetDate, text });
+    },
+  );
 
   return app;
 }

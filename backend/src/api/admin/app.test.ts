@@ -272,6 +272,89 @@ suite("Admin API", () => {
     expect(((await r2.json()) as { sent: number }).sent).toBeGreaterThanOrEqual(2);
   });
 
+  it("テスト送信: 購読者全員へ実経路で送信し、履歴に本文・経路が記録される", async () => {
+    const sent: { lineUserId?: string; text: string }[] = [];
+    const tApp = createApp({
+      db: drizzle(sql, { schema }),
+      verifyIdToken: async (t) => ({ lineUserId: t }),
+      adminJwtSecret: SECRET,
+      notificationProvider: { send: async (target, m) => { sent.push({ lineUserId: target.lineUserId, text: m.text }); } },
+    });
+    const treq = (path: string, init?: RequestInit) => tApp.fetch(new Request(`http://x${path}`, init));
+    const lr = await treq("/api/admin/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ username: suName, password: "password123" }),
+    });
+    const t = ((await lr.json()) as { token: string }).token;
+    const u1 = ((await (await treq("/api/me", { headers: bearer("Utest1") })).json()) as { userId: string }).userId;
+    const school = (await (
+      await treq("/api/admin/schools", {
+        method: "POST",
+        headers: { ...bearer(t), "content-type": "application/json" },
+        body: JSON.stringify({ name: "テスト送信校", prefecture: "兵庫県" }),
+      })
+    ).json()) as { id: string };
+    await treq(`/api/admin/users/${u1}/subscriptions`, {
+      method: "POST",
+      headers: { ...bearer(t), "content-type": "application/json" },
+      body: JSON.stringify({ schoolId: school.id }),
+    });
+
+    const res = await treq(`/api/admin/schools/${school.id}/test-notify`, {
+      method: "POST",
+      headers: { ...bearer(t), "content-type": "application/json" },
+      body: JSON.stringify({ result: "FULL_OFF", target: { type: "subscribers" } }),
+    });
+    expect(res.status).toBe(200);
+    const summary = (await res.json()) as { total: number; sent: number; text: string };
+    expect(summary.total).toBe(1);
+    expect(summary.sent).toBe(1);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.lineUserId).toBe("Utest1");
+    expect(summary.text).toContain("休校");
+
+    // 履歴に送信本文・経路・成功時刻が記録される
+    const notifs = (await (await treq(`/api/admin/notifications?schoolId=${school.id}`, { headers: bearer(t) })).json()) as { id: string; messageText: string; channel: string; sentAt: string | null }[];
+    expect(notifs).toHaveLength(1);
+    expect(notifs[0]?.channel).toBe("line");
+    expect(notifs[0]?.sentAt).not.toBeNull();
+    const detail = (await (await treq(`/api/admin/notifications/${notifs[0]!.id}`, { headers: bearer(t) })).json()) as { messageText: string; error: string | null };
+    expect(detail.messageText).toContain("休校");
+    expect(detail.error).toBeNull();
+  });
+
+  it("テスト送信: 指定LINEユーザーのみ・再送可能（毎回新規ruleIdで重複しない）", async () => {
+    const sent: string[] = [];
+    const tApp = createApp({
+      db: drizzle(sql, { schema }),
+      verifyIdToken: async (t) => ({ lineUserId: t }),
+      adminJwtSecret: SECRET,
+      notificationProvider: { send: async (target) => { sent.push(target.lineUserId ?? ""); } },
+    });
+    const treq = (path: string, init?: RequestInit) => tApp.fetch(new Request(`http://x${path}`, init));
+    const lr = await treq("/api/admin/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ username: suName, password: "password123" }),
+    });
+    const t = ((await lr.json()) as { token: string }).token;
+    const school = (await (
+      await treq("/api/admin/schools", {
+        method: "POST",
+        headers: { ...bearer(t), "content-type": "application/json" },
+        body: JSON.stringify({ name: "自分宛テスト校", prefecture: "兵庫県" }),
+      })
+    ).json()) as { id: string };
+
+    const body = JSON.stringify({ result: "UNKNOWN", target: { type: "lineUser", lineUserId: "Uself" } });
+    const r1 = await treq(`/api/admin/schools/${school.id}/test-notify`, { method: "POST", headers: { ...bearer(t), "content-type": "application/json" }, body });
+    const r2 = await treq(`/api/admin/schools/${school.id}/test-notify`, { method: "POST", headers: { ...bearer(t), "content-type": "application/json" }, body });
+    expect(((await r1.json()) as { sent: number }).sent).toBe(1);
+    expect(((await r2.json()) as { sent: number }).sent).toBe(1); // 2回目も送れる（重複にならない）
+    expect(sent).toEqual(["Uself", "Uself"]);
+  });
+
   it("フラグ: 定義・一括付与/解除・一覧反映", async () => {
     const suT = await loginToken(suName);
     const { userId } = (await (await req("/api/me", { headers: bearer("Uflag1") })).json()) as { userId: string };
