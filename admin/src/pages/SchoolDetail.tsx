@@ -1,4 +1,4 @@
-import { Autocomplete, Box, Button, Card, CardContent, Chip, Divider, MenuItem, Stack, Switch, TextField, Tooltip, Typography } from "@mui/material";
+import { Autocomplete, Box, Button, Card, CardContent, Chip, Divider, Link as MuiLink, MenuItem, Stack, Switch, TextField, Tooltip, Typography } from "@mui/material";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -15,6 +15,14 @@ const RESULTS = [
   ["FULL_OFF", "全日休校"],
 ];
 const TIMES = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`);
+// テスト送信で選べる判定結果（NORMAL は通知しないため除外し、検証用に UNKNOWN を含める）。
+const TEST_RESULTS = [
+  ["WAIT", "自宅待機"],
+  ["AM_OFF", "午前休"],
+  ["PM_START", "午後から登校"],
+  ["FULL_OFF", "全日休校"],
+  ["UNKNOWN", "判定不能（UNKNOWN）"],
+];
 
 export function SchoolDetail({ id }: { id: string }) {
   const qc = useQueryClient();
@@ -41,6 +49,10 @@ export function SchoolDetail({ id }: { id: string }) {
   const [plan, setPlan] = useState("");
   const [planExpiresAt, setPlanExpiresAt] = useState("");
   const [newTeacher, setNewTeacher] = useState({ email: "", name: "", role: "owner", password: "" });
+  const [testResult, setTestResult] = useState("FULL_OFF");
+  const [testTargetMode, setTestTargetMode] = useState<"subscribers" | "lineUser">("lineUser");
+  const [testLineUserId, setTestLineUserId] = useState("");
+  const [testSummary, setTestSummary] = useState<Awaited<ReturnType<typeof api.testNotifySchool>> | null>(null);
 
   useEffect(() => {
     if (!data) return;
@@ -108,6 +120,23 @@ export function SchoolDetail({ id }: { id: string }) {
   const sendBroadcast = () => {
     if (!window.confirm(`この学校の購読者（${subscribers.length}名）にメッセージを送信します。よろしいですか？`)) return;
     broadcastSubs.mutate();
+  };
+
+  const testNotify = useMutation({
+    mutationFn: () =>
+      api.testNotifySchool(id, {
+        result: testResult,
+        target: testTargetMode === "subscribers" ? { type: "subscribers" } : { type: "lineUser", lineUserId: testLineUserId.trim() },
+      }),
+    onSuccess: (r) => {
+      setTestSummary(r);
+      toast.success(`テスト送信しました（成功 ${r.sent} / 全 ${r.total} 件）`);
+    },
+    onError,
+  });
+  const sendTest = () => {
+    if (testTargetMode === "subscribers" && !window.confirm(`この学校の購読者（${subscribers.length}名）全員に実際の通知が送られます。よろしいですか？`)) return;
+    testNotify.mutate();
   };
 
   const savePlan = useMutation({
@@ -346,6 +375,47 @@ export function SchoolDetail({ id }: { id: string }) {
             </TextField>
             <Button variant="outlined" onClick={() => addRule.mutate()}>ルール追加</Button>
           </Stack>
+        </CardContent>
+      </Card>
+
+      <Card variant="outlined" sx={{ mt: 2 }}>
+        <CardContent>
+          <Typography variant="subtitle2" sx={{ mb: 0.5 }}>テスト送信（警報検知通知）</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
+            実際の判定パイプラインと同じ経路・文面で通知を手動送信します。送信本文・成否・エラーログ・経路（FCM/LINE）は{" "}
+            <MuiLink component="button" type="button" onClick={() => navigate({ to: "/history" })}>通知履歴</MuiLink>{" "}
+            の行をクリックすると詳細で確認できます。※NORMAL は通知対象外のため選べません。
+          </Typography>
+          <Stack direction="row" spacing={2} sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
+            <TextField size="small" select label="判定結果" value={testResult} onChange={(e) => setTestResult(e.target.value)} sx={{ width: 190 }}>
+              {TEST_RESULTS.map(([v, l]) => <MenuItem key={v} value={v}>{l}</MenuItem>)}
+            </TextField>
+            <TextField size="small" select label="送信先" value={testTargetMode} onChange={(e) => setTestTargetMode(e.target.value as "subscribers" | "lineUser")} sx={{ width: 240 }}>
+              <MenuItem value="lineUser">指定LINEユーザーのみ（自分宛で検証）</MenuItem>
+              <MenuItem value="subscribers">購読者全員（{subscribers.length}名）</MenuItem>
+            </TextField>
+            {testTargetMode === "lineUser" && (
+              <TextField size="small" label="宛先 LINE User ID" placeholder="Uxxxxxxxxxxxx…" value={testLineUserId} onChange={(e) => setTestLineUserId(e.target.value)} sx={{ width: 280 }} />
+            )}
+            <Button
+              variant="contained"
+              color="secondary"
+              onClick={sendTest}
+              disabled={testNotify.isPending || (testTargetMode === "lineUser" ? !testLineUserId.trim() : subscribers.length === 0)}
+            >
+              テスト送信
+            </Button>
+          </Stack>
+          {testSummary && (
+            <Box sx={{ mt: 2, p: 1.5, bgcolor: "#f8f9fa", borderRadius: 1, border: "1px solid #eceff1" }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                送信結果: 成功 {testSummary.sent} ／ 配信不能 {testSummary.skippedUndeliverable} ／ エラー {testSummary.errors}（全 {testSummary.total} 件・対象日 {testSummary.targetDate}）
+              </Typography>
+              <Box component="pre" sx={{ m: 0, whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 12, fontFamily: "inherit", color: "text.secondary" }}>
+                {testSummary.text}
+              </Box>
+            </Box>
+          )}
         </CardContent>
       </Card>
 
