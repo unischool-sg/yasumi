@@ -33,9 +33,11 @@ interface Props<T> {
   empty?: string;
   searchable?: boolean;
   pageSize?: number;
+  /** 行クリック時のコールバック（指定時は行をポインタ表示にする）。 */
+  onRowClick?: (row: T) => void;
 }
 
-export function DataTable<T>({ columns, data, empty, searchable = true, pageSize = 25 }: Props<T>) {
+export function DataTable<T>({ columns, data, empty, searchable = true, pageSize = 25, onRowClick }: Props<T>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize });
@@ -100,7 +102,12 @@ export function DataTable<T>({ columns, data, empty, searchable = true, pageSize
           </TableHead>
           <TableBody>
             {table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id} hover>
+              <TableRow
+                key={row.id}
+                hover
+                onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                sx={onRowClick ? { cursor: "pointer" } : undefined}
+              >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
                 ))}

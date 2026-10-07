@@ -680,6 +680,14 @@ export function createAdminApp(deps: AdminAppDeps) {
     const { schoolId, date } = c.req.valid("query");
     return c.json(await notificationsRepo.listNotifications(db, { ...(schoolId ? { schoolId } : {}), ...(date ? { targetDate: date } : {}) }));
   });
+  // 通知詳細（送信本文 / 宛先プロフィール / 成否・エラーログ）。原因究明用モーダル。
+  app.get("/notifications/:id", async (c) => {
+    const row = await notificationsRepo.findNotificationById(db, c.req.param("id"));
+    if (!row) return c.json({ error: "not found" }, 404);
+    const lineUserId = await usersRepo.getLineUserId(db, row.userId);
+    const profile = lineUserId && deps.lineAccessToken ? await getLineProfile(deps.lineAccessToken, lineUserId) : null;
+    return c.json({ ...row, lineUserId: lineUserId ?? null, profile });
+  });
 
   return app;
 }
